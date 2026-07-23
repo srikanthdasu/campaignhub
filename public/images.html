@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>CampaignHub AI - Images</title>
+
+    <link rel="stylesheet" href="css/images.css">
+
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>AI Image Gallery</h1>
+
+    <div class="top-bar">
+
+        <input
+            type="text"
+            id="prompt"
+            placeholder="Image Prompt">
+
+        <input
+            type="text"
+            id="imageUrl"
+            placeholder="Image URL">
+
+        <button onclick="saveImage()">
+            Save Image
+        </button>
+
+    </div>
+
+    <div id="gallery" class="gallery"></div>
+
+    <br>
+
+    <button onclick="window.location.href='dashboard.html'">
+        Back Dashboard
+    </button>
+
+</div>
+
+<script src="js/images.js"></script>
+
+</body>
+</html>

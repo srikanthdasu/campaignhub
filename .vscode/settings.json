@@ -1,0 +1,8 @@
+{
+    "appService.zipIgnorePattern": [
+        "node_modules{,/**}",
+        ".vscode{,/**}"
+    ],
+    "appService.defaultWebAppToDeploy": "/subscriptions/21856ec9-0786-4c41-b46c-85717a1c5244/resourceGroups/campaignhub-rg/providers/Microsoft.Web/sites/campaignhub-app",
+    "appService.deploySubpath": "."
+}

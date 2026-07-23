@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampaignHub AI - Analytics</title>
+
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/analytics.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Analytics Dashboard</h1>
+
+    <div class="charts">
+
+        <div class="chart-card">
+            <h3>Platform Usage</h3>
+            <canvas id="platformChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Daily Captions</h3>
+            <canvas id="dailyChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Top Prompts</h3>
+            <canvas id="promptChart"></canvas>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="js/analytics.js"></script>
+
+</body>
+</html>

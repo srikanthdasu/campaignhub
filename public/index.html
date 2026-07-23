@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CampaignHub AI</title>
+
+<style>
+body{
+    margin:0;
+    background:#f5f7fb;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+.container{
+    width:700px;
+    margin:40px auto;
+    background:#fff;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.1);
+}
+
+h1{
+    text-align:center;
+    color:#2563eb;
+}
+
+label{
+    display:block;
+    margin-top:20px;
+    font-weight:bold;
+}
+
+input,select{
+    width:100%;
+    padding:12px;
+    margin-top:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:16px;
+}
+
+button{
+    margin-top:25px;
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:8px;
+    background:#2563eb;
+    color:white;
+    font-size:18px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+#result{
+    margin-top:30px;
+    padding:20px;
+    border-radius:8px;
+    background:#eef4ff;
+    white-space:pre-wrap;
+}
+
+.copy{
+    margin-top:15px;
+    background:#16a34a;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🚀 CampaignHub AI</h1>
+
+<label>Campaign Prompt</label>
+
+<input
+id="prompt"
+placeholder="Example: Diwali Sale 50% OFF">
+
+<label>Platform</label>
+
+<select id="platform">
+<option>Instagram</option>
+<option>Facebook</option>
+<option>LinkedIn</option>
+<option>X</option>
+</select>
+
+<button onclick="generateCaption()">
+✨ Generate Caption
+</button>
+
+<div id="result">
+Generated caption will appear here...
+</div>
+
+<button class="copy" onclick="copyCaption()">
+📋 Copy Caption
+</button>
+
+</div>
+
+<script>
+
+async function generateCaption(){
+
+const prompt=document.getElementById("prompt").value;
+const platform=document.getElementById("platform").value;
+
+if(prompt===""){
+alert("Enter a prompt");
+return;
+}
+
+document.getElementById("result").innerHTML="Generating...";
+
+const response=await fetch(`/api/generate-caption?prompt=${encodeURIComponent(prompt)}&platform=${platform}`);
+
+const data=await response.json();
+
+if(data.success){
+document.getElementById("result").innerText=data.caption;
+}else{
+document.getElementById("result").innerText=JSON.stringify(data.error,null,2);
+}
+
+}
+
+function copyCaption(){
+
+navigator.clipboard.writeText(document.getElementById("result").innerText);
+
+alert("Caption copied!");
+
+}
+
+</script>
+
+</body>
+</html>

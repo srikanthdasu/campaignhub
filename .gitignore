@@ -1,0 +1,5 @@
+.env
+node_modules/
+*.log
+server-backup-working.js
+server.js.bak

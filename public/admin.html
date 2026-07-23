@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>CampaignHub AI - Admin</title>
+
+    <link rel="stylesheet" href="css/admin.css">
+
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>CampaignHub AI Admin Dashboard</h1>
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>Total Users</h3>
+            <h2 id="users">0</h2>
+        </div>
+
+        <div class="card">
+            <h3>Total Captions</h3>
+            <h2 id="captions">0</h2>
+        </div>
+
+        <div class="card">
+            <h3>Scheduled Posts</h3>
+            <h2 id="scheduler">0</h2>
+        </div>
+
+        <div class="card">
+            <h3>Content Plans</h3>
+            <h2 id="planner">0</h2>
+        </div>
+
+    </div>
+
+    <h2>Users</h2>
+
+    <table>
+
+        <thead>
+
+        <tr>
+
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Created</th>
+            <th>Action</th>
+
+        </tr>
+
+        </thead>
+
+        <tbody id="usersTable">
+
+        </tbody>
+
+    </table>
+
+    <h2>Recent Captions</h2>
+
+    <table>
+
+        <thead>
+
+        <tr>
+
+            <th>Prompt</th>
+            <th>Platform</th>
+            <th>Date</th>
+
+        </tr>
+
+        </thead>
+
+        <tbody id="captionsTable">
+
+        </tbody>
+
+    </table>
+
+    <h2>Scheduled Posts</h2>
+
+    <table>
+
+        <thead>
+
+        <tr>
+
+            <th>Platform</th>
+            <th>Caption</th>
+            <th>Schedule</th>
+            <th>Status</th>
+
+        </tr>
+
+        </thead>
+
+        <tbody id="schedulerTable">
+
+        </tbody>
+
+    </table>
+
+    <br>
+
+    <button onclick="window.location.href='dashboard.html'">
+
+        Back Dashboard
+
+    </button>
+
+</div>
+
+<script src="js/admin.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampaignHub AI Dashboard</title>
+
+    <link rel="stylesheet" href="/css/dashboard.css">
+
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+<div class="dashboard">
+
+    <!-- Sidebar -->
+
+    <aside class="sidebar">
+
+        <div class="logo">
+
+            <h2>CampaignHub AI</h2>
+
+        </div>
+
+        <ul class="menu">
+
+            <li class="active">
+                <i class="fa-solid fa-house"></i>
+                Dashboard
+            </li>
+
+            <li>
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Generate Caption
+            </li>
+
+            <li>
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                History
+            </li>
+
+            <li>
+                <i class="fa-solid fa-chart-line"></i>
+                Analytics
+ <li>
+    <a href="analytics.html" style="text-decoration:none;color:inherit;">
+        <i class="fa-solid fa-chart-line"></i>
+        Analytics
+    </a>
+</li>
+
+        </ul>
+
+    </aside>
+
+    <!-- Main Content -->
+
+    <main class="main-content">
+
+        <!-- Header -->
+
+        <header class="topbar">
+
+            <div>
+
+                <h1>Dashboard</h1>
+
+                <p id="welcome"></p>
+
+            </div>
+
+            <button class="logout" onclick="logout()">
+
+                Logout
+
+            </button>
+
+        </header>
+
+        <!-- Statistics -->
+
+        <section class="cards">
+
+            <div class="card">
+
+                <h3>Total Captions</h3>
+
+                <h2 id="totalCaptions">0</h2>
+
+            </div>
+
+            <div class="card">
+
+                <h3>Today's Captions</h3>
+
+                <h2 id="todayCaptions">0</h2>
+
+            </div>
+
+            <div class="card">
+
+                <h3>Total Users</h3>
+
+                <h2 id="totalUsers">0</h2>
+
+            </div>
+
+        </section>
+
+        <!-- Generator -->
+
+        <section class="generator">
+
+            <h2>Generate AI Caption</h2>
+
+            <input
+                type="text"
+                id="prompt"
+                placeholder="Enter your product, campaign or topic">
+
+            <select id="platform">
+
+                <option>Instagram</option>
+
+                <option>Facebook</option>
+
+                <option>LinkedIn</option>
+
+                <option>Twitter</option>
+
+                <option>WhatsApp</option>
+
+            </select>
+
+            <button class="generate"
+                onclick="generateCaption()">
+
+                Generate Caption
+
+            </button>
+
+            <div id="result">
+
+                Waiting for AI...
+
+            </div>
+
+        </section>
+
+        <!-- History -->
+
+        <section class="history">
+
+            <div class="history-header">
+
+                <h2>Caption History</h2>
+
+                <input
+                    type="text"
+                    id="search"
+                    placeholder="Search captions...">
+
+            </div>
+
+            <div class="history-toolbar">
+
+    <input
+        type="text"
+        id="search"
+        placeholder="🔍 Search captions...">
+
+    <select id="filterPlatform">
+
+        <option value="">All Platforms</option>
+        <option value="Instagram">Instagram</option>
+        <option value="Facebook">Facebook</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Twitter">Twitter</option>
+        <option value="WhatsApp">WhatsApp</option>
+
+    </select>
+
+</div>
+
+<div id="history"></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<script src="/js/dashboard.js"></script>
+
+</body>
+
+</html>
