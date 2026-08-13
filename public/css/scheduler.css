@@ -1,0 +1,593 @@
+/* =========================================================
+   CAMPAIGNHUB AI — SCHEDULER
+   LIGHT THEME — SAME STYLE AS CONTENT PLANNER
+   SIDEBAR IS NOT MODIFIED
+   ========================================================= */
+
+/* ---------- PAGE ---------- */
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
+
+body {
+    background: #f5f7fb;
+    color: #0f172a;
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
+}
+
+
+/* =========================================================
+   MAIN AREA
+   ========================================================= */
+
+.main {
+    background: #f5f7fb;
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 38px 40px 70px;
+}
+
+
+/* =========================================================
+   TOP HEADER
+   ========================================================= */
+
+.topbar {
+    max-width: 1400px;
+    margin: 0 auto 28px;
+
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 24px;
+
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.topbar h1 {
+    margin: 0;
+
+    color: #0b1730;
+
+    font-size: 38px;
+    line-height: 1.15;
+
+    font-weight: 800;
+    letter-spacing: -0.8px;
+}
+
+.topbar p {
+    margin: 7px 0 0;
+
+    color: #64748b;
+
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-btn {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+
+    border: none !important;
+    border-radius: 10px !important;
+
+    padding: 13px 22px !important;
+
+    font-size: 15px !important;
+    font-weight: 700 !important;
+
+    cursor: pointer;
+}
+
+.logout-btn:hover {
+    background: #dc2626 !important;
+}
+
+
+/* =========================================================
+   IMPORTANT:
+   THIS FIXES THE TWO-COLUMN LAYOUT
+   ========================================================= */
+
+.layout,
+.scheduler-layout {
+    width: 100%;
+    max-width: 1400px;
+
+    margin: 0 auto;
+
+    display: grid !important;
+
+    grid-template-columns:
+        minmax(0, 1.7fr)
+        minmax(320px, 0.75fr) !important;
+
+    gap: 28px !important;
+
+    align-items: start;
+}
+
+
+/* =========================================================
+   LEFT SCHEDULER CARD
+   ========================================================= */
+
+.panel {
+    width: 100%;
+    box-sizing: border-box;
+
+    background: #ffffff !important;
+
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+
+    padding: 32px !important;
+
+    box-shadow:
+        0 8px 25px rgba(15, 23, 42, 0.06) !important;
+}
+
+
+/* =========================================================
+   SCHEDULE A POST TITLE
+   ========================================================= */
+
+.panel h2,
+.panel h3 {
+    margin-top: 0;
+
+    color: #0b1730 !important;
+
+    font-weight: 800;
+}
+
+.panel h2 {
+    font-size: 26px;
+}
+
+.panel h3 {
+    font-size: 24px;
+}
+
+
+/* =========================================================
+   FORM FIELDS
+   ========================================================= */
+
+.field {
+    margin-bottom: 20px;
+}
+
+.field label {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #17233b !important;
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   ALL INPUTS
+   ========================================================= */
+
+.field input,
+.field select,
+.field textarea,
+
+input[type="text"],
+input[type="date"],
+input[type="time"],
+
+select,
+textarea {
+    width: 100% !important;
+
+    box-sizing: border-box;
+
+    min-height: 54px;
+
+    padding: 0 16px;
+
+    background: #ffffff !important;
+    color: #17233b !important;
+
+    border: 1px solid #d8e0ec !important;
+    border-radius: 11px !important;
+
+    font-family: inherit;
+    font-size: 15px;
+
+    outline: none;
+}
+
+
+/* =========================================================
+   TEXTAREA
+   ========================================================= */
+
+.field textarea,
+textarea {
+    min-height: 125px;
+
+    padding: 14px 16px;
+
+    resize: vertical;
+}
+
+
+/* =========================================================
+   PLACEHOLDER
+   ========================================================= */
+
+input::placeholder,
+textarea::placeholder {
+    color: #9aa9bf;
+}
+
+
+/* =========================================================
+   INPUT FOCUS
+   ========================================================= */
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: #2563eb !important;
+
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.10) !important;
+}
+
+
+/* =========================================================
+   TWO INPUTS IN ONE ROW
+   ========================================================= */
+
+.form-row,
+.date-time-row {
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 18px;
+}
+
+
+/* =========================================================
+   IF HTML USES TWO CHILD DIVS DIRECTLY
+   ========================================================= */
+
+.panel .row {
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 18px;
+
+    margin-bottom: 20px;
+}
+
+
+/* =========================================================
+   SCHEDULE BUTTON
+   ========================================================= */
+
+.btn,
+.schedule-btn,
+#scheduleBtn {
+    width: 100% !important;
+
+    min-height: 56px;
+
+    box-sizing: border-box;
+
+    background: #2563eb !important;
+    color: #ffffff !important;
+
+    border: none !important;
+    border-radius: 11px !important;
+
+    font-family: inherit;
+
+    font-size: 16px !important;
+    font-weight: 700 !important;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 7px 16px rgba(37, 99, 235, 0.18);
+}
+
+.btn:hover,
+.schedule-btn:hover,
+#scheduleBtn:hover {
+    background: #1d4ed8 !important;
+}
+
+
+/* =========================================================
+   RIGHT SIDE — QUEUE
+   ========================================================= */
+
+.queue,
+.queue-panel {
+    width: 100%;
+    box-sizing: border-box;
+
+    background: transparent !important;
+}
+
+
+/* Queue heading */
+
+.queue h2,
+.queue h3,
+.queue-panel h2,
+.queue-panel h3 {
+    margin: 0 0 18px;
+
+    color: #0b1730 !important;
+
+    font-size: 26px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   QUEUE ITEMS
+   ========================================================= */
+
+.queue-item {
+    width: 100%;
+    box-sizing: border-box;
+
+    background: #ffffff !important;
+
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+
+    padding: 20px !important;
+
+    margin-bottom: 14px;
+
+    box-shadow:
+        0 5px 18px rgba(15, 23, 42, 0.04);
+}
+
+.queue-item h4,
+.queue-item .title {
+    margin: 0 0 10px;
+
+    color: #111c33 !important;
+
+    font-size: 16px;
+    font-weight: 750;
+}
+
+.queue-item p {
+    color: #64748b !important;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   QUEUE META
+   ========================================================= */
+
+.queue-item .meta {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    margin-top: 10px;
+
+    color: #64748b;
+
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   PLATFORM BADGE
+   ========================================================= */
+
+.platform-badge {
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 5px 9px;
+
+    background: #eef4ff !important;
+    color: #2563eb !important;
+
+    border-radius: 7px;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+}
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+.status {
+    display: inline-flex;
+
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.status.ready {
+    background: #eafaf2;
+    color: #15915b;
+}
+
+.status.draft {
+    background: #fff4e5;
+    color: #c96b08;
+}
+
+.status.scheduled {
+    background: #edf4ff;
+    color: #2563eb;
+}
+
+
+/* =========================================================
+   EMPTY QUEUE
+   ========================================================= */
+
+.empty-state {
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 28px 20px;
+
+    background: #ffffff;
+
+    border: 1px dashed #d8e0ec;
+
+    border-radius: 14px;
+
+    color: #718096;
+
+    text-align: center;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   SCHEDULED POSTS BELOW
+   ========================================================= */
+
+.scheduled-posts {
+    width: 100%;
+    max-width: 1400px;
+
+    box-sizing: border-box;
+
+    margin: 28px auto 0;
+
+    padding: 30px;
+
+    background: #ffffff !important;
+
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+
+    box-shadow:
+        0 8px 25px rgba(15, 23, 42, 0.06);
+}
+
+.scheduled-posts h2,
+.scheduled-posts h3 {
+    margin-top: 0;
+
+    color: #0b1730 !important;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   DELETE
+   ========================================================= */
+
+.delete-btn {
+    background: transparent !important;
+
+    border: none !important;
+
+    color: #ef4444 !important;
+
+    cursor: pointer;
+
+    font-size: 13px;
+
+    font-weight: 700;
+}
+
+.delete-btn:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+    .main {
+        padding: 30px 25px 60px;
+    }
+
+    .layout,
+    .scheduler-layout {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+@media (max-width: 700px) {
+
+    .main {
+        padding: 24px 16px 50px;
+    }
+
+    .topbar {
+        flex-direction: column;
+    }
+
+    .topbar h1 {
+        font-size: 30px;
+    }
+
+    .panel {
+        padding: 22px !important;
+    }
+
+    .form-row,
+    .date-time-row,
+    .panel .row {
+        grid-template-columns: 1fr;
+    }
+}

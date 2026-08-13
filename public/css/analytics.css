@@ -1,16 +1,124 @@
-.container{
-    padding:30px;
+/* =========================================================
+   CAMPAIGNHUB ANALYTICS
+   Layout only
+   Existing colors are NOT changed
+========================================================= */
+
+
+/* ---------------------------------------------------------
+   SUMMARY CARDS
+--------------------------------------------------------- */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+    width: 100%;
+    margin-bottom: 28px;
 }
 
-.charts{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(400px,1fr));
-    gap:25px;
+
+/* ---------------------------------------------------------
+   TWO CHARTS SIDE BY SIDE
+--------------------------------------------------------- */
+
+.analytics-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+    width: 100%;
+    margin-bottom: 28px;
 }
 
-.chart-card{
-    background:#fff;
-    padding:20px;
-    border-radius:12px;
-    box-shadow:0 4px 10px rgba(0,0,0,.1);
+
+/* ---------------------------------------------------------
+   CHART CARDS
+--------------------------------------------------------- */
+
+.analytics-chart-grid .chart-card,
+.top-prompts-card {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+
+/* ---------------------------------------------------------
+   CHART AREA
+--------------------------------------------------------- */
+
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+
+/* Prevent Chart.js from making cards enormous */
+
+.chart-wrapper canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+
+/* ---------------------------------------------------------
+   TOP PROMPTS
+--------------------------------------------------------- */
+
+.top-prompts-card {
+    margin-bottom: 30px;
+}
+
+
+/* ---------------------------------------------------------
+   RESPONSIVE
+--------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .analytics-chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+@media (max-width: 650px) {
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+/* ---------------------------------------------------------
+   ALLOW PAGE TO SCROLL
+--------------------------------------------------------- */
+
+html,
+body {
+    min-height: 100%;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+
+.dashboard {
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
+}
+
+
+.main-content {
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
 }

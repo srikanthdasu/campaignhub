@@ -1,43 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampaignHub AI - Analytics</title>
 
-    <link rel="stylesheet" href="css/dashboard.css">
-    <link rel="stylesheet" href="css/analytics.css">
+    <title>CampaignHub - Analytics</title>
+
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/analytics.css">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
+
 <body>
 
-<div class="container">
+<div class="dashboard">
 
-    <h1>Analytics Dashboard</h1>
+    <!-- Sidebar -->
 
-    <div class="charts">
+    <aside class="sidebar">
 
-        <div class="chart-card">
-            <h3>Platform Usage</h3>
-            <canvas id="platformChart"></canvas>
+        <div class="logo">
+            <h2>Campaign<span style="color:#60a5fa;">Hub</span></h2>
         </div>
 
-        <div class="chart-card">
-            <h3>Daily Captions</h3>
-            <canvas id="dailyChart"></canvas>
+        <ul class="menu">
+
+            <li>
+                <a href="/dashboard">
+                    📊 Overview
+                </a>
+            </li>
+
+            <li>
+                <a href="/captions.html">
+                    ✨ AI Captions
+                </a>
+            </li>
+
+            <li>
+                <a href="/content-planner.html">
+                    📝 Content Planner
+                </a>
+            </li>
+
+            <li>
+                <a href="/scheduler.html">
+                    📅 Scheduler
+                </a>
+            </li>
+
+            <li>
+                <a href="/images.html">
+                    🖼 Images
+                </a>
+            </li>
+
+            <li class="active">
+                <a href="/analytics.html">
+                    📈 Analytics
+                </a>
+            </li>
+
+            <li>
+                <a href="/notifications.html">
+                    🔔 Notifications
+                </a>
+            </li>
+
+            <li>
+                <a href="/profile.html">
+                    👤 Profile
+                </a>
+            </li>
+
+        </ul>
+
+    </aside>
+
+
+    <!-- Main Content -->
+
+    <div class="main-content">
+
+        <div class="topbar">
+
+            <div>
+
+                <h1>Analytics Dashboard</h1>
+
+                <p>View CampaignHub insights.</p>
+
+            </div>
+
+            <button
+                class="logout"
+                onclick="logout()">
+
+                Logout
+
+            </button>
+
         </div>
 
-        <div class="chart-card">
-            <h3>Top Prompts</h3>
-            <canvas id="promptChart"></canvas>
+
+        <!-- Summary Cards -->
+
+        <div class="stats-grid">
+
+            <div class="stat-card">
+
+                <h2 id="captionCount">0</h2>
+
+                <p>Total Captions</p>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <h2 id="imageCount">0</h2>
+
+                <p>Total Images</p>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <h2 id="planCount">0</h2>
+
+                <p>Content Plans</p>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <h2 id="scheduleCount">0</h2>
+
+                <p>Scheduled Posts</p>
+
+            </div>
+
         </div>
+
+
+        <!-- TWO CHARTS SIDE BY SIDE -->
+
+        <div class="analytics-chart-grid">
+
+
+            <!-- Platform Usage -->
+
+            <div class="chart-card">
+
+                <h2>Platform Usage</h2>
+
+                <div class="chart-wrapper">
+
+                    <canvas id="platformChart"></canvas>
+
+                </div>
+
+            </div>
+
+
+            <!-- Daily Caption Activity -->
+
+            <div class="chart-card">
+
+                <h2>Daily Caption Activity</h2>
+
+                <div class="chart-wrapper">
+
+                    <canvas id="dailyChart"></canvas>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <!-- TOP PROMPTS -->
+
+        <div class="chart-card top-prompts-card">
+
+            <h2>Top Prompts</h2>
+
+            <div class="chart-wrapper">
+
+                <canvas id="promptChart"></canvas>
+
+            </div>
+
+        </div>
+
 
     </div>
 
 </div>
 
-<script src="js/analytics.js"></script>
+
+<script src="/js/analytics.js"></script>
+
+
+<script>
+
+function logout(){
+
+    fetch("/auth/logout", {
+        method: "POST"
+    });
+
+    window.location = "/login.html";
+
+}
+
+</script>
 
 </body>
 </html>

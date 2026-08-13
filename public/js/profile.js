@@ -7,17 +7,34 @@ if (!user) {
 }
 
 // Load profile
+// Load profile
 async function loadProfile() {
 
     try {
 
         const res = await fetch(`/profile/${user.id}`);
+
         const data = await res.json();
+
+        console.log(data);
 
         if (data.success) {
 
             document.getElementById("name").value = data.user.name;
             document.getElementById("email").value = data.user.email;
+
+            // Update Header
+            document.getElementById("profileName").innerText = data.user.name;
+            document.getElementById("profileName").textContent = data.user.name;
+            document.getElementById("profileEmail").textContent = data.user.email;
+
+            const emailElement = document.getElementById("profileEmail");
+
+            if(emailElement){
+
+                emailElement.innerText = data.user.email;
+
+            }
 
         } else {
 
@@ -25,7 +42,7 @@ async function loadProfile() {
 
         }
 
-    } catch (err) {
+    } catch(err){
 
         console.error(err);
 

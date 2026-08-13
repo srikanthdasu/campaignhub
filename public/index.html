@@ -69,6 +69,10 @@ button:hover{
     margin-top:15px;
     background:#16a34a;
 }
+
+.copy:hover{
+    background:#15803d;
+}
 </style>
 
 </head>
@@ -110,35 +114,67 @@ Generated caption will appear here...
 
 <script>
 
-async function generateCaption(){
+async function generateCaption() {
 
-const prompt=document.getElementById("prompt").value;
-const platform=document.getElementById("platform").value;
+    const prompt = document.getElementById("prompt").value.trim();
+    const platform = document.getElementById("platform").value;
 
-if(prompt===""){
-alert("Enter a prompt");
-return;
+    if (!prompt) {
+        alert("Please enter a campaign prompt.");
+        return;
+    }
+
+    document.getElementById("result").innerText = "Generating...";
+
+    try {
+
+        const response = await fetch("/api/generate-caption", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                user_id: 2,
+                prompt: prompt,
+                platform: platform
+            })
+
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            document.getElementById("result").innerText = data.caption;
+
+        } else {
+
+            document.getElementById("result").innerText =
+                data.error || "Something went wrong.";
+
+        }
+
+    } catch (err) {
+
+        console.error(err);
+
+        document.getElementById("result").innerText =
+            "Error: " + err.message;
+
+    }
+
 }
 
-document.getElementById("result").innerHTML="Generating...";
+function copyCaption() {
 
-const response=await fetch(`/api/generate-caption?prompt=${encodeURIComponent(prompt)}&platform=${platform}`);
+    const text = document.getElementById("result").innerText;
 
-const data=await response.json();
+    navigator.clipboard.writeText(text);
 
-if(data.success){
-document.getElementById("result").innerText=data.caption;
-}else{
-document.getElementById("result").innerText=JSON.stringify(data.error,null,2);
-}
-
-}
-
-function copyCaption(){
-
-navigator.clipboard.writeText(document.getElementById("result").innerText);
-
-alert("Caption copied!");
+    alert("Caption copied successfully!");
 
 }
 

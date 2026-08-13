@@ -1,329 +1,457 @@
-// ===============================
+// ========================================
 // CampaignHub AI Dashboard
-// ===============================
+// ========================================
 
-const user = JSON.parse(localStorage.getItem("user"));
+document.addEventListener("DOMContentLoaded", () => {
 
-if (!user) {
-    alert("Please login first");
-    window.location = "/login.html";
+    loadUser();
+    loadStats();
+    loadRecentCaptions();
+
+    const logoutBtn =
+        document.getElementById("logoutBtn");
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", logout);
+    }
+
+});
+
+
+// ========================================
+// Logged-in User
+// ========================================
+
+async function loadUser() {
+
+    try {
+
+        const res = await fetch(
+            "/api/auth/me",
+            {
+                method: "GET",
+                credentials: "include"
+            }
+        );
+
+        if (!res.ok) {
+
+            window.location.href =
+                "/login.html";
+
+            return;
+        }
+
+        const data = await res.json();
+
+        if (!data.success || !data.user) {
+
+            window.location.href =
+                "/login.html";
+
+            return;
+        }
+
+        const userName =
+            document.getElementById("userName");
+
+        if (userName) {
+
+            userName.textContent =
+                data.user.name;
+
+        }
+
+    } catch (err) {
+
+        console.error(
+            "Load User Error:",
+            err
+        );
+
+        window.location.href =
+            "/login.html";
+    }
+
 }
 
-document.getElementById("welcome").innerHTML =
-`Welcome, <b>${user.name}</b>`;
 
-// Load Dashboard
-window.onload = () => {
-    loadHistory();
-    loadStats();
-};
-
-// ===============================
+// ========================================
 // Dashboard Statistics
-// ===============================
+// ========================================
 
 async function loadStats() {
 
     try {
 
-        const response = await fetch("/dashboard/stats");
+        const res = await fetch(
+            "/dashboard/stats",
+            {
+                method: "GET",
+                credentials: "include"
+            }
+        );
 
-        const data = await response.json();
+        const data = await res.json();
 
-        if(data.success){
+        console.log(
+            "DASHBOARD STATS:",
+            data
+        );
 
-            document.getElementById("totalCaptions").innerText =
-            data.totalCaptions;
+        if (!data.success) {
+            return;
+        }
 
-            document.getElementById("todayCaptions").innerText =
-            data.todayCaptions;
 
-            document.getElementById("totalUsers").innerText =
-            data.totalUsers;
+        const totalCaptions =
+            document.getElementById(
+                "totalCaptions"
+            );
+
+        const scheduledPosts =
+            document.getElementById(
+                "scheduledPosts"
+            );
+
+        const contentPlans =
+            document.getElementById(
+                "contentPlans"
+            );
+
+        const todayCaptions =
+            document.getElementById(
+                "todayCaptions"
+            );
+
+
+        if (totalCaptions) {
+
+            totalCaptions.textContent =
+                data.totalCaptions ?? 0;
 
         }
 
-    } catch(err){
+        if (scheduledPosts) {
 
-        console.log(err);
-
-    }
-
-}
-
-// ===============================
-// Generate Caption
-// ===============================
-
-async function generateCaption(){
-
-    const prompt =
-    document.getElementById("prompt").value.trim();
-
-    const platform =
-    document.getElementById("platform").value;
-
-    if(prompt===""){
-
-        alert("Please enter a prompt");
-
-        return;
-
-    }
-
-    document.getElementById("result").innerHTML =
-    "Generating AI Caption...";
-
-    try{
-
-        const response =
-        await fetch("/api/generate-caption",{
-
-            method:"POST",
-
-            headers:{
-                "Content-Type":"application/json"
-            },
-
-            body:JSON.stringify({
-
-                user_id:user.id,
-                prompt,
-                platform
-
-            })
-
-        });
-
-        const data = await response.json();
-
-        if(data.success){
-
-            document.getElementById("result").innerHTML =
-            data.caption;
-
-            document.getElementById("prompt").value="";
-
-            loadHistory();
-
-            loadStats();
-
-        }else{
-
-            document.getElementById("result").innerHTML =
-            data.error;
+            scheduledPosts.textContent =
+                data.scheduledPosts ?? 0;
 
         }
 
-    }catch(err){
+        if (contentPlans) {
 
-        console.log(err);
+            contentPlans.textContent =
+                data.totalPlans ?? 0;
 
-        alert("Server Error");
+        }
 
-    }
+        if (todayCaptions) {
 
-}
+            todayCaptions.textContent =
+                data.todayCaptions ?? 0;
 
-// ===============================
-// Load Caption History
-// ===============================
-
-let allCaptions = [];
-
-async function loadHistory() {
-
-    try {
-
-        const response = await fetch("/captions");
-        const data = await response.json();
-
-        allCaptions = data.captions || [];
-
-        renderHistory(allCaptions);
+        }
 
     } catch (err) {
 
-        console.error(err);
-
-        document.getElementById("history").innerHTML =
-        "<p class='empty'>Unable to load captions.</p>";
+        console.error(
+            "Stats Error:",
+            err
+        );
 
     }
 
 }
 
-// ===============================
-// Render History
-// ===============================
 
-function renderHistory(captions){
+// ========================================
+// Recent Captions
+// ========================================
 
-    const history = document.getElementById("history");
+async function loadRecentCaptions() {
 
-    if(captions.length === 0){
+    const container =
+        document.getElementById(
+            "recentCaptions"
+        );
 
-        history.innerHTML = `
-            <div class="empty">
-                No captions found.
-            </div>
-        `;
-
+    if (!container) {
         return;
     }
 
-    let html = "";
+    try {
 
-    captions.forEach(c => {
+        const userRes =
+            await fetch(
+                "/api/auth/me",
+                {
+                    method: "GET",
+                    credentials: "include"
+                }
+            );
 
-        html += `
-        <div class="card">
 
-            <div class="platform">${c.platform}</div>
+        if (!userRes.ok) {
 
-            <p><strong>Prompt:</strong> ${c.prompt}</p>
+            window.location.href =
+                "/login.html";
 
-         <p class="caption-text">
-${c.caption
-    .replace(/\n/g, "<br>")
-    .replace(/Short Caption:/g, "<strong>Short Caption:</strong><br>")
-    .replace(/Long Caption:/g, "<strong>Long Caption:</strong><br>")
-    .replace(/Hashtags:/g, "<strong>Hashtags:</strong><br>")
-    .replace(/Call To Action:/g, "<strong>Call To Action:</strong><br>")
-    .replace(/Emoji Version:/g, "<strong>Emoji Version:</strong><br>")
-}
-</p>
+            return;
+        }
 
-            <div class="actions">
 
-                <button
-                    class="copyBtn"
-                    onclick="copyCaption(\`${c.caption.replace(/`/g,"\\`")}\`)">
+        const userData =
+            await userRes.json();
 
-                    📋 Copy
 
-                </button>
+        if (
+            !userData.success ||
+            !userData.user
+        ) {
 
-                <button
-                    class="shareBtn"
-                    onclick="shareWhatsApp(\`${c.caption.replace(/`/g,"\\`")}\`)">
+            window.location.href =
+                "/login.html";
 
-                    💬 WhatsApp
+            return;
+        }
 
-                </button>
 
-                <button
-                    class="deleteBtn"
-                    onclick="deleteCaption(${c.id})">
+        const userId =
+            userData.user.id;
 
-                    🗑 Delete
 
-                </button>
+        const res =
+            await fetch(
+                `/captions/history/${userId}`,
+                {
+                    method: "GET",
+                    credentials: "include"
+                }
+            );
 
-            </div>
 
-        </div>
-        `;
+        const data =
+            await res.json();
 
-    });
 
-    history.innerHTML = html;
+        if (
+            !data.success ||
+            !data.captions ||
+            data.captions.length === 0
+        ) {
 
-}
-// ===============================
-// Search
-// ===============================
+            container.innerHTML = `
+                <div class="empty">
+                    No captions generated yet.
+                </div>
+            `;
 
-document.getElementById("search").addEventListener("keyup", function(){
+            return;
+        }
 
-    const value = this.value.toLowerCase();
 
-    const filtered = allCaptions.filter(c =>
+        const recent =
+            data.captions.slice(0, 5);
 
-        c.prompt.toLowerCase().includes(value) ||
-        c.caption.toLowerCase().includes(value) ||
-        c.platform.toLowerCase().includes(value)
 
-    );
+        let html = "";
 
-    renderHistory(filtered);
 
-});
+        recent.forEach(caption => {
 
-// ===============================
-// Copy
-// ===============================
+            const platform =
+                caption.platform || "Social Media";
 
-function copyCaption(text){
 
-    navigator.clipboard.writeText(text);
+            const captionText =
+                caption.caption || "";
 
-    alert("Caption copied successfully!");
 
-}
+            const shortText =
+                captionText.length > 180
+                    ? captionText.substring(0, 180) + "..."
+                    : captionText;
 
-// ===============================
-// WhatsApp Share
-// ===============================
 
-function shareWhatsApp(text){
+            let timeText = "";
 
-    const url =
-    "https://wa.me/?text=" + encodeURIComponent(text);
+            if (caption.created_at) {
 
-    window.open(url,"_blank");
+                timeText =
+                    formatRelativeTime(
+                        caption.created_at
+                    );
 
-}
+            }
 
-// ===============================
-// Delete
-// ===============================
 
-async function deleteCaption(id){
+            html += `
 
-    if(!confirm("Delete this caption?")) return;
+                <div class="caption-item">
 
-    try{
+                    <div class="caption-platform">
+                        ${escapeHtml(platform)}
+                    </div>
 
-        const response =
-        await fetch("/captions/"+id,{
+                    <div class="caption-text">
+                        ${escapeHtml(shortText)}
+                    </div>
 
-            method:"DELETE"
+                    ${
+                        timeText
+                            ? `
+                                <div class="caption-time">
+                                    ${timeText}
+                                </div>
+                              `
+                            : ""
+                    }
+
+                </div>
+
+            `;
 
         });
 
-        const data = await response.json();
 
-        if(data.success){
+        container.innerHTML =
+            html;
 
-            loadHistory();
 
-            loadStats();
+    } catch (err) {
 
-            alert("Caption deleted.");
+        console.error(
+            "Recent Captions Error:",
+            err
+        );
 
-        }else{
-
-            alert(data.error);
-
-        }
-
-    }catch(err){
-
-        console.error(err);
+        container.innerHTML = `
+            <div class="empty">
+                Unable to load recent captions.
+            </div>
+        `;
 
     }
 
 }
 
-// ===============================
-// Logout
-// ===============================
 
-function logout(){
+// ========================================
+// Relative Time
+// ========================================
+
+function formatRelativeTime(dateValue) {
+
+    const date =
+        new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const now =
+        new Date();
+
+    const seconds =
+        Math.floor(
+            (now - date) / 1000
+        );
+
+
+    if (seconds < 60) {
+        return "Just now";
+    }
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    if (minutes < 60) {
+        return `${minutes}m ago`;
+    }
+
+
+    const hours =
+        Math.floor(
+            minutes / 60
+        );
+
+
+    if (hours < 24) {
+        return `${hours}h ago`;
+    }
+
+
+    const days =
+        Math.floor(
+            hours / 24
+        );
+
+
+    if (days < 7) {
+        return `${days}d ago`;
+    }
+
+
+    return date.toLocaleDateString();
+
+}
+
+
+// ========================================
+// HTML Escape
+// ========================================
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+// ========================================
+// Logout
+// ========================================
+
+async function logout() {
+
+    try {
+
+        await fetch(
+            "/api/auth/logout",
+            {
+                method: "POST",
+                credentials: "include"
+            }
+        );
+
+    } catch (err) {
+
+        console.error(
+            "Logout Error:",
+            err
+        );
+
+    }
+
 
     localStorage.removeItem("user");
 
-    window.location="/login.html";
+    localStorage.removeItem(
+        "campaignhubRemember"
+    );
+
+
+    window.location.href =
+        "/login.html";
 
 }

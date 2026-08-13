@@ -1,0 +1,1603 @@
+/* ============================================================
+   CAMPAIGNHUB AI
+   PROFESSIONAL LOGIN PAGE
+   STEP 2 — BRANDING + CLEAN NAVY DESIGN
+   ============================================================ */
+
+
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+
+:root {
+    --ch-navy: #0B1220;
+    --ch-navy-2: #111C35;
+
+    --ch-blue: #2563EB;
+    --ch-blue-light: #60A5FA;
+
+    --ch-violet: #7C3AED;
+    --ch-cyan: #06B6D4;
+    --ch-emerald: #10B981;
+
+    --ch-background: #F5F7FB;
+    --ch-white: #FFFFFF;
+
+    --ch-text: #111827;
+    --ch-text-muted: #64748B;
+    --ch-text-light: #94A3B8;
+
+    --ch-border: #E2E8F0;
+    --ch-border-strong: #CBD5E1;
+
+    --ch-radius: 12px;
+
+    --ch-shadow-sm:
+        0 1px 3px rgba(15, 23, 42, 0.06);
+
+    --ch-shadow-md:
+        0 8px 24px rgba(15, 23, 42, 0.08);
+
+    --ch-transition: 180ms ease;
+}
+
+
+/* ============================================================
+   PAGE RESET
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+
+    width: 100%;
+    min-height: 100%;
+
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+
+    background: var(--ch-background);
+    color: var(--ch-text);
+}
+
+body {
+    min-height: 100vh;
+}
+
+
+/* ============================================================
+   AUTH PAGE
+   ============================================================ */
+
+.auth-page {
+    min-height: 100vh;
+
+    display: grid;
+
+    grid-template-columns:
+        minmax(520px, 1.05fr)
+        minmax(480px, 0.95fr);
+
+    background: var(--ch-background);
+
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   LEFT BRAND PANEL
+   ============================================================ */
+
+.brand-panel {
+    position: relative;
+
+    min-height: 100vh;
+
+    overflow: hidden;
+
+    color: var(--ch-white);
+
+    /* IMPORTANT:
+       Never use campaignhub-logo.png as a background.
+    */
+
+    background-image: none !important;
+
+    background:
+        linear-gradient(
+            145deg,
+            #0B1220 0%,
+            #111C35 52%,
+            #172554 100%
+        );
+}
+
+
+/* ============================================================
+   CONTROLLED DECORATIVE CIRCLE
+   ============================================================ */
+
+.brand-panel::before {
+    content: "";
+
+    position: absolute;
+
+    width: 620px;
+    height: 620px;
+
+    right: -260px;
+    top: -260px;
+
+    border-radius: 50%;
+
+    border:
+        1px solid
+        rgba(96, 165, 250, 0.12);
+
+    background: transparent;
+
+    pointer-events: none;
+}
+
+
+/* ============================================================
+   SUBTLE BLUE GLOW
+   ============================================================ */
+
+.brand-panel::after {
+    content: "";
+
+    position: absolute;
+
+    width: 520px;
+    height: 520px;
+
+    left: -300px;
+    bottom: -300px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(37, 99, 235, 0.20) 0%,
+            rgba(37, 99, 235, 0.08) 35%,
+            transparent 70%
+        );
+
+    pointer-events: none;
+}
+
+
+/* ============================================================
+   BRAND CONTENT
+   ============================================================ */
+
+.brand-content {
+    position: relative;
+
+    z-index: 5;
+
+    width: min(680px, 82%);
+
+    min-height: 100vh;
+
+    margin: 0 auto;
+
+    padding: 48px 0 36px;
+
+    display: flex;
+
+    flex-direction: column;
+}
+
+
+/* ============================================================
+   BRAND LOGO
+   ============================================================ */
+
+.brand-logo {
+    display: inline-flex;
+
+    align-items: center;
+
+    width: fit-content;
+
+    text-decoration: none;
+
+    color: #FFFFFF;
+
+    position: relative;
+
+    z-index: 10;
+}
+
+
+/* ============================================================
+   FULL CAMPAIGNHUB LOGO
+   campaignhub-logo.png
+   ============================================================ */
+
+.brand-logo-image {
+    display: block;
+
+    /*
+       IMPORTANT STEP 2 CHANGE
+
+       Previous:
+       width: 220px;
+       height: 56px;
+
+       New:
+       width: 360px;
+       height: auto;
+
+       This allows the full horizontal logo to display
+       at a professional size without distortion.
+    */
+
+    width: 360px;
+
+    height: auto;
+
+    max-width: 100%;
+
+    max-height: 78px;
+
+    object-fit: contain;
+
+    object-position: left center;
+
+    background: transparent;
+
+    border: 0;
+
+    flex-shrink: 0;
+}
+
+
+/* ============================================================
+   STANDALONE CAMPAIGNHUB POWER MARK
+   campaignhub-mark.png
+   ============================================================ */
+
+.brand-mark-image {
+    display: block;
+
+    width: 52px;
+    height: 52px;
+
+    object-fit: contain;
+
+    object-position: center;
+
+    background: transparent;
+
+    border: 0;
+
+    flex-shrink: 0;
+}
+
+
+/* ============================================================
+   LEGACY CH PLACEHOLDER
+   ============================================================ */
+
+.brand-mark {
+    display: none !important;
+}
+
+
+/* ============================================================
+   LEGACY TEXT LOGO
+   ============================================================ */
+
+.brand-logo > div {
+    display: none;
+}
+
+
+/* ============================================================
+   BRAND MESSAGE
+   ============================================================ */
+
+.brand-message {
+    margin-top: auto;
+
+    margin-bottom: 34px;
+}
+
+
+/* ============================================================
+   EYEBROW
+   ============================================================ */
+
+.eyebrow {
+    display: inline-flex;
+
+    align-items: center;
+
+    width: fit-content;
+
+    padding: 7px 12px;
+
+    margin-bottom: 22px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.14);
+
+    border-radius: 999px;
+
+    background:
+        rgba(255, 255, 255, 0.045);
+
+    color:
+        rgba(255, 255, 255, 0.78);
+
+    font-size: 10px;
+
+    line-height: 1;
+
+    font-weight: 750;
+
+    letter-spacing: 0.13em;
+}
+
+
+/* ============================================================
+   MAIN HEADLINE
+   ============================================================ */
+
+.brand-message h1 {
+    max-width: 620px;
+
+    margin: 0 0 22px;
+
+    color: #FFFFFF;
+
+    font-size:
+        clamp(
+            48px,
+            5vw,
+            72px
+        );
+
+    line-height: 0.98;
+
+    font-weight: 780;
+
+    letter-spacing: -0.055em;
+}
+
+
+/* Publish accent */
+
+.brand-message h1 span {
+    color: var(--ch-blue-light);
+}
+
+
+/* ============================================================
+   BRAND DESCRIPTION
+   ============================================================ */
+
+.brand-message p {
+    max-width: 580px;
+
+    margin: 0;
+
+    color:
+        rgba(255, 255, 255, 0.68);
+
+    font-size: 16px;
+
+    line-height: 1.7;
+}
+
+
+/* ============================================================
+   FEATURES
+   ============================================================ */
+
+.feature-list {
+    display: grid;
+
+    gap: 10px;
+
+    margin: 0;
+}
+
+
+.feature {
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    padding: 14px 16px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.09);
+
+    border-radius: var(--ch-radius);
+
+    background:
+        rgba(255, 255, 255, 0.035);
+
+    box-shadow:
+        inset 0 1px 0
+        rgba(255, 255, 255, 0.04);
+
+    transition:
+        transform var(--ch-transition),
+        background var(--ch-transition),
+        border-color var(--ch-transition);
+}
+
+
+.feature:hover {
+    transform: translateY(-2px);
+
+    background:
+        rgba(255, 255, 255, 0.06);
+
+    border-color:
+        rgba(96, 165, 250, 0.24);
+}
+
+
+/* ============================================================
+   FEATURE ICON
+   ============================================================ */
+
+.feature-icon {
+    width: 40px;
+    height: 40px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 11px;
+
+    background:
+        rgba(37, 99, 235, 0.18);
+
+    border:
+        1px solid
+        rgba(96, 165, 250, 0.14);
+
+    font-size: 18px;
+}
+
+
+.feature strong {
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: #FFFFFF;
+
+    font-size: 13px;
+
+    font-weight: 700;
+}
+
+
+.feature span {
+    display: block;
+
+    color:
+        rgba(255, 255, 255, 0.55);
+
+    font-size: 11px;
+
+    line-height: 1.45;
+}
+
+
+/* ============================================================
+   BRAND FOOTER
+   ============================================================ */
+
+.brand-footer {
+    margin-top: 28px;
+
+    color:
+        rgba(255, 255, 255, 0.38);
+
+    font-size: 11px;
+
+    line-height: 1.5;
+}
+
+
+/* ============================================================
+   RIGHT LOGIN PANEL
+   ============================================================ */
+
+.login-panel {
+    min-height: 100vh;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 48px 56px;
+
+    background: #FFFFFF;
+}
+
+
+/* ============================================================
+   LOGIN CONTAINER
+   ============================================================ */
+
+.login-container {
+    width: min(460px, 100%);
+}
+
+
+/* ============================================================
+   MOBILE LOGO
+   ============================================================ */
+
+.mobile-logo {
+    display: none;
+}
+
+
+/* ============================================================
+   LOGIN HEADER
+   ============================================================ */
+
+.login-header {
+    margin-bottom: 28px;
+}
+
+
+.login-header h2 {
+    margin: 0 0 8px;
+
+    color: var(--ch-text);
+
+    font-size: 34px;
+
+    line-height: 1.15;
+
+    font-weight: 750;
+
+    letter-spacing: -0.04em;
+}
+
+
+.login-header p {
+    margin: 0;
+
+    color: var(--ch-text-muted);
+
+    font-size: 14px;
+
+    line-height: 1.6;
+}
+
+
+/* ============================================================
+   GOOGLE BUTTON
+   ============================================================ */
+
+.google-btn {
+    width: 100%;
+    height: 52px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+
+    border:
+        1px solid
+        var(--ch-border);
+
+    border-radius: var(--ch-radius);
+
+    background: #FFFFFF;
+
+    color: var(--ch-text);
+
+    font-size: 14px;
+
+    font-weight: 650;
+
+    box-shadow: var(--ch-shadow-sm);
+
+    cursor: pointer;
+
+    transition:
+        border-color var(--ch-transition),
+        box-shadow var(--ch-transition),
+        background var(--ch-transition),
+        transform var(--ch-transition);
+}
+
+
+.google-btn:hover {
+    background: #FAFBFD;
+
+    border-color:
+        var(--ch-border-strong);
+
+    box-shadow: var(--ch-shadow-md);
+
+    transform: translateY(-1px);
+}
+
+
+.google-icon {
+    width: 22px;
+    height: 22px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    color: #4285F4;
+
+    font-size: 18px;
+
+    font-weight: 800;
+}
+
+
+/* ============================================================
+   DIVIDER
+   ============================================================ */
+
+.divider {
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    margin: 25px 0;
+
+    color: var(--ch-text-light);
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.08em;
+}
+
+
+.divider::before,
+.divider::after {
+    content: "";
+
+    height: 1px;
+
+    flex: 1;
+
+    background: var(--ch-border);
+}
+
+
+/* ============================================================
+   FORM GROUP
+   ============================================================ */
+
+.form-group {
+    margin-bottom: 19px;
+}
+
+
+.form-group label {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: var(--ch-text);
+
+    font-size: 12px;
+
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   PASSWORD LABEL
+   ============================================================ */
+
+.password-label {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+}
+
+
+.password-label label {
+    margin-bottom: 8px;
+}
+
+
+.password-label a {
+    color: var(--ch-blue);
+
+    font-size: 12px;
+
+    font-weight: 650;
+
+    text-decoration: none;
+}
+
+
+.password-label a:hover {
+    color: var(--ch-violet);
+
+    text-decoration: underline;
+}
+
+
+/* ============================================================
+   INPUT WRAPPER
+   ============================================================ */
+
+.input-wrap {
+    position: relative;
+}
+
+
+/* ============================================================
+   INPUT ICON
+   ============================================================ */
+
+.input-icon {
+    position: absolute;
+
+    left: 15px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    z-index: 2;
+
+    color: var(--ch-text-light);
+
+    font-size: 14px;
+
+    pointer-events: none;
+}
+
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+
+.input-wrap input {
+    width: 100%;
+
+    height: 52px;
+
+    padding:
+        0 46px
+        0 43px;
+
+    border:
+        1px solid
+        var(--ch-border);
+
+    border-radius: var(--ch-radius);
+
+    background: #FFFFFF;
+
+    color: var(--ch-text);
+
+    font-size: 14px;
+
+    outline: none;
+
+    box-shadow: none;
+
+    transition:
+        border-color var(--ch-transition),
+        box-shadow var(--ch-transition);
+}
+
+
+.input-wrap input:hover {
+    border-color: var(--ch-border-strong);
+}
+
+
+.input-wrap input:focus {
+    border-color: var(--ch-blue);
+
+    background: #FFFFFF;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(37, 99, 235, 0.11);
+}
+
+
+.input-wrap input::placeholder {
+    color: var(--ch-text-light);
+}
+
+
+/* ============================================================
+   PASSWORD TOGGLE
+   ============================================================ */
+
+.password-toggle {
+    position: absolute;
+
+    right: 12px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    width: 30px;
+    height: 30px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: 0;
+
+    border-radius: 7px;
+
+    background: transparent;
+
+    color: var(--ch-text-muted);
+
+    font-size: 14px;
+
+    cursor: pointer;
+}
+
+
+.password-toggle:hover {
+    background: #F1F5F9;
+
+    color: var(--ch-blue);
+}
+
+
+/* ============================================================
+   REMEMBER ME
+   ============================================================ */
+
+.remember {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-bottom: 20px;
+
+    color: var(--ch-text-muted);
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+
+.remember input {
+    width: 15px;
+    height: 15px;
+
+    margin: 0;
+
+    accent-color: var(--ch-blue);
+}
+
+
+/* ============================================================
+   LOGIN BUTTON
+   ============================================================ */
+
+.login-btn {
+    width: 100%;
+    height: 54px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+
+    border: 0;
+
+    border-radius: var(--ch-radius);
+
+    background: var(--ch-blue);
+
+    color: #FFFFFF;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    box-shadow:
+        0 8px 20px
+        rgba(37, 99, 235, 0.16);
+
+    cursor: pointer;
+
+    transition:
+        background var(--ch-transition),
+        transform var(--ch-transition),
+        box-shadow var(--ch-transition);
+}
+
+
+.login-btn:hover {
+    background: #1D4ED8;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 12px 28px
+        rgba(37, 99, 235, 0.22);
+}
+
+
+.login-btn:active {
+    transform: translateY(0);
+}
+
+
+.login-btn span {
+    font-size: 17px;
+
+    transition:
+        transform var(--ch-transition);
+}
+
+
+.login-btn:hover span {
+    transform: translateX(3px);
+}
+
+
+/* ============================================================
+   SECURITY NOTE
+   ============================================================ */
+
+.security-note {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 11px;
+
+    margin-top: 23px;
+
+    padding: 14px;
+
+    border:
+        1px solid
+        var(--ch-border);
+
+    border-radius: var(--ch-radius);
+
+    background: #F8FAFC;
+}
+
+
+.security-note > span {
+    width: 30px;
+    height: 30px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 8px;
+
+    background: #ECFDF5;
+
+    font-size: 14px;
+}
+
+
+.security-note strong {
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: var(--ch-text);
+
+    font-size: 11px;
+
+    font-weight: 700;
+}
+
+
+.security-note small {
+    display: block;
+
+    color: var(--ch-text-muted);
+
+    font-size: 10px;
+
+    line-height: 1.45;
+}
+
+
+/* ============================================================
+   REGISTER
+   ============================================================ */
+
+.register {
+    margin-top: 24px;
+
+    text-align: center;
+
+    color: var(--ch-text-muted);
+
+    font-size: 12px;
+
+    line-height: 1.5;
+}
+
+
+.register a {
+    margin-left: 4px;
+
+    color: var(--ch-blue);
+
+    font-weight: 700;
+
+    text-decoration: none;
+}
+
+
+.register a:hover {
+    color: var(--ch-violet);
+
+    text-decoration: underline;
+}
+
+
+/* ============================================================
+   LEGAL
+   ============================================================ */
+
+.legal {
+    margin: 17px 0 0;
+
+    text-align: center;
+
+    color: var(--ch-text-light);
+
+    font-size: 10px;
+
+    line-height: 1.6;
+}
+
+
+.legal a {
+    color: var(--ch-text-muted);
+
+    text-decoration: none;
+}
+
+
+.legal a:hover {
+    color: var(--ch-blue);
+
+    text-decoration: underline;
+}
+
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
+
+.google-btn:focus-visible,
+.login-btn:focus-visible,
+.password-toggle:focus-visible,
+.password-label a:focus-visible,
+.register a:focus-visible,
+.legal a:focus-visible {
+    outline:
+        3px solid
+        rgba(37, 99, 235, 0.25);
+
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   LARGE DESKTOP
+   ============================================================ */
+
+@media (min-width: 1400px) {
+
+    .brand-content {
+        width: min(720px, 82%);
+    }
+
+    .brand-message h1 {
+        font-size: 76px;
+    }
+
+    .login-panel {
+        padding-left: 80px;
+        padding-right: 80px;
+    }
+
+    .brand-logo-image {
+        width: 380px;
+    }
+}
+
+
+/* ============================================================
+   TABLET / SMALL DESKTOP
+   ============================================================ */
+
+@media (max-width: 1050px) {
+
+    .auth-page {
+        grid-template-columns:
+            minmax(450px, 1fr)
+            minmax(420px, 1fr);
+    }
+
+    .brand-content {
+        width: 84%;
+    }
+
+    .brand-message h1 {
+        font-size: 54px;
+    }
+
+    .login-panel {
+        padding:
+            40px 34px;
+    }
+
+    .brand-logo-image {
+        width: 320px;
+    }
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    .auth-page {
+        display: block;
+
+        min-height: 100vh;
+    }
+
+    .brand-panel {
+        display: none;
+    }
+
+    .login-panel {
+        min-height: 100vh;
+
+        padding:
+            38px 24px;
+    }
+
+    .login-container {
+        width: min(440px, 100%);
+    }
+
+    .mobile-logo {
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        width: fit-content;
+
+        margin:
+            0 auto 42px;
+
+        text-decoration: none;
+    }
+
+    .mobile-logo img {
+        display: block;
+
+        width: 190px;
+        height: auto;
+
+        max-height: 52px;
+
+        object-fit: contain;
+
+        object-position: center;
+
+        background: transparent;
+    }
+}
+
+
+/* ============================================================
+   SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 520px) {
+
+    .login-panel {
+        padding:
+            26px 18px;
+    }
+
+    .mobile-logo {
+        margin-bottom: 34px;
+    }
+
+    .mobile-logo img {
+        width: 175px;
+        height: auto;
+
+        max-height: 48px;
+    }
+
+    .login-header {
+        margin-bottom: 23px;
+    }
+
+    .login-header h2 {
+        font-size: 29px;
+    }
+
+    .login-header p {
+        font-size: 13px;
+    }
+
+    .google-btn,
+    .login-btn,
+    .input-wrap input {
+        height: 50px;
+    }
+
+    .security-note {
+        padding: 12px;
+    }
+}
+
+
+/* ============================================================
+   VERY SMALL SCREENS
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+    .login-panel {
+        padding:
+            22px 14px;
+    }
+
+    .login-header h2 {
+        font-size: 26px;
+    }
+
+    .password-label a {
+        font-size: 11px;
+    }
+
+    .mobile-logo img {
+        width: 160px;
+        height: auto;
+    }
+}
+/* ============================================================
+   STEP 2 FINAL BRANDING FIX
+   ============================================================ */
+
+/* Force the left panel to remain dark */
+.auth-page .brand-panel {
+    position: relative !important;
+
+    background-image: none !important;
+
+    background-color: #0B1220 !important;
+
+    background:
+        linear-gradient(
+            145deg,
+            #0B1220 0%,
+            #111C35 55%,
+            #172554 100%
+        ) !important;
+
+    color: #FFFFFF !important;
+
+    opacity: 1 !important;
+
+    filter: none !important;
+
+    isolation: isolate;
+}
+
+
+/* Keep all branding content above decorations */
+.auth-page .brand-content {
+    position: relative !important;
+    z-index: 10 !important;
+
+    opacity: 1 !important;
+}
+
+
+/* Logo container */
+.auth-page .brand-logo {
+    position: relative !important;
+    z-index: 20 !important;
+
+    display: block !important;
+
+    width: 360px !important;
+    height: 78px !important;
+
+    overflow: visible !important;
+
+    opacity: 1 !important;
+}
+
+
+/*
+   IMPORTANT:
+
+   The PNG has a lot of empty canvas around the actual logo.
+   We enlarge the image inside the logo area rather than
+   simply increasing its CSS box.
+*/
+.auth-page .brand-logo-image {
+    display: block !important;
+
+    width: 360px !important;
+    height: 78px !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    object-fit: contain !important;
+    object-position: left center !important;
+
+    opacity: 1 !important;
+
+    background: transparent !important;
+
+    filter: none !important;
+}
+
+
+/* Headline must stay bright */
+.auth-page .brand-message h1 {
+    color: #FFFFFF !important;
+}
+
+
+/* Publish blue */
+.auth-page .brand-message h1 span {
+    color: #60A5FA !important;
+}
+
+
+/* Description */
+.auth-page .brand-message p {
+    color: rgba(255, 255, 255, 0.72) !important;
+}
+
+
+/* Eyebrow */
+.auth-page .eyebrow {
+    color: rgba(255, 255, 255, 0.82) !important;
+
+    background: rgba(255, 255, 255, 0.045) !important;
+
+    border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+
+/* Feature cards */
+.auth-page .feature {
+    background: rgba(255, 255, 255, 0.045) !important;
+
+    border-color: rgba(255, 255, 255, 0.10) !important;
+
+    opacity: 1 !important;
+}
+
+
+/* Feature titles */
+.auth-page .feature strong {
+    color: #FFFFFF !important;
+}
+
+
+/* Feature descriptions */
+.auth-page .feature span {
+    color: rgba(255, 255, 255, 0.62) !important;
+}
+
+
+/* Footer */
+.auth-page .brand-footer {
+    color: rgba(255, 255, 255, 0.42) !important;
+}
+
+
+/* Decorative circle */
+.auth-page .brand-panel::before {
+    opacity: 1 !important;
+}
+
+
+/* ============================================================
+   DESKTOP LOGO SIZE
+   ============================================================ */
+
+@media (min-width: 1051px) {
+
+    .auth-page .brand-logo {
+        width: 360px !important;
+        height: 82px !important;
+    }
+
+    .auth-page .brand-logo-image {
+        width: 360px !important;
+        height: 82px !important;
+    }
+}
+
+
+/* ============================================================
+   LARGE SCREEN
+   ============================================================ */
+
+@media (min-width: 1400px) {
+
+    .auth-page .brand-logo {
+        width: 400px !important;
+        height: 86px !important;
+    }
+
+    .auth-page .brand-logo-image {
+        width: 400px !important;
+        height: 86px !important;
+    }
+}
+/* ============================================================
+   CAMPAIGNHUB PROFESSIONAL BRANDING
+   ============================================================ */
+
+.auth-page .brand-logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    text-decoration: none !important;
+
+    position: relative !important;
+    z-index: 20 !important;
+}
+
+/* Power mark */
+.auth-page .brand-logo-mark {
+    width: 68px !important;
+    height: 68px !important;
+
+    object-fit: contain !important;
+    flex-shrink: 0 !important;
+
+    display: block !important;
+}
+
+/* Text area */
+.auth-page .brand-logo-text {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+
+    line-height: 1 !important;
+}
+
+/* CampaignHub AI */
+.auth-page .brand-name {
+    font-size: 25px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.7px !important;
+
+    color: #FFFFFF !important;
+    white-space: nowrap !important;
+}
+
+/* Hub */
+.auth-page .brand-name span {
+    color: #60A5FA !important;
+}
+
+/* AI */
+.auth-page .brand-name b {
+    color: #7C3AED !important;
+    font-weight: 800 !important;
+}
+
+/* by Sreema */
+.auth-page .brand-by {
+    margin-top: 7px !important;
+
+    font-size: 15px !important;
+    font-weight: 600 !important;
+
+    letter-spacing: 0.4px !important;
+
+    color: #CBD5E1 !important;
+}
+.message {
+    display: none;
+    width: 100%;
+    margin: 12px 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.message.error {
+    display: block;
+    color: #dc2626;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+.message.success {
+    display: block;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+}

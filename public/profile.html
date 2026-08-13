@@ -1,49 +1,527 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Profile</title>
 
-    <link rel="stylesheet" href="css/profile.css">
+    <title>CampaignHub - Profile</title>
+
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/profile.css">
 </head>
+
 <body>
 
-<div class="profile-container">
+<div class="dashboard">
 
-    <h2>My Profile</h2>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
 
-    <label>Name</label>
-    <input type="text" id="name">
+        <div class="logo">
+            <h2>Campaign<span style="color:#60a5fa;">Hub</span></h2>
+        </div>
 
-    <label>Email</label>
-    <input type="email" id="email" readonly>
-    <hr>
+        <ul class="menu">
 
-<h3>Change Password</h3>
+            <li>
+                <a href="/dashboard">📊 Overview</a>
+            </li>
 
-<label>Current Password</label>
-<input type="password" id="currentPassword">
+            <li>
+                <a href="/captions.html">✨ AI Captions</a>
+            </li>
 
-<label>New Password</label>
-<input type="password" id="newPassword">
+            <li>
+                <a href="/content-planner.html">📝 Content Planner</a>
+            </li>
 
-<label>Confirm Password</label>
-<input type="password" id="confirmPassword">
+            <li>
+                <a href="/scheduler.html">📅 Scheduler</a>
+            </li>
 
-<button id="changePasswordBtn">
-    Change Password
-</button>
+            <li>
+                <a href="/images.html">🖼 Images</a>
+            </li>
 
-<br><br>
+            <li>
+                <a href="/analytics.html">📈 Analytics</a>
+            </li>
 
-    <button id="saveBtn">
-        Save Changes
-    </button>
+            <li>
+                <a href="/notifications.html">🔔 Notifications</a>
+            </li>
+
+            <li class="active">
+                <a href="/profile.html">👤 Profile</a>
+            </li>
+
+        </ul>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- HEADER -->
+        <div class="topbar">
+
+            <div>
+                <h1>My Profile</h1>
+                <p>Manage your CampaignHub account.</p>
+            </div>
+
+            <button
+                class="logout"
+                onclick="logout()">
+                Log out
+            </button>
+
+        </div>
+
+
+        <!-- PROFILE LAYOUT -->
+        <div class="profile-layout">
+
+
+            <!-- LEFT PROFILE CARD -->
+            <div class="profile-card">
+
+                <div class="profile-avatar">
+                    S
+                </div>
+
+                <h2 id="profileName">
+                    Sree
+                </h2>
+
+                <p id="profileEmail">
+                    srikanthdasu74@gmail.com
+                </p>
+
+                <span class="plan-badge">
+                    ENTERPRISE PLAN
+                </span>
+
+            </div>
+
+
+            <!-- RIGHT ACCOUNT CARD -->
+            <div class="account-card">
+
+                <h2>
+                    Account details
+                </h2>
+
+
+                <form id="profileForm">
+
+
+                    <!-- NAME + EMAIL -->
+                    <div class="profile-row">
+
+                        <div class="profile-field">
+
+                            <label for="name">
+                                NAME
+                            </label>
+
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                value="Sree"
+                                required>
+
+                        </div>
+
+
+                        <div class="profile-field">
+
+                            <label for="email">
+                                EMAIL
+                            </label>
+
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value="srikanthdasu74@gmail.com"
+                                readonly>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- CURRENT + NEW PASSWORD -->
+                    <div class="profile-row">
+
+                        <div class="profile-field">
+
+                            <label for="currentPassword">
+                                CURRENT PASSWORD
+                            </label>
+
+                            <input
+                                type="password"
+                                id="currentPassword"
+                                name="currentPassword"
+                                placeholder="Enter current password">
+
+                        </div>
+
+
+                        <div class="profile-field">
+
+                            <label for="newPassword">
+                                NEW PASSWORD
+                            </label>
+
+                            <input
+                                type="password"
+                                id="newPassword"
+                                name="newPassword"
+                                placeholder="Enter new password">
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- CONFIRM PASSWORD -->
+                    <div class="profile-row">
+
+                        <div class="profile-field">
+
+                            <label for="confirmPassword">
+                                CONFIRM PASSWORD
+                            </label>
+
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                placeholder="Confirm new password">
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- SAVE -->
+                    <button
+                        type="submit"
+                        class="save-btn">
+
+                        Save changes
+
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </main>
 
 </div>
 
-<script src="js/profile.js"></script>
+
+<script>
+
+/* =========================================================
+   PROFILE FORM
+========================================================= */
+
+const profileForm =
+    document.getElementById("profileForm");
+
+
+profileForm.addEventListener(
+    "submit",
+    async function(event) {
+
+        event.preventDefault();
+
+
+        const name =
+            document.getElementById(
+                "name"
+            ).value.trim();
+
+
+        const currentPassword =
+            document.getElementById(
+                "currentPassword"
+            ).value;
+
+
+        const newPassword =
+            document.getElementById(
+                "newPassword"
+            ).value;
+
+
+        const confirmPassword =
+            document.getElementById(
+                "confirmPassword"
+            ).value;
+
+
+        /* =================================================
+           NAME VALIDATION
+        ================================================= */
+
+        if (!name) {
+
+            alert(
+                "Name is required."
+            );
+
+            return;
+        }
+
+
+        /* =================================================
+           PASSWORD VALIDATION
+        ================================================= */
+
+        const changingPassword =
+            currentPassword ||
+            newPassword ||
+            confirmPassword;
+
+
+        if (changingPassword) {
+
+            if (!currentPassword) {
+
+                alert(
+                    "Please enter your current password."
+                );
+
+                return;
+            }
+
+
+            if (!newPassword) {
+
+                alert(
+                    "Please enter a new password."
+                );
+
+                return;
+            }
+
+
+            if (!confirmPassword) {
+
+                alert(
+                    "Please confirm your new password."
+                );
+
+                return;
+            }
+
+
+            if (
+                newPassword !==
+                confirmPassword
+            ) {
+
+                alert(
+                    "New passwords do not match."
+                );
+
+                return;
+            }
+
+        }
+
+
+        const saveButton =
+            document.querySelector(
+                ".save-btn"
+            );
+
+
+        try {
+
+            saveButton.disabled = true;
+
+            saveButton.textContent =
+                "Saving...";
+
+
+            /* =============================================
+               UPDATE NAME
+            ============================================= */
+
+            const profileResponse =
+                await fetch(
+                    "/profile/update",
+                    {
+                        method: "PUT",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        credentials: "include",
+
+                        body: JSON.stringify({
+                            name: name
+                        })
+                    }
+                );
+
+
+            const profileData =
+                await profileResponse.json();
+
+
+            if (!profileResponse.ok) {
+
+                throw new Error(
+                    profileData.message ||
+                    "Failed to update profile."
+                );
+
+            }
+
+
+            /* =============================================
+               CHANGE PASSWORD
+            ============================================= */
+
+            if (newPassword) {
+
+                const passwordResponse =
+                    await fetch(
+                        "/profile/password",
+                        {
+                            method: "PUT",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            credentials: "include",
+
+                            body: JSON.stringify({
+
+                                currentPassword:
+                                    currentPassword,
+
+                                newPassword:
+                                    newPassword
+
+                            })
+                        }
+                    );
+
+
+                const passwordData =
+                    await passwordResponse.json();
+
+
+                if (!passwordResponse.ok) {
+
+                    throw new Error(
+                        passwordData.message ||
+                        "Failed to change password."
+                    );
+
+                }
+
+            }
+
+
+            /* =============================================
+               UPDATE SCREEN
+            ============================================= */
+
+            document.getElementById(
+                "profileName"
+            ).textContent = name;
+
+
+            /* Clear password fields */
+
+            document.getElementById(
+                "currentPassword"
+            ).value = "";
+
+
+            document.getElementById(
+                "newPassword"
+            ).value = "";
+
+
+            document.getElementById(
+                "confirmPassword"
+            ).value = "";
+
+
+            alert(
+                "Profile changes saved successfully."
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Profile update error:",
+                error
+            );
+
+
+            alert(
+                error.message ||
+                "Failed to save profile changes."
+            );
+
+
+        } finally {
+
+            saveButton.disabled = false;
+
+            saveButton.textContent =
+                "Save changes";
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+function logout() {
+
+    fetch(
+        "/auth/logout",
+        {
+            method: "POST",
+            credentials: "include"
+        }
+    ).finally(() => {
+
+        window.location =
+            "/login.html";
+
+    });
+
+}
+
+</script>
 
 </body>
 </html>

@@ -4,51 +4,594 @@
 <head>
 
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>CampaignHub AI - Images</title>
 
-    <link rel="stylesheet" href="css/images.css">
+    <link rel="stylesheet" href="/css/style.css">
 
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+
+        /* =========================================
+           PAGE
+        ========================================= */
+
+        .images-page {
+            min-height: 100vh;
+            background: #f5f7fb;
+            padding: 35px 45px;
+        }
+
+
+        /* =========================================
+           HEADER
+        ========================================= */
+
+        .images-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+        }
+
+        .images-header h1 {
+            margin: 0;
+            font-size: 38px;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .images-header p {
+            margin: 8px 0 0;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+
+        /* =========================================
+           GENERATOR CARD
+        ========================================= */
+
+        .image-generator-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 32px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+            margin-bottom: 35px;
+        }
+
+        .image-generator-card h2 {
+            margin: 0 0 28px;
+            color: #111827;
+            font-size: 25px;
+            font-weight: 750;
+        }
+
+
+        /* =========================================
+           FORM
+        ========================================= */
+
+        .image-field {
+            margin-bottom: 22px;
+        }
+
+        .image-field label {
+            display: block;
+            margin-bottom: 8px;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .image-field input,
+        .image-field select {
+            width: 100%;
+            height: 54px;
+            padding: 0 16px;
+            border: 1px solid #dbe3ee;
+            border-radius: 11px;
+            background: #ffffff;
+            color: #111827;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .image-field input:focus,
+        .image-field select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+
+        /* =========================================
+           THREE COLUMNS
+        ========================================= */
+
+        .image-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+
+        /* =========================================
+           GENERATE BUTTON
+        ========================================= */
+
+        .generate-image-btn {
+            width: 100%;
+            height: 56px;
+            margin-top: 8px;
+
+            border: none;
+            border-radius: 11px;
+
+            background: #2563eb;
+            color: #ffffff;
+
+            font-size: 17px;
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition: 0.2s ease;
+        }
+
+        .generate-image-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .generate-image-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+
+        /* =========================================
+           GENERATED IMAGES
+        ========================================= */
+
+        .generated-section h2 {
+            margin: 0 0 20px;
+            color: #111827;
+            font-size: 26px;
+            font-weight: 750;
+        }
+
+        .images-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 22px;
+        }
+
+        .image-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow:
+                0 5px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-card-content {
+            padding: 15px;
+        }
+
+        .image-card-content p {
+            margin: 0;
+            color: #475569;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .delete-image-btn {
+            margin-top: 12px;
+            border: none;
+            background: #ef4444;
+            color: white;
+            padding: 8px 13px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .delete-image-btn:hover {
+            background: #dc2626;
+        }
+
+
+        /* =========================================
+           EMPTY STATE
+        ========================================= */
+
+        .empty-images {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 50px 20px;
+            text-align: center;
+            color: #64748b;
+        }
+
+
+        /* =========================================
+           MESSAGE
+        ========================================= */
+
+        #imageMsg {
+            min-height: 22px;
+            margin-top: 15px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        #imageMsg.success {
+            color: #16a34a;
+        }
+
+        #imageMsg.error {
+            color: #dc2626;
+        }
+
+
+        /* =========================================
+           RESPONSIVE
+        ========================================= */
+
+        @media (max-width: 1100px) {
+
+            .images-grid {
+                grid-template-columns:
+                    repeat(3, 1fr);
+            }
+
+        }
+
+        @media (max-width: 850px) {
+
+            .images-page {
+                padding: 25px 20px;
+            }
+
+            .image-options {
+                grid-template-columns: 1fr;
+            }
+
+            .images-grid {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+        }
+
+        @media (max-width: 600px) {
+
+            .images-header h1 {
+                font-size: 30px;
+            }
+
+            .images-grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
 
 </head>
 
+
 <body>
 
-<div class="container">
 
-    <h1>AI Image Gallery</h1>
+<div class="dashboard">
 
-    <div class="top-bar">
 
-        <input
-            type="text"
-            id="prompt"
-            placeholder="Image Prompt">
+    <!-- =========================================
+         SIDEBAR
+    ========================================== -->
 
-        <input
-            type="text"
-            id="imageUrl"
-            placeholder="Image URL">
+    <aside class="sidebar">
 
-        <button onclick="saveImage()">
-            Save Image
-        </button>
+        <div class="logo">
+            <h2>
+                Campaign<span style="color:#60a5fa;">Hub</span>
+            </h2>
+        </div>
 
-    </div>
 
-    <div id="gallery" class="gallery"></div>
+        <ul class="menu">
 
-    <br>
+            <li>
+                <a href="/dashboard">
+                    📊 Overview
+                </a>
+            </li>
 
-    <button onclick="window.location.href='dashboard.html'">
-        Back Dashboard
-    </button>
+            <li>
+                <a href="/captions.html">
+                    ✨ AI Captions
+                </a>
+            </li>
+
+            <li>
+                <a href="/content-planner.html">
+                    📝 Content Planner
+                </a>
+            </li>
+
+            <li>
+                <a href="/scheduler.html">
+                    📅 Scheduler
+                </a>
+            </li>
+
+            <li class="active">
+                <a href="/images.html">
+                    🖼 Images
+                </a>
+            </li>
+
+            <li>
+                <a href="/analytics.html">
+                    📈 Analytics
+                </a>
+            </li>
+
+            <li>
+                <a href="/notifications.html">
+                    🔔 Notifications
+                </a>
+            </li>
+
+            <li>
+                <a href="/profile.html">
+                    👤 Profile
+                </a>
+            </li>
+
+        </ul>
+
+    </aside>
+
+
+
+    <!-- =========================================
+         MAIN
+    ========================================== -->
+
+    <main class="main-content">
+
+
+        <div class="images-page">
+
+
+            <!-- HEADER -->
+
+            <div class="images-header">
+
+                <div>
+
+                    <h1>
+                        AI Image Studio
+                    </h1>
+
+                    <p>
+                        Create professional campaign visuals in seconds.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================
+                 GENERATOR
+            ================================== -->
+
+            <div class="image-generator-card">
+
+                <h2>
+                    Create AI Image
+                </h2>
+
+
+                <div class="image-field">
+
+                    <label for="prompt">
+                        What do you want to create?
+                    </label>
+
+                    <input
+                        type="text"
+                        id="prompt"
+                        placeholder="Example: Rakhi celebration between brother and sister..."
+                    >
+
+                </div>
+
+
+
+                <div class="image-options">
+
+
+                    <!-- PLATFORM -->
+
+                    <div class="image-field">
+
+                        <label for="platform">
+                            Platform
+                        </label>
+
+                        <select id="platform">
+
+                            <option value="general">
+                                General Social Media
+                            </option>
+
+                            <option value="instagram">
+                                Instagram
+                            </option>
+
+                            <option value="facebook">
+                                Facebook
+                            </option>
+
+                            <option value="linkedin">
+                                LinkedIn
+                            </option>
+
+                            <option value="x">
+                                X
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+
+                    <!-- STYLE -->
+
+                    <div class="image-field">
+
+                        <label for="style">
+                            Visual Style
+                        </label>
+
+                        <select id="style">
+
+                            <option value="realistic">
+                                Realistic Photography
+                            </option>
+
+                            <option value="cinematic">
+                                Cinematic
+                            </option>
+
+                            <option value="illustration">
+                                Illustration
+                            </option>
+
+                            <option value="3d">
+                                3D Render
+                            </option>
+
+                            <option value="minimal">
+                                Minimal
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+
+                    <!-- MOOD -->
+
+                    <div class="image-field">
+
+                        <label for="mood">
+                            Mood
+                        </label>
+
+                        <select id="mood">
+
+                            <option value="warm and joyful">
+                                Warm & Joyful
+                            </option>
+
+                            <option value="professional">
+                                Professional
+                            </option>
+
+                            <option value="energetic">
+                                Energetic
+                            </option>
+
+                            <option value="premium">
+                                Premium
+                            </option>
+
+                            <option value="calm">
+                                Calm
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+
+                <button
+                    type="button"
+                    id="generateImageBtn"
+                    class="generate-image-btn"
+                    onclick="generateImage()"
+                >
+
+                    🎨 Generate Professional Image
+
+                </button>
+
+
+                <div id="imageMsg"></div>
+
+            </div>
+
+
+
+            <!-- =================================
+                 GENERATED IMAGES
+            ================================== -->
+
+            <section class="generated-section">
+
+                <h2>
+                    Your Generated Images
+                </h2>
+
+
+                <div
+                    id="imageGrid"
+                    class="images-grid"
+                >
+
+                    <div class="empty-images">
+
+                        No generated images yet.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+        </div>
+
+    </main>
 
 </div>
 
-<script src="js/images.js"></script>
+
+
+<script src="/js/images.js"></script>
 
 </body>
+
 </html>

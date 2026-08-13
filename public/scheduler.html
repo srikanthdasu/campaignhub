@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CampaignHub - Scheduler</title>
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <style>
+        /* =========================================================
+           SCHEDULER PAGE
+           Content Planner style - WHITE background
+           Sidebar is NOT changed
+        ========================================================= */
+
+        body {
+            background: #f5f7fb;
+            color: #0f172a;
+        }
+
+        .dashboard {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            padding: 32px 40px 60px;
+            background: #f5f7fb;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 28px;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 38px;
+            font-weight: 800;
+        }
+
+        .topbar p {
+            margin: 6px 0 0;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .logout {
+            background: #ef4444;
+            color: white;
+            border: 0;
+            border-radius: 10px;
+            padding: 13px 24px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .logout:hover {
+            background: #dc2626;
+        }
+
+        /* Main two-column area */
+
+        .scheduler-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
+            gap: 28px;
+            align-items: start;
+        }
+
+        /* White cards */
+
+        .generator,
+        .history {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            box-shadow: 0 10px 35px rgba(15, 23, 42, 0.06);
+        }
+
+        .generator {
+            padding: 34px;
+        }
+
+        .generator h2,
+        .history h2 {
+            margin: 0 0 26px;
+            color: #0f172a;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        /* Form */
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 9px;
+            color: #172554;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            box-sizing: border-box;
+            height: 56px;
+            padding: 0 16px;
+            border: 1px solid #d7dee9;
+            border-radius: 12px;
+            background: #ffffff;
+            color: #0f172a;
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+            transition: 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+
+        .generate {
+            width: 100%;
+            height: 62px;
+            margin-top: 4px;
+            border: 0;
+            border-radius: 12px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.18);
+            transition: 0.2s ease;
+        }
+
+        .generate:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .generate:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Queue */
+
+        .history {
+            padding: 28px;
+        }
+
+        .history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .history-header h2 {
+            margin: 0;
+        }
+
+        .queue-count {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #eff6ff;
+            color: #2563eb;
+            font-weight: 800;
+        }
+
+        .queue-empty {
+            padding: 28px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            color: #64748b;
+            text-align: center;
+            background: #ffffff;
+        }
+
+        .queue-item {
+            position: relative;
+            padding: 20px;
+            margin-bottom: 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
+        .queue-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .queue-title {
+            margin: 0 0 10px;
+            color: #0f172a;
+            font-size: 17px;
+            font-weight: 800;
+        }
+
+        .queue-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-bottom: 12px;
+        }
+
+        .queue-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 9px;
+            border-radius: 7px;
+            background: #f1f5f9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .queue-status {
+            margin-left: auto;
+        }
+
+        .status-ready {
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        .status-draft {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+
+        .status-scheduled {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .queue-caption {
+            margin: 8px 0 14px;
+            color: #475569;
+            font-size: 14px;
+            line-height: 1.55;
+            word-break: break-word;
+        }
+
+        .queue-time {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .queue-delete {
+            margin-top: 14px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #ef4444;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .queue-delete:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            padding: 24px;
+            color: #64748b;
+            text-align: center;
+        }
+
+        .error-message {
+            padding: 16px;
+            border-radius: 12px;
+            background: #fef2f2;
+            color: #b91c1c;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1050px) {
+            .scheduler-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .main-content {
+                padding: 24px 18px 40px;
+            }
+
+            .topbar {
+                flex-direction: column;
+            }
+
+            .topbar h1 {
+                font-size: 32px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .generator,
+            .history {
+                padding: 22px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="dashboard">
+
+    <!-- =========================================================
+         SIDEBAR - KEEP AS EXISTING
+    ========================================================== -->
+
+    <aside class="sidebar">
+
+        <div class="logo">
+            <h2>
+                Campaign<span style="color:#60a5fa;">Hub</span>
+            </h2>
+        </div>
+
+        <ul class="menu">
+
+            <li>
+                <a href="/dashboard">📊 Overview</a>
+            </li>
+
+            <li>
+                <a href="/captions.html">✨ AI Captions</a>
+            </li>
+
+            <li>
+                <a href="/content-planner.html">📝 Content Planner</a>
+            </li>
+
+            <li class="active">
+                <a href="/scheduler.html">📅 Scheduler</a>
+            </li>
+
+            <li>
+                <a href="/images.html">🖼 Images</a>
+            </li>
+
+            <li>
+                <a href="/analytics.html">📈 Analytics</a>
+            </li>
+
+            <li>
+                <a href="/notifications.html">🔔 Notifications</a>
+            </li>
+
+            <li>
+                <a href="/profile.html">👤 Profile</a>
+            </li>
+
+        </ul>
+
+    </aside>
+
+
+    <!-- =========================================================
+         MAIN
+    ========================================================== -->
+
+    <div class="main-content">
+
+        <div class="topbar">
+
+            <div>
+                <h1>Scheduler</h1>
+                <p>Schedule your AI captions.</p>
+            </div>
+
+            <button class="logout" onclick="logout()">
+                Logout
+            </button>
+
+        </div>
+
+
+        <div class="scheduler-layout">
+
+            <!-- =================================================
+                 SCHEDULE FORM
+            ================================================== -->
+
+            <div class="generator">
+
+                <h2>Schedule a Post</h2>
+
+
+                <div class="form-group">
+
+                    <label for="title">
+                        Campaign Title
+                    </label>
+
+                    <input
+                        type="text"
+                        id="title"
+                        placeholder="Campaign Title"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label for="platform">
+                            Platform
+                        </label>
+
+                        <select id="platform">
+
+                            <option value="Instagram">
+                                Instagram
+                            </option>
+
+                            <option value="Facebook">
+                                Facebook
+                            </option>
+
+                            <option value="X">
+                                X
+                            </option>
+
+                            <option value="LinkedIn">
+                                LinkedIn
+                            </option>
+
+                            <option value="TikTok">
+                                TikTok
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label for="caption">
+                            AI Caption
+                        </label>
+
+                        <select id="caption">
+
+                            <option value="">
+                                Loading AI captions...
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="image">
+                        Image
+                    </label>
+
+                    <select id="image">
+
+                        <option value="">
+                            Loading AI images...
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label for="date">
+                            Date
+                        </label>
+
+                        <input
+                            type="date"
+                            id="date"
+                        >
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label for="time">
+                            Time
+                        </label>
+
+                        <input
+                            type="time"
+                            id="time"
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="generate"
+                    id="scheduleBtn"
+                    onclick="saveSchedule()"
+                >
+                    📅 Schedule Post
+                </button>
+
+            </div>
+
+
+            <!-- =================================================
+                 REAL QUEUE
+            ================================================== -->
+
+            <div class="history">
+
+                <div class="history-header">
+
+                    <h2>Queue</h2>
+
+                    <span
+                        class="queue-count"
+                        id="queueCount"
+                    >
+                        0
+                    </span>
+
+                </div>
+
+
+                <div id="scheduleList">
+
+                    <div class="loading">
+                        Loading scheduled posts...
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="/js/scheduler.js?v=10"></script>
+
+</body>
+</html>

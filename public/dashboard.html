@@ -4,189 +4,287 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>CampaignHub AI Dashboard</title>
 
     <link rel="stylesheet" href="/css/dashboard.css">
-
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
 </head>
 
 <body>
 
 <div class="dashboard">
 
-    <!-- Sidebar -->
+    <!-- ================= SIDEBAR ================= -->
 
     <aside class="sidebar">
 
         <div class="logo">
-
-            <h2>CampaignHub AI</h2>
-
+            <h2>Campaign<span>Hub</span></h2>
         </div>
 
         <ul class="menu">
 
             <li class="active">
-                <i class="fa-solid fa-house"></i>
-                Dashboard
+                <a href="/dashboard">📊 Overview</a>
             </li>
 
             <li>
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                Generate Caption
+                <a href="/captions.html">✨ AI Captions</a>
             </li>
 
             <li>
-                <i class="fa-solid fa-clock-rotate-left"></i>
-                History
+                <a href="/content-planner.html">📅 Content Planner</a>
             </li>
 
             <li>
-                <i class="fa-solid fa-chart-line"></i>
-                Analytics
- <li>
-    <a href="analytics.html" style="text-decoration:none;color:inherit;">
-        <i class="fa-solid fa-chart-line"></i>
-        Analytics
-    </a>
-</li>
+                <a href="/scheduler.html">🗓 Scheduler</a>
+            </li>
+
+            <li>
+                <a href="/images.html">🖼 Images</a>
+            </li>
+
+            <li>
+                <a href="/analytics.html">📈 Analytics</a>
+            </li>
+
+            <li>
+                <a href="/notifications.html">🔔 Notifications</a>
+            </li>
+
+            <li>
+                <a href="/profile.html">👤 Profile</a>
+            </li>
 
         </ul>
 
     </aside>
 
-    <!-- Main Content -->
+
+    <!-- ================= MAIN ================= -->
 
     <main class="main-content">
 
-        <!-- Header -->
+        <!-- HEADER -->
 
-        <header class="topbar">
+        <div class="topbar">
 
             <div>
 
-                <h1>Dashboard</h1>
+                <h1>
+                    Welcome back,
+                    <span id="userName">...</span>
+                </h1>
 
-                <p id="welcome"></p>
+                <p>
+                    Here's what's happening today.
+                </p>
 
             </div>
 
-            <button class="logout" onclick="logout()">
+            <div class="topbar-actions">
 
-                Logout
+                <a
+                    href="/profile.html"
+                    class="settings-btn">
+                    Settings
+                </a>
 
-            </button>
+                <a
+                    href="/content-planner.html"
+                    class="create-btn">
+                    + Create Campaign
+                </a>
 
-        </header>
+            </div>
 
-        <!-- Statistics -->
+        </div>
+
+
+        <!-- ================= STATISTICS ================= -->
 
         <section class="cards">
 
             <div class="card">
 
-                <h3>Total Captions</h3>
+                <div class="card-top">
+                    <h3>Total Captions</h3>
+                </div>
 
                 <h2 id="totalCaptions">0</h2>
 
+                <div class="card-meta">
+                    <span class="status-badge green">Active</span>
+                    <span>AI captions</span>
+                </div>
+
             </div>
+
 
             <div class="card">
 
-                <h3>Today's Captions</h3>
+                <div class="card-top">
+                    <h3>Scheduled Posts</h3>
+                </div>
+
+                <h2 id="scheduledPosts">0</h2>
+
+                <div class="card-meta">
+                    <span class="status-badge blue">Active</span>
+                    <span>Scheduled content</span>
+                </div>
+
+            </div>
+
+
+            <div class="card">
+
+                <div class="card-top">
+                    <h3>Content Plans</h3>
+                </div>
+
+                <h2 id="contentPlans">0</h2>
+
+                <div class="card-meta">
+                    <span>Campaign planning</span>
+                </div>
+
+            </div>
+
+
+            <div class="card">
+
+                <div class="card-top">
+                    <h3>Today's Captions</h3>
+                </div>
 
                 <h2 id="todayCaptions">0</h2>
 
-            </div>
-
-            <div class="card">
-
-                <h3>Total Users</h3>
-
-                <h2 id="totalUsers">0</h2>
+                <div class="card-meta">
+                    <span class="status-badge purple">Today</span>
+                    <span>Generated captions</span>
+                </div>
 
             </div>
 
         </section>
 
-        <!-- Generator -->
 
-        <section class="generator">
+        <!-- ================= DASHBOARD CONTENT ================= -->
 
-            <h2>Generate AI Caption</h2>
+        <section class="dashboard-grid">
 
-            <input
-                type="text"
-                id="prompt"
-                placeholder="Enter your product, campaign or topic">
 
-            <select id="platform">
+            <!-- RECENT CAPTIONS -->
 
-                <option>Instagram</option>
+            <div class="history">
 
-                <option>Facebook</option>
+                <div class="history-header">
 
-                <option>LinkedIn</option>
+                    <div>
+                        <h2>Recent Captions</h2>
+                        <span class="history-subtitle">
+                            Your latest AI-generated content
+                        </span>
+                    </div>
 
-                <option>Twitter</option>
+                    <a href="/captions.html">
+                        View All →
+                    </a>
 
-                <option>WhatsApp</option>
+                </div>
 
-            </select>
+                <div id="recentCaptions">
 
-            <button class="generate"
-                onclick="generateCaption()">
+                    <div class="loading">
+                        Loading captions...
+                    </div>
 
-                Generate Caption
+                </div>
 
-            </button>
+            </div>
 
-            <div id="result">
 
-                Waiting for AI...
+            <!-- VISUAL ASSETS -->
+
+            <div class="assets-section">
+
+                <div class="assets-header">
+
+                    <div>
+                        <h2>Visual Assets</h2>
+                        <span>
+                            Your generated images
+                        </span>
+                    </div>
+
+                    <a href="/images.html">
+                        View Library
+                    </a>
+
+                </div>
+
+                <div class="assets-grid">
+
+                    <a
+                        href="/images.html"
+                        class="asset-placeholder">
+
+                        <span>🖼</span>
+                        <strong>View Images</strong>
+                        <small>
+                            Open your AI image library
+                        </small>
+
+                    </a>
+
+                </div>
 
             </div>
 
         </section>
 
-        <!-- History -->
 
-        <section class="history">
+        <!-- ================= QUICK ACTIONS ================= -->
 
-            <div class="history-header">
+        <section class="quick-section">
 
-                <h2>Caption History</h2>
+            <h2>Quick Actions</h2>
 
-                <input
-                    type="text"
-                    id="search"
-                    placeholder="Search captions...">
+            <div class="quick-actions">
 
-            </div>
+                <a
+                    href="/captions.html"
+                    class="quick-btn">
 
-            <div class="history-toolbar">
+                    ✨ Generate Caption
 
-    <input
-        type="text"
-        id="search"
-        placeholder="🔍 Search captions...">
+                </a>
 
-    <select id="filterPlatform">
+                <a
+                    href="/images.html"
+                    class="quick-btn">
 
-        <option value="">All Platforms</option>
-        <option value="Instagram">Instagram</option>
-        <option value="Facebook">Facebook</option>
-        <option value="LinkedIn">LinkedIn</option>
-        <option value="Twitter">Twitter</option>
-        <option value="WhatsApp">WhatsApp</option>
+                    🖼 Generate Image
 
-    </select>
+                </a>
 
-</div>
+                <a
+                    href="/content-planner.html"
+                    class="quick-btn">
 
-<div id="history"></div>
+                    📅 Create Content Plan
+
+                </a>
+
+                <a
+                    href="/scheduler.html"
+                    class="quick-btn">
+
+                    🗓 Schedule Post
+
+                </a>
 
             </div>
 
@@ -196,8 +294,8 @@
 
 </div>
 
+
 <script src="/js/dashboard.js"></script>
 
 </body>
-
 </html>

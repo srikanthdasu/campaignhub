@@ -1,92 +1,42 @@
-require("dotenv").config();
-const axios = require("axios");
+const OpenAI = require("openai");
 
+// Azure AI Foundry exposes an OpenAI-compatible endpoint, so we can use the
+// official openai SDK pointed at FOUNDRY_ENDPOINT with FOUNDRY_API_KEY.
+const client = new OpenAI({
+    baseURL: process.env.FOUNDRY_ENDPOINT,
+    apiKey: process.env.FOUNDRY_API_KEY
+});
+
+/**
+ * Generate a social media caption using the configured AI model.
+ * @param {string} prompt - what the user wants the caption to be about
+ * @param {string} platform - e.g. "Instagram", "LinkedIn", "Facebook"
+ * @returns {Promise<string>} the generated caption text
+ */
 async function generateCaption(prompt, platform = "Instagram") {
-
-    const aiPrompt = `
-You are a social media marketing expert.
-
-Respond ONLY in plain text.
-
-Do NOT write a normal paragraph.
-
-Follow this format exactly.
-
-Short Caption:
-<write 2 sentences>
-
-Long Caption:
-<write 5-7 sentences>
-
-Hashtags:
-#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8 #tag9 #tag10
-
-Call To Action:
-<one sentence>
-
-Emoji Version:
-<same short caption with emojis>
-
-Product: ${prompt}
-
-Platform: ${platform}
-`;
-
-    try {
-
-        const response = await axios.post(
-
-            `${process.env.FOUNDRY_ENDPOINT}/chat/completions`,
-
-            {
-
-                model: process.env.MODEL_NAME,
-
-                messages: [
-
-                    {
-                        role: "system",
-                        content: "You are an expert social media marketing assistant."
-                    },
-
-                    {
-                        role: "user",
-                        content: aiPrompt
-                    }
-
-                ],
-
-                max_tokens: 600,
-
-                temperature: 0.8
-
-            },
-
-            {
-
-                headers: {
-
-                    "api-key": process.env.FOUNDRY_API_KEY,
-
-                    "Content-Type": "application/json"
-
-                }
-
-            }
-
-        );
-
-        return response.data.choices[0].message.content;
-
-    } catch (err) {
-
-        console.error("Status:", err.response?.status);
-        console.error("Data:", JSON.stringify(err.response?.data, null, 2));
-
-        throw err;
-
+    if (!prompt) {
+        throw new Error("Prompt is required to generate a caption.");
     }
 
+    const systemPrompt = `You are a professional social media copywriter. Write a short, engaging ${platform} caption (with relevant hashtags where appropriate) based on the user's request. Keep it concise and platform-appropriate. Return only the caption text, nothing else.`;
+
+    const response = await client.chat.completions.create({
+        model: process.env.MODEL_NAME,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+        ],
+        max_tokens: 300,
+        temperature: 0.8
+    });
+
+    const caption = response.choices?.[0]?.message?.content?.trim();
+
+    if (!caption) {
+        throw new Error("AI did not return a caption.");
+    }
+
+    return caption;
 }
 
 module.exports = generateCaption;

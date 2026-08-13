@@ -15,8 +15,5 @@ const pool = new Pool({
 pool.connect()
   .then(() => console.log("✅ PostgreSQL Connected"))
   .catch(err => console.error("❌ Database Error:", err.message));
-pool.on('error', (err) => {
-  console.error('⚠️  Unexpected PG pool error (connection dropped, pool will recover):', err.message);
-});
 
 module.exports = pool;

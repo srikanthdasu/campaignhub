@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Content Planner | CampaignHub AI</title>
+
+    <link
+        rel="stylesheet"
+        href="/css/theme.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/css/content-planner.css"
+    >
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <!-- =========================================
+         SIDEBAR
+    ========================================== -->
+
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+
+            <div class="brand-mark">
+                🚀
+            </div>
+
+            <div>
+                <div class="brand-title">
+                    Campaign<span>Hub</span> AI
+                </div>
+
+                <div class="brand-subtitle">
+                    by Sreema
+                </div>
+            </div>
+
+        </div>
+
+
+        <nav class="sidebar-nav">
+
+            <a href="/dashboard.html" class="nav-link">
+                <span>📊</span>
+                <span>Overview</span>
+            </a>
+
+            <a href="/captions.html" class="nav-link">
+                <span>✨</span>
+                <span>AI Captions</span>
+            </a>
+
+            <a
+                href="/content-planner.html"
+                class="nav-link active"
+            >
+                <span>📝</span>
+                <span>Content Planner</span>
+            </a>
+
+            <a href="/scheduler.html" class="nav-link">
+                <span>📅</span>
+                <span>Scheduler</span>
+            </a>
+
+            <a href="/images.html" class="nav-link">
+                <span>🎨</span>
+                <span>AI Images</span>
+            </a>
+
+            <!-- Video will be enabled later -->
+            <a
+                href="#"
+                class="nav-link disabled-link"
+                title="AI Video coming soon"
+            >
+                <span>🎬</span>
+                <span>AI Video</span>
+                <small>Coming soon</small>
+            </a>
+
+            <a href="/analytics.html" class="nav-link">
+                <span>📈</span>
+                <span>Analytics</span>
+            </a>
+
+            <a href="/notifications.html" class="nav-link">
+                <span>🔔</span>
+                <span>Notifications</span>
+            </a>
+
+            <a href="/profile.html" class="nav-link">
+                <span>👤</span>
+                <span>Profile</span>
+            </a>
+
+        </nav>
+
+
+        <div class="sidebar-bottom">
+
+            <button
+                type="button"
+                class="logout-link"
+                onclick="logout()"
+            >
+                <span>↪</span>
+                Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =========================================
+         MAIN AREA
+    ========================================== -->
+
+    <main class="main-content">
+
+        <!-- TOP HEADER -->
+
+        <header class="page-header">
+
+            <div>
+
+                <div class="breadcrumb">
+                    CampaignHub AI
+                    <span>›</span>
+                    Content Planner
+                </div>
+
+                <h1>
+                    Content Planner
+                </h1>
+
+                <p>
+                    Create, organize and manage your campaign content.
+                </p>
+
+            </div>
+
+
+            <div class="user-area">
+
+                <div class="user-avatar" id="userAvatar">
+                    U
+                </div>
+
+                <div class="user-info">
+
+                    <strong id="userName">
+                        Loading...
+                    </strong>
+
+                    <span id="userEmail">
+                        Loading...
+                    </span>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- =========================================
+             PLANNER GRID
+        ========================================== -->
+
+        <section class="planner-grid">
+
+
+            <!-- =====================================
+                 CREATE PLAN
+            ====================================== -->
+
+            <div class="planner-card create-card">
+
+                <div class="card-heading">
+
+                    <div class="heading-icon">
+                        📝
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Create Content Plan
+                        </h2>
+
+                        <p>
+                            Build your next social media campaign.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <form
+                    id="plannerForm"
+                    autocomplete="off"
+                >
+
+
+                    <!-- Campaign -->
+
+                    <div class="form-field">
+
+                        <label for="campaign">
+                            Campaign Name
+                        </label>
+
+                        <input
+                            id="campaign"
+                            type="text"
+                            placeholder="e.g. Diwali Sale 2026"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- Platform -->
+
+                    <div class="form-field">
+
+                        <label for="platform">
+                            Platform
+                        </label>
+
+                        <select id="platform">
+
+                            <option value="Instagram">
+                                Instagram
+                            </option>
+
+                            <option value="Facebook">
+                                Facebook
+                            </option>
+
+                            <option value="LinkedIn">
+                                LinkedIn
+                            </option>
+
+                            <option value="X">
+                                X
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Content Type -->
+
+                    <div class="form-field">
+
+                        <label for="type">
+                            Content Type
+                        </label>
+
+                        <select id="type">
+
+                            <option value="Post">
+                                Post
+                            </option>
+
+                            <option value="Story">
+                                Story
+                            </option>
+
+                            <option value="Reel">
+                                Reel
+                            </option>
+
+                            <option value="Carousel">
+                                Carousel
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Caption -->
+
+                    <div class="form-field">
+
+                        <div class="field-label-row">
+
+                            <label for="caption">
+                                AI Caption
+                            </label>
+
+                            <a
+                                href="/captions.html"
+                                class="field-action"
+                            >
+                                + Create caption
+                            </a>
+
+                        </div>
+
+                        <select id="caption">
+
+                            <option value="">
+                                Loading captions...
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Image -->
+
+                    <div class="form-field">
+
+                        <div class="field-label-row">
+
+                            <label for="image">
+                                AI Image
+                            </label>
+
+                            <a
+                                href="/images.html"
+                                class="field-action"
+                            >
+                                + Create image
+                            </a>
+
+                        </div>
+
+                        <select id="image">
+
+                            <option value="">
+                                Loading images...
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Date -->
+
+                    <div class="form-row">
+
+                        <div class="form-field">
+
+                            <label for="publishDate">
+                                Publish Date
+                            </label>
+
+                            <input
+                                id="publishDate"
+                                type="date"
+                            >
+
+                        </div>
+
+
+                        <div class="form-field">
+
+                            <label for="status">
+                                Status
+                            </label>
+
+                            <select id="status">
+
+                                <option value="Draft">
+                                    Draft
+                                </option>
+
+                                <option value="Ready">
+                                    Ready
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Message -->
+
+                    <div
+                        id="plannerMsg"
+                        class="planner-message"
+                    ></div>
+
+
+                    <!-- Save -->
+
+                    <button
+                        type="submit"
+                        id="savePlanBtn"
+                        class="primary-button"
+                    >
+
+                        <span>
+                            ✨
+                        </span>
+
+                        Create Content Plan
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            <!-- =====================================
+                 SAVED PLANS
+            ====================================== -->
+
+            <div class="planner-card plans-card">
+
+                <div class="card-heading plans-heading">
+
+                    <div class="heading-icon">
+                        📋
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Your Content Plans
+                        </h2>
+
+                        <p>
+                            Campaigns you've created.
+                        </p>
+
+                    </div>
+
+                    <span
+                        id="planCount"
+                        class="plan-count"
+                    >
+                        0
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="planList"
+                    class="plan-list"
+                >
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">
+                            📅
+                        </div>
+
+                        <h3>
+                            No content plans yet
+                        </h3>
+
+                        <p>
+                            Create your first campaign plan
+                            using the form.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =========================================
+             QUICK ACTIONS
+        ========================================== -->
+
+        <section class="quick-actions">
+
+            <a
+                href="/captions.html"
+                class="quick-action"
+            >
+
+                <span>✨</span>
+
+                <div>
+                    <strong>
+                        AI Captions
+                    </strong>
+
+                    <small>
+                        Generate campaign copy
+                    </small>
+                </div>
+
+                <b>→</b>
+
+            </a>
+
+
+            <a
+                href="/images.html"
+                class="quick-action"
+            >
+
+                <span>🎨</span>
+
+                <div>
+                    <strong>
+                        AI Images
+                    </strong>
+
+                    <small>
+                        Create campaign visuals
+                    </small>
+                </div>
+
+                <b>→</b>
+
+            </a>
+
+
+            <a
+                href="/scheduler.html"
+                class="quick-action"
+            >
+
+                <span>📅</span>
+
+                <div>
+                    <strong>
+                        Scheduler
+                    </strong>
+
+                    <small>
+                        Schedule your content
+                    </small>
+                </div>
+
+                <b>→</b>
+
+            </a>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script src="/js/contentPlanner.js"></script>
+
+</body>
+</html>

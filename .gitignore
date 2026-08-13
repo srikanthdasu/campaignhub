@@ -1,5 +1,11 @@
-.env
 node_modules/
+.env
+.env.*
+!.env.example
+
 *.log
-server-backup-working.js
-server.js.bak
+
+.DS_Store
+Thumbs.db
+
+.vscode/

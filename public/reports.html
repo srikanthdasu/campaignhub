@@ -1,46 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>CampaignHub AI - Reports</title>
 
     <link rel="stylesheet" href="css/reports.css">
 
     <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
 </head>
+
 <body>
 
 <div class="container">
 
-    <h1>📊 CampaignHub Reports</h1>
+    <h1>
+        <i class="fa-solid fa-chart-column"></i>
+        CampaignHub AI Reports
+    </h1>
 
     <div class="report-box">
 
-        <button onclick="downloadCaptionsPDF()">
-            <i class="fa-solid fa-file-pdf"></i>
-            Export Captions PDF
-        </button>
+        <!-- ===========================
+             Filters
+        ============================ -->
 
-        <button onclick="downloadCaptionsExcel()">
-            <i class="fa-solid fa-file-excel"></i>
-            Export Captions Excel
-        </button>
+        <div class="filters">
 
-        <button onclick="downloadSchedulerPDF()">
-            <i class="fa-solid fa-calendar-days"></i>
-            Export Scheduler PDF
-        </button>
+            <input
+                type="date"
+                id="fromDate">
 
-        <button onclick="downloadSchedulerExcel()">
-            <i class="fa-solid fa-table"></i>
-            Export Scheduler Excel
-        </button>
+            <input
+                type="date"
+                id="toDate">
 
-        <button onclick="window.location.href='dashboard.html'">
+            <select id="platform">
+
+                <option value="">All Platforms</option>
+
+                <option value="Instagram">Instagram</option>
+
+                <option value="Facebook">Facebook</option>
+
+                <option value="LinkedIn">LinkedIn</option>
+
+                <option value="Twitter">Twitter</option>
+
+                <option value="WhatsApp">WhatsApp</option>
+
+            </select>
+
+            <input
+                type="text"
+                id="search"
+                placeholder="🔍 Search captions...">
+
+        </div>
+
+        <!-- ===========================
+             Export Buttons
+        ============================ -->
+
+        <div class="button-grid">
+
+            <button onclick="downloadCaptionsPDF()">
+
+                <i class="fa-solid fa-file-pdf"></i>
+
+                Export Captions PDF
+
+            </button>
+
+            <button onclick="downloadCaptionsExcel()">
+
+                <i class="fa-solid fa-file-excel"></i>
+
+                Export Captions Excel
+
+            </button>
+
+            <button onclick="downloadSchedulerPDF()">
+
+                <i class="fa-solid fa-calendar-days"></i>
+
+                Export Scheduler PDF
+
+            </button>
+
+            <button onclick="downloadSchedulerExcel()">
+
+                <i class="fa-solid fa-table"></i>
+
+                Export Scheduler Excel
+
+            </button>
+
+        </div>
+
+        <br>
+
+        <button
+            class="back-btn"
+            onclick="window.location.href='dashboard.html'">
+
             <i class="fa-solid fa-arrow-left"></i>
+
             Back to Dashboard
+
         </button>
 
     </div>
@@ -50,4 +123,5 @@
 <script src="js/reports.js"></script>
 
 </body>
+
 </html>

@@ -1,16 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>Notifications</title>
-    <link rel="stylesheet" href="css/notifications.css">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CampaignHub - Notifications</title>
+
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+
 </head>
+
 <body>
 
-<h1>Notifications</h1>
+<div class="dashboard">
 
-<div id="notifications"></div>
+    <!-- Sidebar -->
 
-<script src="js/notifications.js"></script>
+    <aside class="sidebar">
+
+        <div class="logo">
+            <h2>Campaign<span style="color:#60a5fa;">Hub</span></h2>
+        </div>
+
+        <ul class="menu">
+
+            <li><a href="/dashboard">📊 Overview</a></li>
+
+            <li><a href="/captions.html">✨ AI Captions</a></li>
+
+            <li><a href="/content-planner.html">📝 Content Planner</a></li>
+
+            <li><a href="/scheduler.html">📅 Scheduler</a></li>
+
+            <li><a href="/images.html">🖼 Images</a></li>
+
+            <li><a href="/analytics.html">📈 Analytics</a></li>
+
+            <li class="active">
+                <a href="/notifications.html">
+                    🔔 Notifications
+                </a>
+            </li>
+
+            <li><a href="/profile.html">👤 Profile</a></li>
+
+        </ul>
+
+    </aside>
+
+    <!-- Main Content -->
+
+    <div class="main-content">
+
+        <div class="topbar">
+
+            <div>
+
+                <h1>Notifications</h1>
+
+                <p>Stay updated with CampaignHub activities.</p>
+
+            </div>
+
+            <button
+                class="logout"
+                onclick="logout()">
+
+                Logout
+
+            </button>
+
+        </div>
+
+        <!-- Notification List -->
+
+        <div class="notification-container">
+
+            <div id="notifications">
+
+                Loading notifications...
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="/js/notifications.js"></script>
+
+<script>
+
+function logout(){
+
+    fetch("/auth/logout",{
+        method:"POST"
+    });
+
+    window.location="/login.html";
+
+}
+
+</script>
 
 </body>
 </html>

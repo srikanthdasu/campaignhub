@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CampaignHub AI — Captions</title>
+
+    <link
+        rel="stylesheet"
+        href="/css/captions.css?v=11"
+    >
+</head>
+
+<body>
+
+<div class="shell">
+
+    <!-- =====================================================
+         SIDEBAR
+         ===================================================== -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            Campaign<span>Hub</span>
+        </div>
+
+        <nav>
+
+            <a
+                class="nav-item"
+                href="/dashboard"
+            >
+                📊 Overview
+            </a>
+
+            <a
+                class="nav-item active"
+                href="/captions.html"
+            >
+                ✨ AI Captions
+            </a>
+
+            <a
+                class="nav-item"
+                href="/content-planner.html"
+            >
+                📝 Content Planner
+            </a>
+
+            <a
+                class="nav-item"
+                href="/scheduler.html"
+            >
+                📅 Scheduler
+            </a>
+
+            <a
+                class="nav-item"
+                href="/images.html"
+            >
+                🎨 AI Images
+            </a>
+
+            <a
+                class="nav-item"
+                href="/analytics.html"
+            >
+                📈 Analytics
+            </a>
+
+            <a
+                class="nav-item"
+                href="/notifications.html"
+            >
+                🔔 Notifications
+            </a>
+
+            <a
+                class="nav-item"
+                href="/profile.html"
+            >
+                👤 Profile
+            </a>
+
+        </nav>
+
+    </aside>
+
+
+    <!-- =====================================================
+         MAIN
+         ===================================================== -->
+
+    <main class="main">
+
+        <div class="topbar">
+
+            <h1>
+                AI Captions
+            </h1>
+
+            <button
+                class="logout-btn"
+                id="logoutBtn"
+                type="button"
+            >
+                Log out
+            </button>
+
+        </div>
+
+
+        <div class="layout">
+
+
+            <!-- =================================================
+                 GENERATOR
+                 ================================================= -->
+
+            <section class="panel">
+
+                <h3>
+                    Generate a new caption
+                </h3>
+
+
+                <div class="field">
+
+                    <label for="prompt">
+                        Campaign prompt
+                    </label>
+
+                    <textarea
+                        id="prompt"
+                        rows="5"
+                        placeholder="e.g. A celebratory post for Independence Day with a focus on unity..."
+                    ></textarea>
+
+                </div>
+
+
+                <div class="form-row">
+
+
+                    <!-- PLATFORM -->
+
+                    <div class="field">
+
+                        <label for="platform">
+                            Platform
+                        </label>
+
+                        <select id="platform">
+
+                            <option value="Instagram">
+                                Instagram
+                            </option>
+
+                            <option value="Facebook">
+                                Facebook
+                            </option>
+
+                            <option value="LinkedIn">
+                                LinkedIn
+                            </option>
+
+                            <option value="X">
+                                X
+                            </option>
+
+                            <option value="TikTok">
+                                TikTok
+                            </option>
+
+                            <option value="Pinterest">
+                                Pinterest
+                            </option>
+
+                            <option value="WhatsApp Business">
+                                WhatsApp Business
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- TONE -->
+
+                    <div class="field">
+
+                        <label for="tone">
+                            Tone
+                        </label>
+
+                        <select id="tone">
+
+                            <option value="Professional">
+                                Professional
+                            </option>
+
+                            <option value="Playful">
+                                Playful
+                            </option>
+
+                            <option value="Bold">
+                                Bold
+                            </option>
+
+                            <option value="Minimalist">
+                                Minimalist
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <!-- GENERATE -->
+
+                <button
+                    class="btn"
+                    id="generateBtn"
+                    type="button"
+                >
+                    ✨ Generate Caption
+                </button>
+
+
+                <!-- RESULT -->
+
+                <div
+                    class="result-box"
+                    id="resultBox"
+                >
+                    Generated caption will appear here...
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 HISTORY
+                 ================================================= -->
+
+            <section class="panel">
+
+                <h3>
+                    History
+                </h3>
+
+                <div id="historyList">
+
+                    <div class="empty-state">
+                        Loading...
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<!-- =========================================================
+     JAVASCRIPT
+     ========================================================= -->
+
+<script src="/js/captions.js?v=11"></script>
+
+</body>
+</html>
