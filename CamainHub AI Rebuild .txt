@@ -1,0 +1,25 @@
+Phase 1 plan — Auth, RBAC, Agency/Client Setup, Profile, Settings, Security & Audit
+
+Database (Prisma) — I'll add only the tables Phase 1 needs, matching the spec's schema exactly (naming, agency_id/client_id scoping, cascade rules):
+
+agencies, clients, users (with the 7-role enum), user_client_access, audit_logs
+Everything else (campaigns, content, billing, etc.) stays out until its phase.
+
+Backend (NestJS)
+
+AuthModule — register/login, bcrypt password hashing, JWT access + refresh tokens
+UsersModule — profile CRUD, agency member management
+AgenciesModule / ClientsModule — agency setup, client creation, assigning users to clients via user_client_access
+RbacModule — a @Roles() decorator + guard enforcing the Section 4 permission matrix server-side, plus a client-access guard checking user_client_access for non-agency-wide roles
+AuditModule — interceptor that writes to audit_logs on sensitive actions (login, role changes, settings changes)
+SettingsModule — agency-level settings (name, branding basics, timezone) and per-user settings (notification prefs)
+No debug/reset endpoints anywhere, per Section 8.
+
+Frontend (Next.js)
+
+/login, /register
+/dashboard shell with role-aware nav
+/admin/agency (agency + client setup, Owner/Admin only)
+/admin/members (invite/manage users + roles, scoped by permission matrix)
+/settings (agency settings), /profile (own profile)
+Auth context + protected-route wrapper calling the NestJS API (no client-side-only permission checks — matches Section 4's "never in the frontend alone")

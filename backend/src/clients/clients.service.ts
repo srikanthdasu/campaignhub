@@ -69,6 +69,17 @@ export class ClientsService {
     return client;
   }
 
+  async listAccess(agencyId: string, clientId: string) {
+    await this.requireInAgency(agencyId, clientId);
+
+    const access = await this.prisma.userClientAccess.findMany({
+      where: { clientId },
+      include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    });
+
+    return access.map((a) => a.user);
+  }
+
   async grantAccess(agencyId: string, actorId: string, clientId: string, targetUserId: string) {
     await this.requireInAgency(agencyId, clientId);
 

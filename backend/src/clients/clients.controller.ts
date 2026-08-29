@@ -42,6 +42,12 @@ export class ClientsController {
     return this.clientsService.update(user.agencyId!, user.sub, id, dto);
   }
 
+  @Get(':id/access')
+  @Roles(Role.OWNER, Role.ADMIN)
+  listAccess(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.clientsService.listAccess(user.agencyId!, id);
+  }
+
   @Post(':id/access')
   @Roles(Role.OWNER, Role.ADMIN)
   grantAccess(
