@@ -1,26 +1,159 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* neutral scale — cool violet undertone, not flat gray */
+  --color-neutral-50: #f9f9fb;
+  --color-neutral-100: #f1f1f5;
+  --color-neutral-200: #e3e3ea;
+  --color-neutral-300: #cbcbd6;
+  --color-neutral-400: #9e9eae;
+  --color-neutral-500: #75758a;
+  --color-neutral-600: #55556b;
+  --color-neutral-700: #3d3d4f;
+  --color-neutral-800: #26262f;
+  --color-neutral-900: #18181f;
+  --color-neutral-950: #0d0d12;
+
+  /* accent — indigo/violet */
+  --color-accent-50: #f2f0fe;
+  --color-accent-100: #e6e2fd;
+  --color-accent-200: #cdc5fb;
+  --color-accent-300: #aea0f7;
+  --color-accent-400: #8b75f1;
+  --color-accent-500: #6c54eb;
+  --color-accent-600: #5b3fe0;
+  --color-accent-700: #4a31c4;
+  --color-accent-800: #3b2699;
+  --color-accent-900: #2e1e76;
+
+  --background: var(--color-neutral-50);
+  --foreground: var(--color-neutral-900);
+  --surface: #ffffff;
+  --surface-muted: var(--color-neutral-100);
+  --border-subtle: color-mix(in oklab, var(--color-neutral-900) 8%, transparent);
+
+  --shadow-tint: 234 15% 20%;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-accent-50: var(--color-accent-50);
+  --color-accent-100: var(--color-accent-100);
+  --color-accent-200: var(--color-accent-200);
+  --color-accent-300: var(--color-accent-300);
+  --color-accent-400: var(--color-accent-400);
+  --color-accent-500: var(--color-accent-500);
+  --color-accent-600: var(--color-accent-600);
+  --color-accent-700: var(--color-accent-700);
+  --color-accent-800: var(--color-accent-800);
+  --color-accent-900: var(--color-accent-900);
+
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+  --color-neutral-950: var(--color-neutral-950);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* generous, consistent radius scale — the single lever every rounded-* utility inherits */
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  /* soft, diffused, hue-tinted elevation instead of flat black shadows */
+  --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-tint) / 0.06);
+  --shadow-md: 0 2px 4px -1px hsl(var(--shadow-tint) / 0.05), 0 12px 24px -8px hsl(var(--shadow-tint) / 0.12);
+  --shadow-lg: 0 4px 8px -2px hsl(var(--shadow-tint) / 0.06), 0 24px 48px -12px hsl(var(--shadow-tint) / 0.18);
+  --shadow-xl: 0 8px 16px -4px hsl(var(--shadow-tint) / 0.08), 0 40px 80px -20px hsl(var(--shadow-tint) / 0.22);
+
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--color-neutral-950);
+    --foreground: var(--color-neutral-50);
+    --surface: var(--color-neutral-900);
+    --surface-muted: var(--color-neutral-800);
+    --border-subtle: color-mix(in oklab, white 10%, transparent);
+    --shadow-tint: 234 60% 3%;
   }
+}
+
+@utility card-surface {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, white 7%, transparent), transparent 55%),
+    var(--surface);
+  border: 1px solid var(--border-subtle);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+@utility animate-pulse-slow {
+  animation: pulse-slow 5s ease-in-out infinite;
+}
+
+@utility skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted) 25%,
+    color-mix(in oklab, var(--surface-muted) 60%, white) 50%,
+    var(--surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@utility text-balance-pretty {
+  text-wrap: balance;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
