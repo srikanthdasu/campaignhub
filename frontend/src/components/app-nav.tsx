@@ -40,16 +40,15 @@ export function AppNav() {
 
   return (
     <nav className="card-surface flex w-64 shrink-0 flex-col rounded-none border-y-0 border-l-0 p-5">
-      <div className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-neutral-900 to-accent-900 shadow-md shadow-accent-900/30">
-          <Image src="/brand/emblem.png" alt="" width={28} height={27} className="h-7 w-auto" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-neutral-50">
-            Campaign<span className="gradient-text">Hub AI</span>
-          </p>
-          <p className="truncate text-[11px] text-neutral-500">by Sreema</p>
-        </div>
+      <div className="mb-8">
+        <Image
+          src="/brand/logo-wide.png"
+          alt="CampaignHub AI by Sreema"
+          width={920}
+          height={299}
+          priority
+          className="h-auto w-full"
+        />
       </div>
 
       <ul className="flex-1 space-y-1">
