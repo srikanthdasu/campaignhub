@@ -43,7 +43,7 @@ export default function RegisterPage() {
         subtext="You'll be the Owner — invite your team and clients once you're in."
       />
 
-      <div className="flex flex-col items-center justify-center gap-8 px-6 py-16">
+      <div className="flex flex-col items-center justify-center gap-6 px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}

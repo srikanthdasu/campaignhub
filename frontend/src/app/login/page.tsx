@@ -41,7 +41,7 @@ export default function LoginPage() {
         subtext="Auth, roles, clients, approvals, publishing, and AI — built for agencies that manage many brands at once."
       />
 
-      <div className="flex flex-col items-center justify-center gap-8 px-6 py-16">
+      <div className="flex flex-col items-center justify-center gap-6 px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}

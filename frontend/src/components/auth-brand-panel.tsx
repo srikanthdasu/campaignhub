@@ -15,7 +15,7 @@ export function AuthBrandPanel({
   subtext: string;
 }) {
   return (
-    <div className="relative hidden overflow-y-auto overflow-x-hidden bg-gradient-to-br from-neutral-950 via-accent-900 to-neutral-950 lg:flex lg:flex-col lg:gap-6 lg:p-10">
+    <div className="relative hidden overflow-y-auto overflow-x-hidden bg-gradient-to-br from-neutral-950 via-accent-900 to-neutral-950 lg:flex lg:flex-col lg:gap-4 lg:px-10 lg:pb-6 lg:pt-6">
       {/* Ambient depth: soft glows + a faint dot grid, so the panel reads as a "scene" rather than a flat fill */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
