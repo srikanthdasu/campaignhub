@@ -26,11 +26,11 @@
   --color-accent-800: #3b2699;
   --color-accent-900: #2e1e76;
 
-  --background: var(--color-neutral-50);
+  --background: var(--color-neutral-100);
   --foreground: var(--color-neutral-900);
   --surface: #ffffff;
   --surface-muted: var(--color-neutral-100);
-  --border-subtle: color-mix(in oklab, var(--color-neutral-900) 8%, transparent);
+  --border-subtle: color-mix(in oklab, var(--color-neutral-900) 12%, transparent);
 
   --shadow-tint: 234 15% 20%;
 }

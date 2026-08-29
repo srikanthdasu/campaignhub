@@ -51,7 +51,7 @@ export default function DashboardPage() {
         transition={{ duration: DURATION.base, ease: EASE_SOFT }}
         className="card-surface relative overflow-hidden rounded-3xl p-8 shadow-lg"
       >
-        <div className="absolute -right-16 -top-16 h-72 w-72 opacity-60 lg:opacity-100">
+        <div className="absolute -right-4 -top-4 hidden h-64 w-64 sm:block">
           <GradientMeshHeroLazy className="h-full w-full" />
         </div>
         <div className="relative z-10 max-w-xl">
