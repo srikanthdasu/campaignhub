@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth, ApiError } from '@/contexts/auth-context';
@@ -39,14 +40,18 @@ export default function LoginPage() {
           <GradientMeshHeroLazy className="h-[28rem] w-[28rem]" />
         </div>
 
-        <motion.p
+        <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION.base, ease: EASE_SOFT }}
-          className="relative z-10 text-sm font-semibold tracking-wide text-white/80"
+          className="relative z-10 flex items-center gap-2.5"
         >
-          CampaignHub AI
-        </motion.p>
+          <Image src="/brand/emblem.png" alt="" width={30} height={28} className="h-7 w-auto" />
+          <div>
+            <p className="text-sm font-semibold tracking-wide text-white">CampaignHub AI</p>
+            <p className="text-xs text-white/50">by Sreema</p>
+          </div>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}

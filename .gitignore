@@ -4,3 +4,6 @@
 !.env.example
 .DS_Store
 CamainHub AI Rebuild .txt
+
+# raw brand source assets — optimized/cropped copies live in frontend/public/brand
+/images/

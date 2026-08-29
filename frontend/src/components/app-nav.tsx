@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/auth-context';
@@ -31,18 +32,14 @@ export function AppNav() {
   return (
     <nav className="card-surface flex w-60 shrink-0 flex-col rounded-none border-y-0 border-l-0 p-5">
       <div className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-400 to-accent-700 text-sm font-bold text-white shadow-md shadow-accent-900/20">
-          C
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-neutral-900 to-accent-900 shadow-md shadow-accent-900/20">
+          <Image src="/brand/emblem.png" alt="" width={28} height={27} className="h-7 w-auto" />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50">
             CampaignHub AI
           </p>
-          {user && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              {ROLE_LABELS[user.role as Role] ?? user.role}
-            </p>
-          )}
+          <p className="truncate text-xs text-neutral-400 dark:text-neutral-500">by Sreema</p>
         </div>
       </div>
 
@@ -76,10 +73,15 @@ export function AppNav() {
       </ul>
 
       <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-        <p className="mb-2 truncate text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
           {user?.name}
         </p>
-        <Button variant="secondary" size="sm" onClick={onLogout} className="w-full">
+        {user && (
+          <p className="mb-2 truncate text-xs text-neutral-500 dark:text-neutral-400">
+            {ROLE_LABELS[user.role as Role] ?? user.role}
+          </p>
+        )}
+        <Button variant="secondary" size="sm" onClick={onLogout} className="mt-2 w-full">
           Sign out
         </Button>
       </div>
