@@ -69,6 +69,7 @@ export function PlatformOrbit({ className }: { className?: string }) {
                         alt={p.label}
                         width={96}
                         height={96}
+                        priority
                         className="h-full w-full object-cover"
                       />
                     </motion.div>
