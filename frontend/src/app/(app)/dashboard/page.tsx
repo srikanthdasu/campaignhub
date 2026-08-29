@@ -87,9 +87,9 @@ export default function DashboardPage() {
         )}
         <Card padding="lg">
           <p className="text-sm text-neutral-500 dark:text-neutral-400">Plan</p>
-          <p className="mt-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
+          <div className="mt-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
             {agency?.plan ?? <Skeleton className="h-7 w-20" />}
-          </p>
+          </div>
         </Card>
       </motion.div>
     </motion.div>
@@ -100,9 +100,9 @@ function StatCard({ label, value }: { label: string; value: number | null }) {
   return (
     <Card padding="lg" hoverable>
       <p className="text-sm text-neutral-500 dark:text-neutral-400">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
+      <div className="mt-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
         {value === null ? <Skeleton className="h-9 w-16" /> : <AnimatedNumber value={value} />}
-      </p>
+      </div>
     </Card>
   );
 }
