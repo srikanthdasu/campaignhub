@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { api, ApiError, AuthUser, setAccessToken } from '@/lib/api';
+import { api, ApiError, AuthUser, setAccessToken, subscribeToTokenChanges } from '@/lib/api';
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -20,6 +20,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
+    // Catches session expiry discovered mid-session (a background silent-refresh
+    // failing inside api.ts) as well as the explicit logout() call below.
+    subscribeToTokenChanges((token) => {
+      if (token === null) {
+        setUser(null);
+        setStatus('unauthenticated');
+      }
+    });
+
     api
       .refreshSession()
       .then((session) => {

@@ -43,18 +43,31 @@ interface AuthResponse {
   accessToken: string;
 }
 
-async function refreshSession(): Promise<AuthResponse | null> {
-  const res = await fetch(`${API_URL}/auth/refresh`, {
-    method: 'POST',
-    credentials: 'include',
+// Deduped so concurrent 401s (e.g. several requests firing on page load) share one
+// /auth/refresh call instead of racing — the backend rotates the refresh token on each
+// use, so a second concurrent call would otherwise present an already-revoked token and fail.
+let refreshInFlight: Promise<AuthResponse | null> | null = null;
+
+function refreshSession(): Promise<AuthResponse | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      setAccessToken(null);
+      return null;
+    }
+    const body = (await parseBody(res)) as AuthResponse;
+    setAccessToken(body.accessToken);
+    return body;
+  })().finally(() => {
+    refreshInFlight = null;
   });
-  if (!res.ok) {
-    setAccessToken(null);
-    return null;
-  }
-  const body = (await parseBody(res)) as AuthResponse;
-  setAccessToken(body.accessToken);
-  return body;
+
+  return refreshInFlight;
 }
 
 interface RequestOptions {

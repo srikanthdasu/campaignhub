@@ -113,7 +113,16 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user || !user.isActive) {
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!user.isActive) {
+      await this.audit.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED_INACTIVE',
+        entityType: 'user',
+        entityId: user.id,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
