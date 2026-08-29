@@ -75,7 +75,7 @@ export default function ProfilePage() {
   }
 
   if (!profile) {
-    return <p className="text-sm text-red-600">{error ?? 'Profile not found'}</p>;
+    return <p className="text-sm text-red-400">{error ?? 'Profile not found'}</p>;
   }
 
   return (
@@ -86,10 +86,8 @@ export default function ProfilePage() {
       className="max-w-md space-y-6"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
-        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Your profile
-        </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">{profile.email}</p>
+        <h1 className="text-2xl font-semibold text-neutral-50">Your profile</h1>
+        <p className="text-sm text-neutral-400">{profile.email}</p>
       </motion.div>
 
       <AnimatePresence>
@@ -98,7 +96,7 @@ export default function ProfilePage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+            className="overflow-hidden rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300"
           >
             {error}
           </motion.p>
@@ -108,7 +106,7 @@ export default function ProfilePage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            className="overflow-hidden rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300"
           >
             {message}
           </motion.p>
@@ -121,20 +119,18 @@ export default function ProfilePage() {
             <Input id="name" label="Name" value={name} onChange={(e) => setName(e.target.value)} />
 
             <div className="space-y-1.5">
-              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Role
-              </span>
+              <span className="text-sm font-medium text-neutral-300">Role</span>
               <div>
                 <Badge tone="accent">{ROLE_LABELS[profile.role]}</Badge>
               </div>
             </div>
 
-            <label className="flex items-center gap-2.5 text-sm text-neutral-700 dark:text-neutral-300">
+            <label className="flex items-center gap-2.5 text-sm text-neutral-300">
               <input
                 type="checkbox"
                 checked={emailOnApproval}
                 onChange={(e) => setEmailOnApproval(e.target.checked)}
-                className="h-4 w-4 rounded border-neutral-300 text-accent-600 focus:ring-accent-400"
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-accent-500 focus:ring-accent-400"
               />
               Email me when content needs my approval
             </label>

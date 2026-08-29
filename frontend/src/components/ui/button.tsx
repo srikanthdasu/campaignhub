@@ -17,11 +17,10 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-b from-accent-500 to-accent-600 text-white shadow-md shadow-accent-900/10 hover:shadow-lg hover:from-accent-400 hover:to-accent-600',
-  secondary:
-    'card-surface text-neutral-900 dark:text-neutral-50 hover:shadow-md',
-  ghost: 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800',
-  danger: 'bg-red-600 text-white shadow-md shadow-red-900/10 hover:bg-red-500',
+    'bg-gradient-to-r from-accent-400 via-accent-500 to-fuchsia-500 text-white shadow-md shadow-accent-900/30 hover:shadow-lg hover:brightness-110',
+  secondary: 'card-surface text-neutral-50 hover:border-white/20 hover:bg-white/[0.07]',
+  ghost: 'text-neutral-300 hover:bg-white/[0.06]',
+  danger: 'bg-red-500/90 text-white shadow-md shadow-red-900/30 hover:bg-red-500',
 };
 
 const sizeClasses: Record<Size, string> = {

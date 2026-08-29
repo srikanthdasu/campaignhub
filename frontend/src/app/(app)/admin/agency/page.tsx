@@ -109,10 +109,8 @@ export default function AgencyAdminPage() {
       className="max-w-2xl space-y-8"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
-        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Agency &amp; clients
-        </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-2xl font-semibold text-neutral-50">Agency &amp; clients</h1>
+        <p className="text-sm text-neutral-400">
           Create clients and control which members can access each one.
         </p>
       </motion.div>
@@ -123,7 +121,7 @@ export default function AgencyAdminPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+            className="overflow-hidden rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300"
           >
             {error}
           </motion.p>
@@ -156,7 +154,7 @@ export default function AgencyAdminPage() {
           </div>
         ) : clients.length === 0 ? (
           <Card padding="lg">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">No clients yet.</p>
+            <p className="text-sm text-neutral-400">No clients yet.</p>
           </Card>
         ) : (
           <ul className="space-y-3">
@@ -173,10 +171,10 @@ export default function AgencyAdminPage() {
                   <Card padding="none" className="overflow-hidden">
                     <button
                       onClick={() => toggleClient(client.id)}
-                      className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-medium text-neutral-900 dark:text-neutral-50"
+                      className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-medium text-neutral-50"
                     >
                       {client.name}
-                      <span className="text-xs font-normal text-accent-600 dark:text-accent-400">
+                      <span className="text-xs font-normal text-accent-300">
                         {expandedClientId === client.id ? 'Hide access' : 'Manage access'}
                       </span>
                     </button>
@@ -188,7 +186,7 @@ export default function AgencyAdminPage() {
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: DURATION.base, ease: EASE_SOFT }}
-                          className="overflow-hidden border-t border-neutral-100 dark:border-neutral-800"
+                          className="overflow-hidden border-t border-white/10"
                         >
                           <div className="space-y-3 px-5 py-4">
                             {accessLoading ? (
@@ -196,7 +194,7 @@ export default function AgencyAdminPage() {
                             ) : (
                               <ul className="space-y-2">
                                 {access.length === 0 && (
-                                  <li className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  <li className="text-xs text-neutral-400">
                                     No members assigned yet. Owners and Admins always have full
                                     access.
                                   </li>
@@ -211,12 +209,12 @@ export default function AgencyAdminPage() {
                                       transition={{ duration: DURATION.fast, ease: EASE_SOFT }}
                                       className="flex items-center justify-between text-xs"
                                     >
-                                      <span className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                                      <span className="flex items-center gap-2 text-neutral-300">
                                         {m.name} <Badge tone="neutral">{ROLE_LABELS[m.role]}</Badge>
                                       </span>
                                       <button
                                         onClick={() => onRevoke(client.id, m.id)}
-                                        className="font-medium text-red-600 hover:underline dark:text-red-400"
+                                        className="font-medium text-red-400 hover:underline"
                                       >
                                         Remove
                                       </button>

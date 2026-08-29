@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { ROLE_LABELS, Role, isAgencyAdmin } from '@/lib/roles';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedNumber } from '@/components/ui/animated-number';
 import { GradientMeshHeroLazy } from '@/components/three/gradient-mesh-hero-lazy';
@@ -49,19 +50,20 @@ export default function DashboardPage() {
       <motion.div
         variants={fadeUp}
         transition={{ duration: DURATION.base, ease: EASE_SOFT }}
-        className="card-surface relative overflow-hidden rounded-3xl p-8 shadow-lg"
+        className="card-surface relative overflow-hidden rounded-3xl p-8 shadow-lg sm:p-10"
       >
-        <div className="absolute -right-4 -top-4 hidden h-64 w-64 sm:block">
+        <div className="absolute -right-8 -top-8 hidden h-72 w-72 sm:block">
           <GradientMeshHeroLazy className="h-full w-full" />
         </div>
         <div className="relative z-10 max-w-xl">
-          <p className="text-sm font-medium text-accent-600 dark:text-accent-400">
-            {agency?.name ?? 'Your agency'}
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
-            Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-300 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
+            {agency?.name ?? 'Campaign Command Center'}
+          </span>
+          <h1 className="mt-4 text-3xl font-semibold leading-tight text-neutral-50 sm:text-4xl">
+            Welcome back<span className="gradient-text">{user ? `, ${user.name.split(' ')[0]}` : ''}</span>
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
             You&apos;re signed in as {user ? ROLE_LABELS[user.role as Role] ?? user.role : '—'}.
             Phase 1 — Auth, RBAC, Agency/Client Setup, Profile, Settings, and Security &amp; Audit
             — is live. Content, scheduling, and AI modules land in later phases.
@@ -79,16 +81,19 @@ export default function DashboardPage() {
           <StatCard label="Team members" value={memberCount} />
         ) : (
           <Card padding="lg">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">Your role</p>
-            <p className="mt-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
+            <p className="text-sm text-neutral-400">Your role</p>
+            <p className="mt-2 text-2xl font-semibold text-neutral-50">
               {user ? ROLE_LABELS[user.role as Role] ?? user.role : '—'}
             </p>
           </Card>
         )}
         <Card padding="lg">
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">Plan</p>
-          <div className="mt-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-            {agency?.plan ?? <Skeleton className="h-7 w-20" />}
+          <p className="text-sm text-neutral-400">Plan</p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-2xl font-semibold text-neutral-50">
+              {agency?.plan ?? <Skeleton className="h-7 w-20" />}
+            </span>
+            {agency && <Badge tone="success">Active</Badge>}
           </div>
         </Card>
       </motion.div>
@@ -99,8 +104,8 @@ export default function DashboardPage() {
 function StatCard({ label, value }: { label: string; value: number | null }) {
   return (
     <Card padding="lg" hoverable>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400">{label}</p>
-      <div className="mt-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
+      <p className="text-sm text-neutral-400">{label}</p>
+      <div className="mt-2 text-3xl font-semibold text-neutral-50">
         {value === null ? <Skeleton className="h-9 w-16" /> : <AnimatedNumber value={value} />}
       </div>
     </Card>

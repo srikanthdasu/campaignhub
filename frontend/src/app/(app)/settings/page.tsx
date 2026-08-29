@@ -79,7 +79,7 @@ export default function SettingsPage() {
   }
 
   if (!agency) {
-    return <p className="text-sm text-red-600">{error ?? 'Agency not found'}</p>;
+    return <p className="text-sm text-red-400">{error ?? 'Agency not found'}</p>;
   }
 
   return (
@@ -90,9 +90,7 @@ export default function SettingsPage() {
       className="max-w-md space-y-6"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
-        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Agency settings
-        </h1>
+        <h1 className="text-2xl font-semibold text-neutral-50">Agency settings</h1>
         <div className="mt-2 flex items-center gap-2">
           <Badge tone="accent">{agency.plan}</Badge>
           <Badge tone="neutral">{agency.subscriptionStatus}</Badge>
@@ -105,7 +103,7 @@ export default function SettingsPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+            className="overflow-hidden rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300"
           >
             {error}
           </motion.p>
@@ -115,7 +113,7 @@ export default function SettingsPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+            className="overflow-hidden rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300"
           >
             {message}
           </motion.p>
@@ -125,8 +123,8 @@ export default function SettingsPage() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <Card padding="lg">
           {!admin ? (
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Agency name: <span className="font-medium">{agency.name}</span>
+            <p className="text-sm text-neutral-300">
+              Agency name: <span className="font-medium text-neutral-100">{agency.name}</span>
               <br />
               Only Owners and Admins can change agency settings.
             </p>

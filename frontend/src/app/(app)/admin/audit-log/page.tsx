@@ -47,16 +47,14 @@ export default function AuditLogPage() {
       className="max-w-3xl space-y-6"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
-        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Security &amp; audit
-        </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-2xl font-semibold text-neutral-50">Security &amp; audit</h1>
+        <p className="text-sm text-neutral-400">
           Recent security-relevant activity across your agency.
         </p>
       </motion.div>
 
       {error && (
-        <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
+        <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300">
           {error}
         </p>
       )}
@@ -70,7 +68,7 @@ export default function AuditLogPage() {
           </div>
         ) : entries.length === 0 ? (
           <Card padding="lg">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">No activity yet.</p>
+            <p className="text-sm text-neutral-400">No activity yet.</p>
           </Card>
         ) : (
           <ul className="space-y-2">
@@ -90,7 +88,7 @@ export default function AuditLogPage() {
                           <span className="text-xs text-neutral-400">{entry.entityType}</span>
                         )}
                       </div>
-                      <p className="mt-1.5 truncate text-xs text-neutral-500 dark:text-neutral-400">
+                      <p className="mt-1.5 truncate text-xs text-neutral-400">
                         {entry.user ? `${entry.user.name} (${entry.user.email})` : 'System'}
                       </p>
                     </div>

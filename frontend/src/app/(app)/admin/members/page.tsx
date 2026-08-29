@@ -84,8 +84,8 @@ export default function MembersAdminPage() {
       className="max-w-2xl space-y-8"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
-        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">Members</h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-2xl font-semibold text-neutral-50">Members</h1>
+        <p className="text-sm text-neutral-400">
           Add teammates and clients, and manage their roles. Assign them to specific clients from
           the Agency &amp; Clients page.
         </p>
@@ -97,7 +97,7 @@ export default function MembersAdminPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+            className="overflow-hidden rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300"
           >
             {error}
           </motion.p>
@@ -106,9 +106,7 @@ export default function MembersAdminPage() {
 
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <Card padding="lg">
-          <h2 className="mb-4 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-            Add a member
-          </h2>
+          <h2 className="mb-4 text-sm font-semibold text-neutral-50">Add a member</h2>
           <form onSubmit={onCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -163,10 +161,8 @@ export default function MembersAdminPage() {
                 >
                   <Card padding="md" className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50">
-                        {m.name}
-                      </p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{m.email}</p>
+                      <p className="text-sm font-medium text-neutral-50">{m.name}</p>
+                      <p className="text-xs text-neutral-400">{m.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Select

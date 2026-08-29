@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 function AppShellSkeleton() {
   return (
     <div className="flex flex-1">
-      <div className="w-56 shrink-0 border-r border-neutral-200 p-4 dark:border-neutral-800">
+      <div className="w-64 shrink-0 border-r border-white/10 p-4">
         <Skeleton className="mb-6 h-5 w-32" />
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
