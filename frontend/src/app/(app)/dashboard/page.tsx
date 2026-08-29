@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedNumber } from '@/components/ui/animated-number';
-import { Logo3DShowcase } from '@/components/logo-3d-showcase';
+import { SocialConstellation } from '@/components/social-constellation';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 interface Agency {
@@ -62,8 +62,8 @@ export default function DashboardPage() {
         transition={{ duration: DURATION.base, ease: EASE_SOFT }}
         className="card-surface relative overflow-hidden rounded-3xl p-8 shadow-lg sm:p-10"
       >
-        <div className="absolute -right-4 -top-4 hidden h-56 w-56 sm:block">
-          <Logo3DShowcase className="h-full w-full" />
+        <div className="absolute -right-2 -top-2 hidden sm:block">
+          <SocialConstellation size="md" />
         </div>
         <div className="relative z-10 max-w-xl">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-300 backdrop-blur-sm">

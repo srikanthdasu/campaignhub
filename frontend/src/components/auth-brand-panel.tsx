@@ -15,7 +15,7 @@ export function AuthBrandPanel({
   subtext: string;
 }) {
   return (
-    <div className="relative hidden overflow-y-auto overflow-x-hidden bg-gradient-to-br from-neutral-950 via-accent-900 to-neutral-950 lg:flex lg:flex-col lg:gap-4 lg:px-10 lg:pb-6 lg:pt-6">
+    <div className="relative hidden overflow-y-auto overflow-x-hidden bg-gradient-to-br from-neutral-950 via-accent-900 to-neutral-950 lg:flex lg:min-h-screen lg:flex-col lg:gap-2 lg:px-10 lg:pb-4 lg:pt-3">
       {/* Ambient depth: soft glows + a faint dot grid, so the panel reads as a "scene" rather than a flat fill */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
@@ -83,7 +83,7 @@ export function AuthBrandPanel({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION.base, ease: EASE_SOFT, delay: 1 }}
-          className="mt-6 text-center text-sm font-medium text-white/70"
+          className="mt-3 text-center text-sm font-medium text-white/70"
         >
           Publish everywhere — one click, every platform.
         </motion.p>

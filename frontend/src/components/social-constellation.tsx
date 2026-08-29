@@ -28,11 +28,17 @@ const toneClasses: Record<StatChip['tone'], string> = {
 };
 
 interface SocialConstellationProps {
-  size?: 'lg' | 'sm';
+  size?: 'lg' | 'md' | 'sm';
   showStats?: boolean;
   hint?: boolean;
   className?: string;
 }
+
+const SIZES = {
+  lg: { dims: 340, radius: 148, centerSize: 84, chipSize: 48, iconSize: 20 },
+  md: { dims: 208, radius: 90, centerSize: 60, chipSize: 36, iconSize: 16 },
+  sm: { dims: 128, radius: 54, centerSize: 38, chipSize: 26, iconSize: 13 },
+} as const;
 
 export function SocialConstellation({
   size = 'lg',
@@ -50,11 +56,7 @@ export function SocialConstellation({
   const shiftX = useTransform(springX, [-0.5, 0.5], [-10, 10]);
   const shiftY = useTransform(springY, [-0.5, 0.5], [-10, 10]);
 
-  const dims = size === 'lg' ? 340 : 128;
-  const radius = size === 'lg' ? 148 : 54;
-  const centerSize = size === 'lg' ? 84 : 38;
-  const chipSize = size === 'lg' ? 48 : 26;
-  const iconSize = size === 'lg' ? 20 : 13;
+  const { dims, radius, centerSize, chipSize, iconSize } = SIZES[size];
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const rect = containerRef.current?.getBoundingClientRect();
