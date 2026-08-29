@@ -51,6 +51,7 @@ model Client {
   contentItems   ContentItem[]
   mediaAssets    MediaAsset[]
   socialAccounts SocialAccount[]
+  inboxMessages  InboxMessage[]
 
   @@index([agencyId])
   @@map("clients")
@@ -306,13 +307,16 @@ model ApprovalStep {
   @@map("approval_steps")
 }
 
-// Minimal placeholder — no OAuth token exchange yet. Lets Phase 2's Scheduler/Content
-// Planner reference "a platform target" before Phase 3 builds real account connections.
+// Real OAuth token exchange requires a registered developer app per platform (Meta, LinkedIn,
+// X, TikTok, YouTube, Pinterest, WhatsApp) — external dependency the spec itself flags as
+// slow to obtain. Until those exist, accounts are added manually (label + optional externally
+// known account id); accessTokenEncrypted/refreshTokenEncrypted populate once real OAuth lands.
 model SocialAccount {
   id                    String         @id @default(uuid()) @db.Uuid
   clientId              String         @map("client_id") @db.Uuid
   client                Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   platform              SocialPlatform
+  label                 String
   externalAccountId     String?        @map("external_account_id")
   accessTokenEncrypted  String?        @map("access_token_encrypted")
   refreshTokenEncrypted String?        @map("refresh_token_encrypted")
@@ -321,9 +325,26 @@ model SocialAccount {
   connectedAt           DateTime       @default(now()) @map("connected_at")
 
   scheduledPosts ScheduledPost[]
+  inboxMessages  InboxMessage[]
 
   @@index([clientId])
   @@map("social_accounts")
+}
+
+model InboxMessage {
+  id              String         @id @default(uuid()) @db.Uuid
+  clientId        String         @map("client_id") @db.Uuid
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  socialAccountId String?        @map("social_account_id") @db.Uuid
+  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
+  platform        SocialPlatform
+  senderName      String         @map("sender_name")
+  message         String
+  isRead          Boolean        @default(false) @map("is_read")
+  receivedAt      DateTime       @default(now()) @map("received_at")
+
+  @@index([clientId])
+  @@map("inbox_messages")
 }
 
 enum ScheduledPostStatus {
