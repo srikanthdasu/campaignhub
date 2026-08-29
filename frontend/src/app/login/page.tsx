@@ -35,15 +35,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="grid lg:grid-cols-2 lg:items-start">
-        <AuthBrandPanel
-          eyebrow="Agency Command Center"
-          headline="Run every client campaign from one calm, connected workspace."
-          subtext="Auth, roles, clients, approvals, publishing, and AI — built for agencies that manage many brands at once."
-        />
+    <div className="grid lg:grid-cols-2 lg:items-start">
+      <AuthBrandPanel
+        eyebrow="Agency Command Center"
+        headline="Run every client campaign from one calm, connected workspace."
+        subtext="Auth, roles, clients, approvals, publishing, and AI — built for agencies that manage many brands at once."
+      />
 
-        <div className="flex flex-col items-center gap-4 px-6 py-8">
+      <div className="flex flex-col items-center gap-4 px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -126,10 +125,9 @@ export default function LoginPage() {
             </motion.p>
           </motion.form>
         </Card>
-        </div>
-      </div>
 
-      <AuthPromoFooter />
+        <AuthPromoFooter />
+      </div>
     </div>
   );
 }

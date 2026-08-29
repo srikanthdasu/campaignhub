@@ -3,10 +3,8 @@
 import { motion } from 'framer-motion';
 import { DURATION, EASE_SOFT } from '@/lib/motion';
 
-// Fills whatever vertical space is left below the hero/form grid instead of leaving it blank —
-// grows via flex-1 so it absorbs exactly the leftover room on any screen height rather than
-// adding fixed height on top of already-fitted content. Real, built capabilities only (no
-// fabricated stats/social proof) — matches the "no free space, but nothing fake either" brief.
+// Sits below the sign-in/sign-up card, in the space that would otherwise be empty on tall
+// screens — real, already-built capabilities only (no fabricated stats/social proof).
 const FEATURES = ['Role-based access', 'Real-time approvals', 'AI content tools', 'Multi-client workspace'];
 
 export function AuthPromoFooter() {
@@ -15,9 +13,9 @@ export function AuthPromoFooter() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: DURATION.base, ease: EASE_SOFT, delay: 0.4 }}
-      className="flex flex-1 flex-col items-center justify-center gap-1 border-t border-white/10 px-6 py-1 text-center"
+      className="flex w-full max-w-sm flex-col items-center gap-2 pt-6 text-center"
     >
-      <p className="gradient-text text-sm font-semibold sm:text-base">
+      <p className="gradient-text text-base font-semibold sm:text-lg">
         Plan it. Approve it. Publish it. All in one place.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
