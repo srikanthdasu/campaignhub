@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService } from './media.service.js';
 import { UpdateMediaDto } from './dto/update-media.dto.js';
-import { mediaMulterStorage } from './media-storage.js';
+import { mediaMulterStorage, mediaMulterFileFilter } from './media-storage.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
@@ -28,7 +28,9 @@ export class MediaController {
   constructor(private mediaService: MediaService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file', { storage: mediaMulterStorage }))
+  @UseInterceptors(
+    FileInterceptor('file', { storage: mediaMulterStorage, fileFilter: mediaMulterFileFilter }),
+  )
   upload(
     @Param('clientId') clientId: string,
     @CurrentUser() user: AuthenticatedUser,

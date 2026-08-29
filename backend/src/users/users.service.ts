@@ -69,7 +69,11 @@ export class UsersService {
     });
   }
 
-  async createMember(agencyId: string, actorId: string, dto: CreateMemberDto) {
+  async createMember(agencyId: string, actorId: string, actorRole: Role, dto: CreateMemberDto) {
+    if (dto.role === Role.OWNER && actorRole !== Role.OWNER) {
+      throw new ForbiddenException('Only an Owner can create another Owner');
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists');
@@ -111,7 +115,17 @@ export class UsersService {
     return user;
   }
 
-  async updateRole(agencyId: string, actorId: string, targetUserId: string, role: Role) {
+  async updateRole(
+    agencyId: string,
+    actorId: string,
+    actorRole: Role,
+    targetUserId: string,
+    role: Role,
+  ) {
+    if (role === Role.OWNER && actorRole !== Role.OWNER) {
+      throw new ForbiddenException('Only an Owner can promote a member to Owner');
+    }
+
     const target = await this.requireAgencyMember(agencyId, targetUserId);
 
     if (target.role === Role.OWNER && role !== Role.OWNER) {

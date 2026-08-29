@@ -132,6 +132,10 @@ export class ApprovalsService {
 
     const flow = await this.fetchFlow(flowId);
 
+    if (flow.contentItem.client.agencyId !== user.agencyId) {
+      throw new NotFoundException('Approval flow not found');
+    }
+
     const step = flow.steps.find((s) => s.id === stepId);
     if (!step) throw new NotFoundException('Approval step not found on this flow');
 

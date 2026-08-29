@@ -34,7 +34,7 @@ export class UsersController {
   @Post()
   @Roles(Role.OWNER, Role.ADMIN)
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateMemberDto) {
-    return this.usersService.createMember(user.agencyId!, user.sub, dto);
+    return this.usersService.createMember(user.agencyId!, user.sub, user.role, dto);
   }
 
   @Patch(':id/role')
@@ -44,7 +44,7 @@ export class UsersController {
     @Param('id') targetUserId: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    return this.usersService.updateRole(user.agencyId!, user.sub, targetUserId, dto.role);
+    return this.usersService.updateRole(user.agencyId!, user.sub, user.role, targetUserId, dto.role);
   }
 
   @Patch(':id/active')

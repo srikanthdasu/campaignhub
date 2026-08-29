@@ -38,6 +38,8 @@ export class SchedulerController {
   }
 
   @Patch('scheduled-posts/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...CAN_SCHEDULE)
   reschedule(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -47,11 +49,15 @@ export class SchedulerController {
   }
 
   @Delete('scheduled-posts/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...CAN_SCHEDULE)
   cancel(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.schedulerService.cancel(id, user);
   }
 
   @Post('scheduled-posts/:id/publish')
+  @UseGuards(RolesGuard)
+  @Roles(...CAN_SCHEDULE)
   publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.schedulerService.markPublished(id, user);
   }
