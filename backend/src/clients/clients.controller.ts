@@ -42,8 +42,10 @@ export class ClientsController {
     return this.clientsService.update(user.agencyId!, user.sub, id, dto);
   }
 
+  // Any client-scoped user can see who else has access — used to pick approvers when
+  // submitting content, not just by Owner/Admin managing access grants.
   @Get(':id/access')
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(ClientAccessGuard)
   listAccess(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.clientsService.listAccess(user.agencyId!, id);
   }

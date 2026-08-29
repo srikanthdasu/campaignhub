@@ -12,19 +12,52 @@ import {
   Settings as SettingsIcon,
   User as UserIcon,
   LogOut,
+  CalendarClock,
+  Image as ImageIcon,
+  ClipboardCheck,
+  CheckSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { isAgencyAdmin, ROLE_LABELS, Role } from '@/lib/roles';
 import { DURATION, EASE_SOFT, tapScale } from '@/lib/motion';
 
-const links: { href: string; label: string; icon: LucideIcon; adminOnly: boolean }[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-  { href: '/admin/agency', label: 'Agency & Clients', icon: Building2, adminOnly: true },
-  { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
-  { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, adminOnly: true },
-  { href: '/profile', label: 'Profile', icon: UserIcon, adminOnly: false },
+interface NavLink {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly: boolean;
+}
+
+const sections: { label: string; links: NavLink[] }[] = [
+  {
+    label: 'Workspace',
+    links: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+      { href: '/admin/agency', label: 'Agency & Clients', icon: Building2, adminOnly: true },
+      { href: '/content-planner', label: 'Content Planner', icon: ClipboardCheck, adminOnly: false },
+      { href: '/media-library', label: 'Media Library', icon: ImageIcon, adminOnly: false },
+      { href: '/scheduler', label: 'Scheduler', icon: CalendarClock, adminOnly: false },
+    ],
+  },
+  {
+    label: 'Engagement',
+    links: [{ href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false }],
+  },
+  {
+    label: 'Business',
+    links: [
+      { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
+      { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
+    ],
+  },
+  {
+    label: 'System',
+    links: [
+      { href: '/settings', label: 'Settings', icon: SettingsIcon, adminOnly: true },
+      { href: '/profile', label: 'Profile', icon: UserIcon, adminOnly: false },
+    ],
+  },
 ];
 
 export function AppNav() {
@@ -39,7 +72,7 @@ export function AppNav() {
   }
 
   return (
-    <nav className="card-surface flex w-64 shrink-0 flex-col rounded-none border-y-0 border-l-0 p-5">
+    <nav className="card-surface flex w-64 shrink-0 flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-5">
       <div className="mb-8">
         <Image
           src="/brand/logo-wide.png"
@@ -51,34 +84,47 @@ export function AppNav() {
         />
       </div>
 
-      <ul className="flex-1 space-y-1">
-        {links
-          .filter((link) => !link.adminOnly || admin)
-          .map((link) => {
-            const active = pathname === link.href;
-            const Icon = link.icon;
-            return (
-              <li key={link.href} className="relative">
-                {active && (
-                  <motion.span
-                    layoutId="nav-active-pill"
-                    transition={{ duration: DURATION.base, ease: EASE_SOFT }}
-                    className="absolute inset-0 rounded-xl border border-accent-400/40 bg-accent-500/15 shadow-[0_0_20px_-4px_rgba(91,99,245,0.5)]"
-                  />
-                )}
-                <Link
-                  href={link.href}
-                  className={`relative z-10 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                    active ? 'text-white' : 'text-neutral-400 hover:bg-white/[0.05] hover:text-neutral-200'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  {link.label}
-                </Link>
-              </li>
-            );
-          })}
-      </ul>
+      <div className="flex-1 space-y-5">
+        {sections.map((section) => {
+          const visibleLinks = section.links.filter((link) => !link.adminOnly || admin);
+          if (visibleLinks.length === 0) return null;
+          return (
+            <div key={section.label}>
+              <p className="mb-1.5 px-3.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+                {section.label}
+              </p>
+              <ul className="space-y-1">
+                {visibleLinks.map((link) => {
+                  const active = pathname === link.href;
+                  const Icon = link.icon;
+                  return (
+                    <li key={link.href} className="relative">
+                      {active && (
+                        <motion.span
+                          layoutId="nav-active-pill"
+                          transition={{ duration: DURATION.base, ease: EASE_SOFT }}
+                          className="absolute inset-0 rounded-xl border border-accent-400/40 bg-accent-500/15 shadow-[0_0_20px_-4px_rgba(91,99,245,0.5)]"
+                        />
+                      )}
+                      <Link
+                        href={link.href}
+                        className={`relative z-10 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                          active
+                            ? 'text-white'
+                            : 'text-neutral-400 hover:bg-white/[0.05] hover:text-neutral-200'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                        {link.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
 
       <div className="mt-4 border-t border-white/10 pt-4">
         <p className="truncate text-xs font-medium text-neutral-200">{user?.name}</p>

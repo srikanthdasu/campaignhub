@@ -25,6 +25,13 @@ interface Member {
   role: Role;
 }
 
+interface BrandKit {
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  voiceGuidelines: string | null;
+  aiContext: string | null;
+}
+
 export default function AgencyAdminPage() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -35,6 +42,13 @@ export default function AgencyAdminPage() {
   const [access, setAccess] = useState<Member[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [accessLoading, setAccessLoading] = useState(false);
+  const [brandKit, setBrandKit] = useState<BrandKit>({
+    primaryColor: '',
+    secondaryColor: '',
+    voiceGuidelines: '',
+    aiContext: '',
+  });
+  const [savingBrandKit, setSavingBrandKit] = useState(false);
 
   function loadClients() {
     api
@@ -73,10 +87,29 @@ export default function AgencyAdminPage() {
     try {
       const list = await api.get<Member[]>(`/clients/${clientId}/access`);
       setAccess(list);
+      const kit = await api.get<BrandKit | null>(`/clients/${clientId}/brand-kit`);
+      setBrandKit({
+        primaryColor: kit?.primaryColor ?? '',
+        secondaryColor: kit?.secondaryColor ?? '',
+        voiceGuidelines: kit?.voiceGuidelines ?? '',
+        aiContext: kit?.aiContext ?? '',
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load client access');
     } finally {
       setAccessLoading(false);
+    }
+  }
+
+  async function onSaveBrandKit(clientId: string) {
+    setSavingBrandKit(true);
+    setError(null);
+    try {
+      await api.put(`/clients/${clientId}/brand-kit`, brandKit);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save brand kit');
+    } finally {
+      setSavingBrandKit(false);
     }
   }
 
@@ -246,6 +279,54 @@ export default function AgencyAdminPage() {
                                 onClick={() => onGrant(client.id)}
                               >
                                 Grant access
+                              </Button>
+                            </div>
+
+                            <div className="border-t border-white/10 pt-4">
+                              <p className="mb-3 text-xs font-medium text-neutral-300">
+                                Brand kit
+                              </p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <Input
+                                  placeholder="Primary color (#1D4ED8)"
+                                  value={brandKit.primaryColor ?? ''}
+                                  onChange={(e) =>
+                                    setBrandKit((prev) => ({ ...prev, primaryColor: e.target.value }))
+                                  }
+                                />
+                                <Input
+                                  placeholder="Secondary color"
+                                  value={brandKit.secondaryColor ?? ''}
+                                  onChange={(e) =>
+                                    setBrandKit((prev) => ({ ...prev, secondaryColor: e.target.value }))
+                                  }
+                                />
+                              </div>
+                              <textarea
+                                placeholder="Voice guidelines"
+                                value={brandKit.voiceGuidelines ?? ''}
+                                onChange={(e) =>
+                                  setBrandKit((prev) => ({ ...prev, voiceGuidelines: e.target.value }))
+                                }
+                                rows={2}
+                                className="mt-3 w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
+                              />
+                              <textarea
+                                placeholder="AI context (used to keep AI-generated content on-brand)"
+                                value={brandKit.aiContext ?? ''}
+                                onChange={(e) =>
+                                  setBrandKit((prev) => ({ ...prev, aiContext: e.target.value }))
+                                }
+                                rows={2}
+                                className="mt-3 w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
+                              />
+                              <Button
+                                size="sm"
+                                className="mt-3"
+                                loading={savingBrandKit}
+                                onClick={() => onSaveBrandKit(client.id)}
+                              >
+                                Save brand kit
                               </Button>
                             </div>
                           </div>

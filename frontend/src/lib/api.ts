@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export class ApiError extends Error {
   status: number;
@@ -103,10 +103,33 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   return body as T;
 }
 
+async function upload<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    body: formData,
+  });
+
+  if (res.status === 401 && !isRetry) {
+    const session = await refreshSession();
+    if (session) return upload<T>(path, formData, true);
+  }
+
+  const body = await parseBody(res);
+  if (!res.ok) {
+    const message = (body && (body.message?.toString() ?? body.error)) || res.statusText;
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message);
+  }
+  return body as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
+  put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload,
   refreshSession,
 };
