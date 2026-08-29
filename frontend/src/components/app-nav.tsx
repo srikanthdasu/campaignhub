@@ -16,6 +16,8 @@ import {
   Image as ImageIcon,
   ClipboardCheck,
   CheckSquare,
+  Share2,
+  Inbox,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -38,11 +40,20 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: '/content-planner', label: 'Content Planner', icon: ClipboardCheck, adminOnly: false },
       { href: '/media-library', label: 'Media Library', icon: ImageIcon, adminOnly: false },
       { href: '/scheduler', label: 'Scheduler', icon: CalendarClock, adminOnly: false },
+      {
+        href: '/social-accounts',
+        label: 'Social Accounts',
+        icon: Share2,
+        adminOnly: false,
+      },
     ],
   },
   {
     label: 'Engagement',
-    links: [{ href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false }],
+    links: [
+      { href: '/unified-inbox', label: 'Unified Inbox', icon: Inbox, adminOnly: false },
+      { href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false },
+    ],
   },
   {
     label: 'Business',
