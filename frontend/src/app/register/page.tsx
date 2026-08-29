@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { AuthBrandPanel } from '@/components/auth-brand-panel';
+import { AuthPromoFooter } from '@/components/auth-promo-footer';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 export default function RegisterPage() {
@@ -36,14 +37,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="grid flex-1 lg:grid-cols-2 lg:items-start">
-      <AuthBrandPanel
-        eyebrow="Agency Command Center"
-        headline="Bring your whole agency into one workspace, in minutes."
-        subtext="You'll be the Owner — invite your team and clients once you're in."
-      />
+    <div className="flex flex-1 flex-col">
+      <div className="grid lg:grid-cols-2 lg:items-start">
+        <AuthBrandPanel
+          eyebrow="Agency Command Center"
+          headline="Bring your whole agency into one workspace, in minutes."
+          subtext="You'll be the Owner — invite your team and clients once you're in."
+        />
 
-      <div className="flex flex-col items-center gap-4 px-6 py-8">
+        <div className="flex flex-col items-center gap-4 px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -150,7 +152,10 @@ export default function RegisterPage() {
             </motion.p>
           </motion.form>
         </Card>
+        </div>
       </div>
+
+      <AuthPromoFooter />
     </div>
   );
 }

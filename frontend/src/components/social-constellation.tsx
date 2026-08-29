@@ -35,7 +35,7 @@ interface SocialConstellationProps {
 }
 
 const SIZES = {
-  lg: { dims: 264, radius: 114, centerSize: 68, chipSize: 40, iconSize: 17 },
+  lg: { dims: 224, radius: 96, centerSize: 60, chipSize: 36, iconSize: 16 },
   md: { dims: 208, radius: 90, centerSize: 60, chipSize: 36, iconSize: 16 },
   sm: { dims: 128, radius: 54, centerSize: 38, chipSize: 26, iconSize: 13 },
 } as const;
