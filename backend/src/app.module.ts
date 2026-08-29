@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module.js';
 import { AgenciesModule } from './agencies/agencies.module.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { AuditModule } from './audit/audit.module.js';
+import { BrandKitModule } from './brand-kit/brand-kit.module.js';
+import { MediaModule } from './media/media.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 
@@ -19,6 +21,8 @@ import { AppController } from './app.controller.js';
     AgenciesModule,
     ClientsModule,
     AuditModule,
+    BrandKitModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
