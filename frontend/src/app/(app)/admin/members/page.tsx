@@ -1,9 +1,16 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { ROLE_LABELS, ROLES, Role } from '@/lib/roles';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 interface Member {
   id: string;
@@ -15,7 +22,7 @@ interface Member {
 
 export default function MembersAdminPage() {
   const { user: currentUser } = useAuth();
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -70,100 +77,126 @@ export default function MembersAdminPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold">Members</h1>
-        <p className="text-sm text-neutral-500">
+    <motion.div
+      variants={staggerContainer(0.08)}
+      initial="hidden"
+      animate="show"
+      className="max-w-2xl space-y-8"
+    >
+      <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">Members</h1>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
           Add teammates and clients, and manage their roles. Assign them to specific clients from
           the Agency &amp; Clients page.
         </p>
-      </div>
+      </motion.div>
 
-      {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-      <form onSubmit={onCreate} className="space-y-3 rounded-md border border-neutral-200 p-4">
-        <h2 className="text-sm font-semibold">Add a member</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            required
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            required
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            required
-            type="password"
-            minLength={10}
-            placeholder="Temporary password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
           >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          disabled={creating}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {creating ? 'Adding…' : 'Add member'}
-        </button>
-      </form>
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
-      <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200">
-        {members.map((m) => (
-          <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">{m.name}</p>
-              <p className="text-xs text-neutral-500">{m.email}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={m.role}
-                onChange={(e) => onRoleChange(m.id, e.target.value as Role)}
-                disabled={m.id === currentUser?.id}
-                className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-              >
+      <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+        <Card padding="lg">
+          <h2 className="mb-4 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+            Add a member
+          </h2>
+          <form onSubmit={onCreate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input
+                required
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <Input
+                required
+                type="password"
+                minLength={10}
+                placeholder="Temporary password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABELS[r]}
                   </option>
                 ))}
-              </select>
-              <button
-                onClick={() => onToggleActive(m.id, m.isActive)}
-                disabled={m.id === currentUser?.id}
-                className={`rounded-md border px-3 py-1 text-xs font-medium ${
-                  m.isActive
-                    ? 'border-neutral-300 text-neutral-700 hover:bg-neutral-100'
-                    : 'border-amber-300 bg-amber-50 text-amber-700'
-                } disabled:opacity-40`}
-              >
-                {m.isActive ? 'Deactivate' : 'Activate'}
-              </button>
+              </Select>
             </div>
-          </li>
-        ))}
-      </ul>
-    </div>
+            <Button type="submit" loading={creating}>
+              {creating ? 'Adding…' : 'Add member'}
+            </Button>
+          </form>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+        {members === null ? (
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            <AnimatePresence initial={false}>
+              {members.map((m) => (
+                <motion.li
+                  key={m.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: DURATION.base, ease: EASE_SOFT }}
+                >
+                  <Card padding="md" className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                        {m.name}
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{m.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={m.role}
+                        onChange={(e) => onRoleChange(m.id, e.target.value as Role)}
+                        disabled={m.id === currentUser?.id}
+                        className="py-1.5 text-xs"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        variant={m.isActive ? 'secondary' : 'primary'}
+                        size="sm"
+                        onClick={() => onToggleActive(m.id, m.isActive)}
+                        disabled={m.id === currentUser?.id}
+                      >
+                        {m.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }

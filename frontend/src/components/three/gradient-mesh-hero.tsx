@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, MeshDistortMaterial } from '@react-three/drei';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import type { Mesh } from 'three';
 import { cn } from '@/lib/cn';
@@ -34,17 +34,16 @@ function RotatingBlob() {
 }
 
 function useHasWebGL() {
-  const [supported, setSupported] = useState<boolean | null>(null);
-
-  useEffect(() => {
+  const [supported] = useState<boolean | null>(() => {
+    if (typeof window === 'undefined') return null;
     try {
       const canvas = document.createElement('canvas');
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      setSupported(!!gl);
+      return !!gl;
     } catch {
-      setSupported(false);
+      return false;
     }
-  }, []);
+  });
 
   return supported;
 }
