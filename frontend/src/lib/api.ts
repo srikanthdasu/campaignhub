@@ -96,8 +96,9 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   const body = await parseBody(res);
 
   if (!res.ok) {
-    const message = (body && (body.message?.toString() ?? body.error)) || res.statusText;
-    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message);
+    const rawMessage = body && (body.message ?? body.error);
+    const message = (Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage) || res.statusText;
+    throw new ApiError(res.status, message);
   }
 
   return body as T;
@@ -118,8 +119,9 @@ async function upload<T>(path: string, formData: FormData, isRetry = false): Pro
 
   const body = await parseBody(res);
   if (!res.ok) {
-    const message = (body && (body.message?.toString() ?? body.error)) || res.statusText;
-    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message);
+    const rawMessage = body && (body.message ?? body.error);
+    const message = (Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage) || res.statusText;
+    throw new ApiError(res.status, message);
   }
   return body as T;
 }
