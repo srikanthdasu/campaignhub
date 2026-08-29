@@ -139,4 +139,12 @@ describe('ApprovalsService.decide', () => {
       'already been decided',
     );
   });
+
+  it('blocks an OWNER/ADMIN from another agency from deciding this flow (cross-tenant IDOR)', async () => {
+    const user = makeUser({ sub: 'foreign-owner', role: Role.OWNER, agencyId: 'agency-2' });
+    await expect(service.decide('flow-1', 'step-1', user, ApprovalDecision.APPROVED)).rejects.toThrow(
+      'Approval flow not found',
+    );
+    expect(flowState.steps[0].decision).toBe(ApprovalDecision.PENDING);
+  });
 });
