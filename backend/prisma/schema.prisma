@@ -56,6 +56,7 @@ model Client {
   aiCaptions        AiCaption[]
   aiVideoProjects   AiVideoProject[]
   aiStrategyRequests AiStrategyRequest[]
+  adCampaigns       AdCampaign[]
 
   @@index([agencyId])
   @@map("clients")
@@ -85,6 +86,10 @@ model User {
   aiCaptionsCreated      AiCaption[]         @relation("AiCaptionCreatedBy")
   aiVideoProjectsCreated AiVideoProject[]    @relation("AiVideoCreatedBy")
   aiStrategyRequestsMade AiStrategyRequest[] @relation("AiStrategyCreatedBy")
+  campaignsAssigned      Campaign[]          @relation("CampaignAssignedTo")
+  campaignsReviewing     Campaign[]          @relation("CampaignReviewer")
+  adCampaignsCreated     AdCampaign[]        @relation("AdCampaignCreatedBy")
+  adCampaignsApproved    AdCampaign[]        @relation("AdCampaignApprovedBy")
 
   @@index([agencyId])
   @@map("users")
@@ -159,21 +164,30 @@ enum CampaignStatus {
 }
 
 model Campaign {
-  id          String         @id @default(uuid()) @db.Uuid
-  clientId    String         @map("client_id") @db.Uuid
-  client      Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid()) @db.Uuid
+  clientId    String           @map("client_id") @db.Uuid
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name        String
+  objective   String?
   goal        String?
   kpi         String?
   target      Int?
-  startDate   DateTime?      @map("start_date") @db.Date
-  endDate     DateTime?      @map("end_date") @db.Date
-  status      CampaignStatus @default(DRAFT)
-  createdById String?        @map("created_by") @db.Uuid
-  createdBy   User?          @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime       @default(now()) @map("created_at")
+  platforms   SocialPlatform[]
+  contentIdeas Json?           @map("content_ideas")
+  assignedToId String?         @map("assigned_to") @db.Uuid
+  assignedTo   User?           @relation("CampaignAssignedTo", fields: [assignedToId], references: [id])
+  reviewerId   String?         @map("reviewer_id") @db.Uuid
+  reviewer     User?           @relation("CampaignReviewer", fields: [reviewerId], references: [id])
+  startDate   DateTime?        @map("start_date") @db.Date
+  endDate     DateTime?        @map("end_date") @db.Date
+  status      CampaignStatus   @default(DRAFT)
+  createdById String?          @map("created_by") @db.Uuid
+  createdBy   User?            @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   contentItems ContentItem[]
+  adCampaigns  AdCampaign[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -204,6 +218,7 @@ model MediaAsset {
   createdAt    DateTime  @default(now()) @map("created_at")
 
   contentItems ContentItem[]
+  adCampaigns  AdCampaign[]
 
   @@index([clientId])
   @@map("media_assets")
@@ -512,4 +527,51 @@ model AiStrategyRequest {
 
   @@index([clientId])
   @@map("ai_strategy_requests")
+}
+
+// --- Phase 5 — Campaigns & Ads ------------------------------------------
+// Matches the book's 5-step Ads & Paid Campaigns flow (Brief -> Audience/Budget -> Creative
+// -> Approval -> Launch), whose stated result is "paid campaigns launch only after budget,
+// permission and platform validation" — Approval is a hard gate before Launch, not optional.
+// No Meta/Google/TikTok Ads API credentials are configured in this environment, so Launch
+// marks the record launched rather than actually placing a paid ad buy — flagged in-UI, same
+// pattern as AI Video Studio's simulated render.
+enum AdStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  LAUNCHED
+  PAUSED
+  COMPLETED
+}
+
+model AdCampaign {
+  id             String     @id @default(uuid()) @db.Uuid
+  clientId       String     @map("client_id") @db.Uuid
+  client         Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaignId     String?    @map("campaign_id") @db.Uuid
+  campaign       Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  name           String
+  objective      String?
+  platform       SocialPlatform
+  audienceNotes  String?    @map("audience_notes")
+  budgetAmount   Float?     @map("budget_amount")
+  budgetCurrency String     @default("USD") @map("budget_currency")
+  creativeText   String?    @map("creative_text")
+  creativeMediaAssetId String? @map("creative_media_asset_id") @db.Uuid
+  creativeMediaAsset    MediaAsset? @relation(fields: [creativeMediaAssetId], references: [id])
+  status         AdStatus   @default(DRAFT)
+  approvedById   String?    @map("approved_by") @db.Uuid
+  approvedBy     User?      @relation("AdCampaignApprovedBy", fields: [approvedById], references: [id])
+  approvedAt     DateTime?  @map("approved_at")
+  launchedAt     DateTime?  @map("launched_at")
+  createdById    String?    @map("created_by") @db.Uuid
+  createdBy      User?      @relation("AdCampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("ad_campaigns")
 }

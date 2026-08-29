@@ -28,8 +28,12 @@ export class ContentController {
   }
 
   @Get()
-  list(@Param('clientId') clientId: string, @Query('status') status?: ContentStatus) {
-    return this.contentService.list(clientId, status);
+  list(
+    @Param('clientId') clientId: string,
+    @Query('status') status?: ContentStatus,
+    @Query('campaignId') campaignId?: string,
+  ) {
+    return this.contentService.list(clientId, status, campaignId);
   }
 
   @Get(':id')

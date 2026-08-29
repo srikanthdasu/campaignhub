@@ -18,6 +18,8 @@ import { AiAssistantModule } from './ai-assistant/ai-assistant.module.js';
 import { AiCaptionsModule } from './ai-captions/ai-captions.module.js';
 import { AiVideoStudioModule } from './ai-video-studio/ai-video-studio.module.js';
 import { AiStrategyModule } from './ai-strategy/ai-strategy.module.js';
+import { CampaignsModule } from './campaigns/campaigns.module.js';
+import { AdsModule } from './ads/ads.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 
@@ -41,6 +43,8 @@ import { AppController } from './app.controller.js';
     AiCaptionsModule,
     AiVideoStudioModule,
     AiStrategyModule,
+    CampaignsModule,
+    AdsModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

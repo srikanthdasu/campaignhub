@@ -46,9 +46,9 @@ export class ContentService {
     return item;
   }
 
-  async list(clientId: string, status?: ContentStatus) {
+  async list(clientId: string, status?: ContentStatus, campaignId?: string) {
     return this.prisma.contentItem.findMany({
-      where: { clientId, status },
+      where: { clientId, status, campaignId },
       orderBy: { createdAt: 'desc' },
       include: { mediaAsset: true, approvalFlow: { include: { steps: true } } },
     });
