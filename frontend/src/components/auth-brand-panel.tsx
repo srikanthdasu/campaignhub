@@ -40,7 +40,7 @@ export function AuthBrandPanel({
           width={1536}
           height={1024}
           priority
-          className="h-24 w-auto"
+          className="h-36 w-auto"
         />
       </motion.div>
 
