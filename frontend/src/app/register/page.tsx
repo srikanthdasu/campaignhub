@@ -43,7 +43,22 @@ export default function RegisterPage() {
         subtext="You'll be the Owner — invite your team and clients once you're in."
       />
 
-      <div className="flex items-center justify-center px-6 py-16">
+      <div className="flex flex-col items-center justify-center gap-8 px-6 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION.base, ease: EASE_SOFT }}
+          className="w-full max-w-sm text-center"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-accent-400">
+            CampaignHub AI
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
+            Set up your agency in minutes, then invite your team and clients into one connected
+            workspace.
+          </p>
+        </motion.div>
+
         <Card padding="lg" className="w-full max-w-sm">
           <motion.form
             onSubmit={onSubmit}

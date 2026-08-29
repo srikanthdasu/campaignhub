@@ -41,7 +41,22 @@ export default function LoginPage() {
         subtext="Auth, roles, clients, approvals, publishing, and AI — built for agencies that manage many brands at once."
       />
 
-      <div className="flex items-center justify-center px-6 py-16">
+      <div className="flex flex-col items-center justify-center gap-8 px-6 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION.base, ease: EASE_SOFT }}
+          className="w-full max-w-sm text-center"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-accent-400">
+            CampaignHub AI
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
+            One workspace to plan, approve, and publish every client campaign — with AI built in
+            at every step.
+          </p>
+        </motion.div>
+
         <Card padding="lg" className="w-full max-w-sm">
           <motion.form
             onSubmit={onSubmit}
