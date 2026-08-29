@@ -1,19 +1,83 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { simulateCaptionVariants } from '../ai-common/simulated-ai.js';
+import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { GenerateCaptionsDto } from './dto/generate-captions.dto.js';
 import { SaveCaptionDto } from './dto/save-caption.dto.js';
+
+export interface CaptionVariant {
+  text: string;
+  hashtags: string[];
+}
+
+const VARIANT_COUNT = 3;
+
+function buildPrompt(input: string, tone: string, platform?: string): string {
+  return [
+    `Write ${VARIANT_COUNT} distinct social media caption variants for the following, in a ${tone} tone` +
+      (platform ? ` for ${platform}` : '') +
+      '.',
+    'Each variant must be a short, ready-to-post caption (1-3 sentences) plus 3-5 relevant hashtags.',
+    '',
+    `Content: """${input}"""`,
+    '',
+    'Respond with ONLY a JSON array, no prose, no markdown code fences, in exactly this shape:',
+    '[{"text": "...", "hashtags": ["#example", "#example2"]}]',
+  ].join('\n');
+}
+
+function parseVariants(raw: string): CaptionVariant[] {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    throw new BadGatewayException('The AI service returned a response we could not parse. Please try again.');
+  }
+
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length === 0 ||
+    !parsed.every(
+      (v): v is CaptionVariant =>
+        typeof v === 'object' &&
+        v !== null &&
+        typeof (v as CaptionVariant).text === 'string' &&
+        Array.isArray((v as CaptionVariant).hashtags) &&
+        (v as CaptionVariant).hashtags.every((h) => typeof h === 'string'),
+    )
+  ) {
+    throw new BadGatewayException('The AI service returned an unexpected response. Please try again.');
+  }
+
+  return parsed;
+}
 
 @Injectable()
 export class AiCaptionsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private foundry: AzureAiFoundryService,
   ) {}
 
-  generate(dto: GenerateCaptionsDto) {
-    return simulateCaptionVariants(dto.input, dto.tone ?? 'Friendly', dto.platform);
+  async generate(dto: GenerateCaptionsDto): Promise<CaptionVariant[]> {
+    const tone = dto.tone ?? 'Friendly';
+    const raw = await this.foundry.chat(
+      [
+        {
+          role: 'system',
+          content: 'You are a social media copywriter. Respond with only valid JSON, nothing else.',
+        },
+        { role: 'user', content: buildPrompt(dto.input, tone, dto.platform) },
+      ],
+      { maxTokens: 500, temperature: 0.8 },
+    );
+    return parseVariants(raw);
   }
 
   async save(clientId: string, actorId: string, dto: SaveCaptionDto) {

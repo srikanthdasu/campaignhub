@@ -98,52 +98,6 @@ export function simulateAssistantReply(question: string): string {
   ].join('\n');
 }
 
-export interface SimulatedCaptionVariant {
-  text: string;
-  hashtags: string[];
-}
-
-export function simulateCaptionVariants(
-  input: string,
-  tone: string,
-  platform?: string,
-): SimulatedCaptionVariant[] {
-  const kws = keywords(input, 4);
-  const subject = kws.slice(0, 2).join(' ') || 'this';
-  const hashtags = [
-    ...kws.map((k) => `#${k.replace(/\s+/g, '')}`),
-    '#NewPost',
-    platform ? `#${toTitleCase(platform.toLowerCase())}` : '#SocialMedia',
-  ].slice(0, 5);
-
-  const toneOpeners: Record<string, [string, string, string]> = {
-    Friendly: [
-      `New season, new ${subject}. We think you'll love it.`,
-      `Quick question — have you tried our ${subject} yet?`,
-      `Here's the story behind our ${subject}, straight from the team.`,
-    ],
-    Professional: [
-      `Introducing ${subject} — built for results.`,
-      `What does great ${subject} look like? Let us show you.`,
-      `A closer look at how we approach ${subject}.`,
-    ],
-    Playful: [
-      `Okay but have you SEEN our ${subject}?!`,
-      `POV: you just found the ${subject} you didn't know you needed.`,
-      `Plot twist: ${subject} just got a whole lot better.`,
-    ],
-    Bold: [
-      `${toTitleCase(subject)}. No compromises.`,
-      `Stop scrolling — ${subject} like this doesn't come around often.`,
-      `We built ${subject} to turn heads. Mission accomplished.`,
-    ],
-  };
-
-  const openers = toneOpeners[tone] ?? toneOpeners.Friendly;
-
-  return openers.map((text) => ({ text, hashtags }));
-}
-
 export function simulateVideoScript(idea: string): string {
   const kws = keywords(idea, 3).join(' ') || 'your idea';
   return [
