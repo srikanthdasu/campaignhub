@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Image from 'next/image';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { PLATFORM_ICONS, PLATFORM_ORDER } from '@/lib/platform-icons';
+import { PLATFORM_COLORS, PLATFORM_ICONS, PLATFORM_ORDER } from '@/lib/platform-icons';
 import { DURATION, EASE_SOFT } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 
@@ -149,10 +149,14 @@ export function SocialConstellation({
                 <motion.div
                   whileHover={{ scale: 1.15 }}
                   transition={{ duration: DURATION.fast, ease: EASE_SOFT }}
-                  className="flex items-center justify-center rounded-xl border border-white/12 bg-white/[0.06] text-neutral-200 shadow-[0_8px_20px_-6px_rgba(0,0,0,0.6)] backdrop-blur-sm"
-                  style={{ width: chipSize, height: chipSize }}
+                  className="flex items-center justify-center rounded-xl border border-white/12 bg-white/[0.07] backdrop-blur-sm"
+                  style={{
+                    width: chipSize,
+                    height: chipSize,
+                    boxShadow: `0 8px 20px -6px rgba(0,0,0,0.6), 0 0 16px -4px ${PLATFORM_COLORS[platform]}55`,
+                  }}
                 >
-                  <Icon size={iconSize} />
+                  <Icon size={iconSize} color={PLATFORM_COLORS[platform]} />
                 </motion.div>
               </motion.div>
             </motion.div>
