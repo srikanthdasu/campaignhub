@@ -1,5 +1,8 @@
-// Prisma schema for CampaignHub AI — Phase 1 (Auth, RBAC, Agency/Client Setup, Profile, Settings, Security & Audit)
-// Additional modules' tables (campaigns, content, billing, etc.) are added in later phases per the technical spec.
+// Prisma schema for CampaignHub AI
+// Phase 1 — Auth, RBAC, Agency/Client Setup, Profile, Settings, Security & Audit
+// Phase 2 — Content Creation, Media Library, Brand Kit, Content Planner, Approval Workflow,
+//           Scheduler, Publishing (SocialAccount is a minimal placeholder here; real OAuth
+//           connection flows are Phase 3 — Social Accounts & Integrations)
 
 generator client {
   provider = "prisma-client"
@@ -36,14 +39,18 @@ model Agency {
 }
 
 model Client {
-  id         String   @id @default(uuid()) @db.Uuid
-  agencyId   String   @map("agency_id") @db.Uuid
-  agency     Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  name       String
-  brandKitId String?  @map("brand_kit_id") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid()) @db.Uuid
+  agencyId  String   @map("agency_id") @db.Uuid
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
 
-  userAccess UserClientAccess[]
+  userAccess     UserClientAccess[]
+  brandKit       BrandKit?
+  campaigns      Campaign[]
+  contentItems   ContentItem[]
+  mediaAssets    MediaAsset[]
+  socialAccounts SocialAccount[]
 
   @@index([agencyId])
   @@map("clients")
@@ -61,9 +68,14 @@ model User {
   isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at")
 
-  clientAccess  UserClientAccess[]
-  auditLogs     AuditLog[]
-  refreshTokens RefreshToken[]
+  clientAccess    UserClientAccess[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+  campaignsMade   Campaign[]         @relation("CampaignCreatedBy")
+  mediaUploaded   MediaAsset[]       @relation("MediaUploadedBy")
+  contentCreated  ContentItem[]      @relation("ContentCreatedBy")
+  approvalSteps   ApprovalStep[]     @relation("ApprovalApprover")
+  socialConnected SocialAccount[]    @relation("SocialConnectedBy")
 
   @@index([agencyId])
   @@map("users")
@@ -106,4 +118,234 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// --- Phase 2 -----------------------------------------------------------
+
+// One brand kit per client — the "single source of truth" the book's Brand Kit
+// workflow describes (Brand Identity -> Voice -> Assets -> Rules -> AI Context).
+model BrandKit {
+  id              String   @id @default(uuid()) @db.Uuid
+  clientId        String   @unique @map("client_id") @db.Uuid
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  logoUrl         String?  @map("logo_url")
+  primaryColor    String?  @map("primary_color")
+  secondaryColor  String?  @map("secondary_color")
+  fonts           Json?
+  voiceGuidelines String?  @map("voice_guidelines")
+  brandRules      Json?    @map("brand_rules")
+  aiContext       String?  @map("ai_context")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("brand_kits")
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model Campaign {
+  id          String         @id @default(uuid()) @db.Uuid
+  clientId    String         @map("client_id") @db.Uuid
+  client      Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  goal        String?
+  kpi         String?
+  target      Int?
+  startDate   DateTime?      @map("start_date") @db.Date
+  endDate     DateTime?      @map("end_date") @db.Date
+  status      CampaignStatus @default(DRAFT)
+  createdById String?        @map("created_by") @db.Uuid
+  createdBy   User?          @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  contentItems ContentItem[]
+
+  @@index([clientId])
+  @@map("campaigns")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  GIF
+  AUDIO
+  DOCUMENT
+}
+
+model MediaAsset {
+  id           String    @id @default(uuid()) @db.Uuid
+  clientId     String    @map("client_id") @db.Uuid
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type         MediaType
+  storageUrl   String    @map("storage_url")
+  fileName     String    @map("file_name")
+  folder       String?
+  tags         String[]
+  aiProvider   String?   @map("ai_provider")
+  prompt       String?
+  uploadedById String?   @map("uploaded_by") @db.Uuid
+  uploadedBy   User?     @relation("MediaUploadedBy", fields: [uploadedById], references: [id])
+  usageCount   Int       @default(0) @map("usage_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  contentItems ContentItem[]
+
+  @@index([clientId])
+  @@map("media_assets")
+}
+
+enum ContentType {
+  CAPTION
+  IMAGE
+  VIDEO
+  POST
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  LINKEDIN
+  X
+  TIKTOK
+  YOUTUBE
+  PINTEREST
+  WHATSAPP
+}
+
+model ContentItem {
+  id           String           @id @default(uuid()) @db.Uuid
+  clientId     String           @map("client_id") @db.Uuid
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaignId   String?          @map("campaign_id") @db.Uuid
+  campaign     Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  type         ContentType
+  body         String?
+  platforms    SocialPlatform[]
+  mediaAssetId String?          @map("media_asset_id") @db.Uuid
+  mediaAsset   MediaAsset?      @relation(fields: [mediaAssetId], references: [id])
+  aiGenerated  Boolean          @default(false) @map("ai_generated")
+  status       ContentStatus    @default(DRAFT)
+  createdById  String?          @map("created_by") @db.Uuid
+  createdBy    User?            @relation("ContentCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  approvalFlow   ApprovalFlow?
+  scheduledPosts ScheduledPost[]
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("content_items")
+}
+
+enum ApprovalMode {
+  SEQUENTIAL
+  PARALLEL
+}
+
+// Matches the book's Approvals workflow lifecycle exactly:
+// Submitted -> Notified -> In Review -> (Changes Requested -> Re-Submitted ->) In Review -> Approved -> Completed
+enum ApprovalFlowStatus {
+  SUBMITTED
+  IN_REVIEW
+  CHANGES_REQUESTED
+  RE_SUBMITTED
+  APPROVED
+  COMPLETED
+}
+
+model ApprovalFlow {
+  id            String             @id @default(uuid()) @db.Uuid
+  contentItemId String             @unique @map("content_item_id") @db.Uuid
+  contentItem   ContentItem        @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  mode          ApprovalMode       @default(SEQUENTIAL)
+  dueDate       DateTime?          @map("due_date")
+  status        ApprovalFlowStatus @default(SUBMITTED)
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  steps ApprovalStep[]
+
+  @@map("approval_flows")
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+}
+
+model ApprovalStep {
+  id             String           @id @default(uuid()) @db.Uuid
+  approvalFlowId String           @map("approval_flow_id") @db.Uuid
+  approvalFlow   ApprovalFlow     @relation(fields: [approvalFlowId], references: [id], onDelete: Cascade)
+  approverId     String?          @map("approver_id") @db.Uuid
+  approver       User?            @relation("ApprovalApprover", fields: [approverId], references: [id])
+  stepOrder      Int?             @map("step_order")
+  decision       ApprovalDecision @default(PENDING)
+  comment        String?
+  decidedAt      DateTime?        @map("decided_at")
+
+  @@index([approvalFlowId])
+  @@map("approval_steps")
+}
+
+// Minimal placeholder — no OAuth token exchange yet. Lets Phase 2's Scheduler/Content
+// Planner reference "a platform target" before Phase 3 builds real account connections.
+model SocialAccount {
+  id                    String         @id @default(uuid()) @db.Uuid
+  clientId              String         @map("client_id") @db.Uuid
+  client                Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  platform              SocialPlatform
+  externalAccountId     String?        @map("external_account_id")
+  accessTokenEncrypted  String?        @map("access_token_encrypted")
+  refreshTokenEncrypted String?        @map("refresh_token_encrypted")
+  connectedById         String?        @map("connected_by") @db.Uuid
+  connectedBy           User?          @relation("SocialConnectedBy", fields: [connectedById], references: [id])
+  connectedAt           DateTime       @default(now()) @map("connected_at")
+
+  scheduledPosts ScheduledPost[]
+
+  @@index([clientId])
+  @@map("social_accounts")
+}
+
+enum ScheduledPostStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+model ScheduledPost {
+  id              String              @id @default(uuid()) @db.Uuid
+  contentItemId   String              @map("content_item_id") @db.Uuid
+  contentItem     ContentItem         @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  socialAccountId String?             @map("social_account_id") @db.Uuid
+  socialAccount   SocialAccount?      @relation(fields: [socialAccountId], references: [id])
+  platform        SocialPlatform
+  scheduledTime   DateTime            @map("scheduled_time")
+  status          ScheduledPostStatus @default(PENDING)
+  publishedAt     DateTime?           @map("published_at")
+  errorMessage    String?             @map("error_message")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([contentItemId])
+  @@index([scheduledTime])
+  @@map("scheduled_posts")
 }
