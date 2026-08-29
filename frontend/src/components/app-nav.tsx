@@ -24,6 +24,9 @@ import {
   Brain,
   Megaphone,
   Rocket,
+  BarChart3,
+  FileText,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -72,10 +75,18 @@ const sections: { label: string; links: NavLink[] }[] = [
     ],
   },
   {
+    label: 'Insights',
+    links: [
+      { href: '/analytics', label: 'Analytics', icon: BarChart3, adminOnly: false },
+      { href: '/reports', label: 'Reports', icon: FileText, adminOnly: false },
+    ],
+  },
+  {
     label: 'Business',
     links: [
       { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
       { href: '/ai-strategy', label: 'AI Strategy & Governance', icon: Brain, adminOnly: false },
+      { href: '/billing', label: 'Billing & Subscriptions', icon: CreditCard, adminOnly: true },
       { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
     ],
   },
@@ -88,11 +99,31 @@ const sections: { label: string; links: NavLink[] }[] = [
   },
 ];
 
+// A Client-role user gets their own portal only — not the agency's full workspace, per the
+// book's Client Portal result: "A client sees only their own campaigns, approvals, analytics,
+// social status and subscription."
+const clientSections: { label: string; links: NavLink[] }[] = [
+  {
+    label: 'Client Portal',
+    links: [
+      { href: '/client-portal', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+      { href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false },
+      { href: '/analytics', label: 'Analytics', icon: BarChart3, adminOnly: false },
+    ],
+  },
+  {
+    label: 'System',
+    links: [{ href: '/profile', label: 'Profile', icon: UserIcon, adminOnly: false }],
+  },
+];
+
 export function AppNav() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const admin = isAgencyAdmin(user?.role as Role | undefined);
+  const isClient = user?.role === 'CLIENT';
+  const navSections = isClient ? clientSections : sections;
 
   async function onLogout() {
     await logout();
@@ -113,7 +144,7 @@ export function AppNav() {
       </div>
 
       <div className="flex-1 space-y-5">
-        {sections.map((section) => {
+        {navSections.map((section) => {
           const visibleLinks = section.links.filter((link) => !link.adminOnly || admin);
           if (visibleLinks.length === 0) return null;
           return (

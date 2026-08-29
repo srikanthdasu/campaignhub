@@ -34,6 +34,8 @@ model Agency {
 
   clients Client[]
   users   User[]
+  subscription Subscription?
+  invoices     Invoice[]
 
   @@map("agencies")
 }
@@ -90,6 +92,7 @@ model User {
   campaignsReviewing     Campaign[]          @relation("CampaignReviewer")
   adCampaignsCreated     AdCampaign[]        @relation("AdCampaignCreatedBy")
   adCampaignsApproved    AdCampaign[]        @relation("AdCampaignApprovedBy")
+  notifications          Notification[]
 
   @@index([agencyId])
   @@map("users")
@@ -574,4 +577,83 @@ model AdCampaign {
   @@index([clientId])
   @@index([campaignId])
   @@map("ad_campaigns")
+}
+
+// --- Phase 6 — Insight & business layer ---------------------------------
+
+// In-app notifications, created by other services as real events happen (a content item is
+// submitted for approval, a decision is made, an ad is approved/launched) — not a separate
+// simulated feed. `link` is a frontend path so the bell dropdown can route straight to the
+// relevant page.
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+// No Razorpay/Stripe credentials are configured in this environment, so Billing &
+// Subscriptions runs the full plan-selection -> checkout -> GST invoice pipeline for real,
+// except the payment step itself, which marks the subscription active without calling a real
+// gateway — flagged in-UI. Swapping in a real gateway later replaces one service method, not
+// this schema.
+enum SubscriptionPlan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  PAUSED
+}
+
+model Subscription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  agencyId           String             @unique @map("agency_id") @db.Uuid
+  agency             Agency             @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  plan               SubscriptionPlan
+  status             SubscriptionStatus @default(TRIAL)
+  billingCycle       String             @default("MONTHLY") @map("billing_cycle")
+  currentPeriodEnd   DateTime?          @map("current_period_end")
+  paymentProviderRef String?            @map("payment_provider_ref")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  invoices Invoice[]
+
+  @@map("subscriptions")
+}
+
+enum InvoiceStatus {
+  ISSUED
+  PAID
+  OVERDUE
+}
+
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  agencyId       String        @map("agency_id") @db.Uuid
+  agency         Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  subscriptionId String?       @map("subscription_id") @db.Uuid
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  amount         Float
+  gstAmount      Float         @default(0) @map("gst_amount")
+  gstNumber      String?       @map("gst_number")
+  currency       String        @default("INR")
+  status         InvoiceStatus @default(ISSUED)
+  issuedAt       DateTime      @default(now()) @map("issued_at")
+
+  @@index([agencyId])
+  @@map("invoices")
 }

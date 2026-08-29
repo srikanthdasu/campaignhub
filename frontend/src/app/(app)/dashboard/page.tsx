@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/auth-context';
 import { ROLE_LABELS, Role, isAgencyAdmin } from '@/lib/roles';
@@ -20,13 +21,20 @@ interface Agency {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const admin = isAgencyAdmin(user?.role as Role | undefined);
+  const isClient = user?.role === 'CLIENT';
 
   const [agency, setAgency] = useState<Agency | null>(null);
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [clientCount, setClientCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (isClient) router.replace('/client-portal');
+  }, [isClient, router]);
+
+  useEffect(() => {
+    if (isClient) return;
     api.get<Agency>('/agencies/me').then(setAgency).catch(() => {});
     api
       .get<unknown[]>('/clients')
@@ -38,7 +46,9 @@ export default function DashboardPage() {
         .then((u) => setMemberCount(u.length))
         .catch(() => {});
     }
-  }, [admin]);
+  }, [admin, isClient]);
+
+  if (isClient) return null;
 
   return (
     <motion.div

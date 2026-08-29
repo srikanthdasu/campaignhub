@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { CreateAdDto } from './dto/create-ad.dto.js';
 import { UpdateAdDto } from './dto/update-ad.dto.js';
 import { ReviewAdDto } from './dto/review-ad.dto.js';
@@ -14,6 +15,7 @@ export class AdsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateAdDto) {
@@ -127,6 +129,14 @@ export class AdsService {
       entityId: id,
       metadata: { note: dto.note },
     });
+
+    if (ad.createdById && ad.createdById !== user.sub) {
+      await this.notifications.create(
+        ad.createdById,
+        `Ad "${ad.name}" was ${dto.status === AdStatus.APPROVED ? 'approved' : 'rejected'}`,
+        '/ads',
+      );
+    }
 
     return updated;
   }

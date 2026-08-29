@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { AppNav } from '@/components/app-nav';
+import { NotificationBell } from '@/components/notification-bell';
 import { PageTransition } from '@/components/ui/page-transition';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -41,9 +42,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-1">
       <AppNav />
-      <main className="flex-1 overflow-y-auto p-6 lg:p-10">
-        <PageTransition>{children}</PageTransition>
-      </main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-end border-b border-white/10 px-6 py-3 lg:px-10">
+          <NotificationBell />
+        </header>
+        <main className="flex-1 overflow-y-auto p-6 lg:p-10">
+          <PageTransition>{children}</PageTransition>
+        </main>
+      </div>
     </div>
   );
 }

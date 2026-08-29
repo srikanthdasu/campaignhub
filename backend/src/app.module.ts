@@ -20,6 +20,9 @@ import { AiVideoStudioModule } from './ai-video-studio/ai-video-studio.module.js
 import { AiStrategyModule } from './ai-strategy/ai-strategy.module.js';
 import { CampaignsModule } from './campaigns/campaigns.module.js';
 import { AdsModule } from './ads/ads.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { BillingModule } from './billing/billing.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 
@@ -45,6 +48,9 @@ import { AppController } from './app.controller.js';
     AiStrategyModule,
     CampaignsModule,
     AdsModule,
+    NotificationsModule,
+    BillingModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

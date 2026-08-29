@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   ApprovalDecision,
   ApprovalFlowStatus,
@@ -25,6 +26,7 @@ export class ApprovalsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async createFlowForContent(
@@ -66,6 +68,12 @@ export class ApprovalsService {
       entityId: contentItemId,
       metadata: { mode, approverIds },
     });
+
+    await this.notifications.createMany(
+      approverIds,
+      'Content is waiting for your review',
+      '/approvals',
+    );
 
     return flow;
   }
@@ -156,7 +164,18 @@ export class ApprovalsService {
       metadata: { stepId, comment },
     });
 
-    return this.resolveFlowStatus(flowId);
+    const resolved = await this.resolveFlowStatus(flowId);
+
+    const createdById = resolved.contentItem.createdById;
+    if (createdById && createdById !== user.sub) {
+      await this.notifications.create(
+        createdById,
+        `Your content was ${decision.toLowerCase().replace('_', ' ')}`,
+        '/content-planner',
+      );
+    }
+
+    return resolved;
   }
 
   async resubmit(contentItemId: string, actorId: string) {
