@@ -43,13 +43,16 @@ export function AuthBrandPanel({
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION.base, ease: EASE_SOFT }}
-        className="relative z-10 flex items-center gap-2.5"
+        className="relative z-10"
       >
-        <Image src="/brand/emblem.png" alt="" width={30} height={28} className="h-7 w-auto" />
-        <div>
-          <p className="text-sm font-semibold tracking-wide text-white">CampaignHub AI</p>
-          <p className="text-xs text-white/50">by Sreema</p>
-        </div>
+        <Image
+          src="/brand/logo-full.png"
+          alt="CampaignHub AI by Sreema"
+          width={1536}
+          height={1024}
+          priority
+          className="h-16 w-auto"
+        />
       </motion.div>
 
       <motion.div
