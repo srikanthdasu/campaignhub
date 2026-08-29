@@ -104,6 +104,12 @@ export default function SchedulerPage() {
         <p className="text-sm text-neutral-400">
           Schedule approved content and track what&apos;s queued to publish.
         </p>
+        <p className="mt-2 text-xs text-amber-300/80">
+          Posts publish automatically once their scheduled time passes — a background job
+          checks every minute, so this keeps working even if nobody has the app open. &quot;Mark
+          published&quot; below is only for publishing early. Actual delivery to each platform
+          is still simulated until real OAuth connections (Phase 3) exist.
+        </p>
       </motion.div>
 
       {clients && clients.length === 0 ? (

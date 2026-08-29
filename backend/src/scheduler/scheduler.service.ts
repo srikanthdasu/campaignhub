@@ -109,8 +109,10 @@ export class SchedulerService {
   }
 
   /**
-   * No OAuth publishing integration exists yet (Phase 3), so this is a manual stand-in for
-   * the background job BullMQ will run automatically once real platform APIs are wired up.
+   * No OAuth publishing integration exists yet (Phase 3), so publishing itself is simulated —
+   * but which posts get published is now real: `autoPublishDuePosts` below runs on a schedule
+   * and publishes whatever is actually due, same as this manual action would, so scheduled
+   * content publishes on time even with nobody watching the app.
    */
   async markPublished(id: string, user: AuthenticatedUser) {
     const post = await this.requireAccess(id, user);
@@ -118,20 +120,7 @@ export class SchedulerService {
       throw new BadRequestException('Only pending posts can be marked published');
     }
 
-    const updated = await this.prisma.scheduledPost.update({
-      where: { id },
-      data: { status: ScheduledPostStatus.PUBLISHED, publishedAt: new Date() },
-    });
-
-    const remaining = await this.prisma.scheduledPost.count({
-      where: { contentItemId: post.contentItemId, status: { not: ScheduledPostStatus.PUBLISHED } },
-    });
-    if (remaining === 0) {
-      await this.prisma.contentItem.update({
-        where: { id: post.contentItemId },
-        data: { status: ContentStatus.PUBLISHED },
-      });
-    }
+    const updated = await this.publishPost(post.id, post.contentItemId);
 
     await this.audit.log({
       userId: user.sub,
@@ -139,6 +128,44 @@ export class SchedulerService {
       entityType: 'scheduled_post',
       entityId: id,
     });
+
+    return updated;
+  }
+
+  /** Called by SchedulerCronService — no user in the loop, so no access check or actor on the audit entry. */
+  async autoPublishDuePosts() {
+    const due = await this.prisma.scheduledPost.findMany({
+      where: { status: ScheduledPostStatus.PENDING, scheduledTime: { lte: new Date() } },
+    });
+
+    for (const post of due) {
+      await this.publishPost(post.id, post.contentItemId);
+      await this.audit.log({
+        action: 'SCHEDULED_POST_PUBLISHED',
+        entityType: 'scheduled_post',
+        entityId: post.id,
+        metadata: { auto: true },
+      });
+    }
+
+    return due.length;
+  }
+
+  private async publishPost(id: string, contentItemId: string) {
+    const updated = await this.prisma.scheduledPost.update({
+      where: { id },
+      data: { status: ScheduledPostStatus.PUBLISHED, publishedAt: new Date() },
+    });
+
+    const remaining = await this.prisma.scheduledPost.count({
+      where: { contentItemId, status: { not: ScheduledPostStatus.PUBLISHED } },
+    });
+    if (remaining === 0) {
+      await this.prisma.contentItem.update({
+        where: { id: contentItemId },
+        data: { status: ContentStatus.PUBLISHED },
+      });
+    }
 
     return updated;
   }
