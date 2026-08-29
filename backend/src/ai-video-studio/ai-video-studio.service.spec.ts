@@ -3,8 +3,17 @@ import { AiVideoStudioService } from './ai-video-studio.service.js';
 import { AiVideoStep } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 
-function buildService(overrides: { project?: any } = {}) {
+const VALID_SCRIPT_REPLY = JSON.stringify({
+  script: 'Scene 1: intro. Scene 2: product.',
+  scenes: [
+    { title: 'Intro', description: 'Opening shot', durationSec: 4 },
+    { title: 'Product', description: 'Close-up', durationSec: 6 },
+  ],
+});
+
+function buildService(overrides: { project?: any; scriptReply?: string } = {}) {
   const project = overrides.project ?? { id: 'proj-1', clientId: 'client-1', step: AiVideoStep.IDEA };
   const audit = { log: vi.fn() };
   const prisma = {
@@ -14,8 +23,13 @@ function buildService(overrides: { project?: any } = {}) {
       delete: vi.fn(() => Promise.resolve({})),
     },
   };
-  const service = new AiVideoStudioService(prisma as unknown as PrismaService, audit as unknown as AuditService);
-  return { service, prisma, audit, project };
+  const foundry = { chat: vi.fn(() => Promise.resolve(overrides.scriptReply ?? VALID_SCRIPT_REPLY)) };
+  const service = new AiVideoStudioService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    foundry as unknown as AzureAiFoundryService,
+  );
+  return { service, prisma, audit, foundry, project };
 }
 
 describe('AiVideoStudioService — tenant scoping', () => {
@@ -48,12 +62,37 @@ describe('AiVideoStudioService — tenant scoping', () => {
     await service.render('client-1', 'proj-1', 'actor-1');
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: { simulated: true } }));
   });
+});
 
-  it('advances the project through its step machine as each stage completes', async () => {
+describe('AiVideoStudioService.generateScript', () => {
+  it('stores the real model script and scenes, and advances the step machine', async () => {
     const { service, prisma } = buildService();
-    await service.generateScript('client-1', 'proj-1', { idea: 'x' } as any);
+    await service.generateScript('client-1', 'proj-1', { idea: 'eco water bottle launch' } as any);
     expect(prisma.aiVideoProject.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ step: AiVideoStep.SCRIPT }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          script: 'Scene 1: intro. Scene 2: product.',
+          scenes: [
+            { title: 'Intro', description: 'Opening shot', durationSec: 4 },
+            { title: 'Product', description: 'Close-up', durationSec: 6 },
+          ],
+          step: AiVideoStep.SCRIPT,
+        }),
+      }),
     );
+  });
+
+  it('rejects a response that is not valid JSON', async () => {
+    const { service } = buildService({ scriptReply: 'Sure, here is a script...' });
+    await expect(
+      service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
+    ).rejects.toThrow('could not parse');
+  });
+
+  it('rejects a response missing the scenes array', async () => {
+    const { service } = buildService({ scriptReply: JSON.stringify({ script: 'just a script' }) });
+    await expect(
+      service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
+    ).rejects.toThrow('unexpected response');
   });
 });

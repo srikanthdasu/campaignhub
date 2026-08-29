@@ -3,8 +3,9 @@ import { AiStrategyService } from './ai-strategy.service.js';
 import { AiStrategyStatus } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 
-function buildService(overrides: { request?: any } = {}) {
+function buildService(overrides: { request?: any; reply?: string } = {}) {
   const request = overrides.request ?? {
     id: 'req-1',
     clientId: 'client-1',
@@ -21,8 +22,13 @@ function buildService(overrides: { request?: any } = {}) {
       delete: vi.fn(() => Promise.resolve({})),
     },
   };
-  const service = new AiStrategyService(prisma as unknown as PrismaService, audit as unknown as AuditService);
-  return { service, prisma, audit, request };
+  const foundry = { chat: vi.fn(() => Promise.resolve(overrides.reply ?? 'Objective: grow reach.\n1. Do X.')) };
+  const service = new AiStrategyService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    foundry as unknown as AzureAiFoundryService,
+  );
+  return { service, prisma, audit, foundry, request };
 }
 
 describe('AiStrategyService', () => {
@@ -53,5 +59,35 @@ describe('AiStrategyService', () => {
     const { service, audit } = buildService();
     await service.review('client-1', 'req-1', 'actor-1', { status: AiStrategyStatus.REJECTED } as any);
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AI_STRATEGY_REJECTED' }));
+  });
+
+  describe('generate', () => {
+    it('stores the model output and marks the request GENERATED', async () => {
+      const { service, prisma } = buildService({ reply: 'Objective: grow reach.\n1. Post daily.' });
+      const updated = await service.generate('client-1', 'req-1', 'actor-1');
+      expect(updated.output).toBe('Objective: grow reach.\n1. Post daily.');
+      expect(prisma.aiStrategyRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: AiStrategyStatus.GENERATED }) }),
+      );
+    });
+
+    it('passes the title, goal, and context note through to the prompt', async () => {
+      const { service, foundry } = buildService({
+        request: {
+          id: 'req-1',
+          clientId: 'client-1',
+          title: 'Spring Launch',
+          goal: 'drive signups',
+          context: { note: 'targeting first-time buyers' },
+          status: AiStrategyStatus.DRAFT,
+        },
+      });
+      await service.generate('client-1', 'req-1', 'actor-1');
+      const [messages] = foundry.chat.mock.calls[0];
+      const userMessage = messages.find((m: any) => m.role === 'user').content;
+      expect(userMessage).toContain('Spring Launch');
+      expect(userMessage).toContain('drive signups');
+      expect(userMessage).toContain('targeting first-time buyers');
+    });
   });
 });

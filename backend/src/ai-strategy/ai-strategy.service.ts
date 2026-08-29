@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { simulateStrategyOutput } from '../ai-common/simulated-ai.js';
+import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { CreateStrategyDto } from './dto/create-strategy.dto.js';
 import { ReviewStrategyDto } from './dto/review-strategy.dto.js';
 import { FeedbackStrategyDto } from './dto/feedback-strategy.dto.js';
@@ -13,6 +13,7 @@ export class AiStrategyService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private foundry: AzureAiFoundryService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateStrategyDto) {
@@ -45,7 +46,30 @@ export class AiStrategyService {
   async generate(clientId: string, id: string, actorId: string) {
     const request = await this.requireInClient(id, clientId);
     const contextNote = (request.context as { note?: string } | null)?.note;
-    const output = simulateStrategyOutput(request.title, request.goal ?? '', contextNote);
+    const output = await this.foundry.chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You are a social media marketing strategist. Write a concise, actionable strategy ' +
+            'recommendation using only the context given — do not invent data about the client, ' +
+            'their audience, or their past performance that was not provided.',
+        },
+        {
+          role: 'user',
+          content: [
+            `Title: ${request.title}`,
+            `Goal: ${request.goal || 'Not specified — treat this as a general growth strategy.'}`,
+            contextNote ? `Additional context: ${contextNote}` : null,
+            '',
+            'Provide: a brief objective summary, then 3-5 numbered recommended actions.',
+          ]
+            .filter((line) => line !== null)
+            .join('\n'),
+        },
+      ],
+      { maxTokens: 500, temperature: 0.6 },
+    );
 
     const updated = await this.prisma.aiStrategyRequest.update({
       where: { id },

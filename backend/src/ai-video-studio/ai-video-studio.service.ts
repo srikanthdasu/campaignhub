@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { simulateVideoScenes, simulateVideoScript } from '../ai-common/simulated-ai.js';
+import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { parseModelJson } from '../ai-common/parse-model-json.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
 import { UpdateStoryboardDto } from './dto/update-storyboard.dto.js';
@@ -13,16 +14,41 @@ import type { Prisma } from '../generated/prisma/client.js';
 
 // No Google Cloud / Vertex AI credentials are configured (spec itself notes the Veo provider
 // choice is undecided pending GCP credit confirmation), so "render" and "export" produce a
-// placeholder thumbnail instead of a real video file. Every other step (script, storyboard,
-// asset selection, enhancements) is fully functional against the same data shape a real
-// pipeline would use.
+// placeholder thumbnail instead of a real video file. Script generation calls a real model
+// (Azure AI Foundry); storyboard/asset selection/enhancements are user-driven, not AI-generated,
+// so there's nothing to simulate there either way.
 const PLACEHOLDER_PREVIEW_URL = '/brand/emblem.png';
+
+interface ScriptScene {
+  title: string;
+  description: string;
+  durationSec: number;
+}
+
+interface ScriptResult {
+  script: string;
+  scenes: ScriptScene[];
+}
+
+function isScriptResult(value: unknown): value is ScriptResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as ScriptResult;
+  return (
+    typeof v.script === 'string' &&
+    Array.isArray(v.scenes) &&
+    v.scenes.length > 0 &&
+    v.scenes.every(
+      (s) => typeof s.title === 'string' && typeof s.description === 'string' && typeof s.durationSec === 'number',
+    )
+  );
+}
 
 @Injectable()
 export class AiVideoStudioService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private foundry: AzureAiFoundryService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateVideoProjectDto) {
@@ -51,11 +77,32 @@ export class AiVideoStudioService {
 
   async generateScript(clientId: string, id: string, dto: GenerateScriptDto) {
     await this.requireInClient(id, clientId);
-    const script = simulateVideoScript(dto.idea);
-    const scenes = simulateVideoScenes(dto.idea) as unknown as Prisma.InputJsonValue;
+
+    const raw = await this.foundry.chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You are a short-form social video scriptwriter. Respond with only valid JSON, nothing else.',
+        },
+        {
+          role: 'user',
+          content: [
+            `Write a short-form video script for this idea: """${dto.idea}"""`,
+            'Break it into 3-5 scenes, each a few seconds long, totaling under 30 seconds.',
+            '',
+            'Respond with ONLY a JSON object, no prose, no markdown code fences, in exactly this shape:',
+            '{"script": "full script as plain text with scene labels", "scenes": [{"title": "...", "description": "...", "durationSec": 4}]}',
+          ].join('\n'),
+        },
+      ],
+      { maxTokens: 700, temperature: 0.7 },
+    );
+    const { script, scenes } = parseModelJson(raw, isScriptResult);
+
     return this.prisma.aiVideoProject.update({
       where: { id },
-      data: { idea: dto.idea, script, scenes, step: AiVideoStep.SCRIPT },
+      data: { idea: dto.idea, script, scenes: scenes as unknown as Prisma.InputJsonValue, step: AiVideoStep.SCRIPT },
     });
   }
 

@@ -1,7 +1,8 @@
-import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { parseModelJson } from '../ai-common/parse-model-json.js';
 import { GenerateCaptionsDto } from './dto/generate-captions.dto.js';
 import { SaveCaptionDto } from './dto/save-caption.dto.js';
 
@@ -26,23 +27,11 @@ function buildPrompt(input: string, tone: string, platform?: string): string {
   ].join('\n');
 }
 
-function parseVariants(raw: string): CaptionVariant[] {
-  const stripped = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '');
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripped);
-  } catch {
-    throw new BadGatewayException('The AI service returned a response we could not parse. Please try again.');
-  }
-
-  if (
-    !Array.isArray(parsed) ||
-    parsed.length === 0 ||
-    !parsed.every(
+function isCaptionVariants(value: unknown): value is CaptionVariant[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
       (v): v is CaptionVariant =>
         typeof v === 'object' &&
         v !== null &&
@@ -50,11 +39,7 @@ function parseVariants(raw: string): CaptionVariant[] {
         Array.isArray((v as CaptionVariant).hashtags) &&
         (v as CaptionVariant).hashtags.every((h) => typeof h === 'string'),
     )
-  ) {
-    throw new BadGatewayException('The AI service returned an unexpected response. Please try again.');
-  }
-
-  return parsed;
+  );
 }
 
 @Injectable()
@@ -77,7 +62,7 @@ export class AiCaptionsService {
       ],
       { maxTokens: 500, temperature: 0.8 },
     );
-    return parseVariants(raw);
+    return parseModelJson(raw, isCaptionVariants);
   }
 
   async save(clientId: string, actorId: string, dto: SaveCaptionDto) {
