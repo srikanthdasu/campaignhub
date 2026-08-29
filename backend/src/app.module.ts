@@ -9,6 +9,9 @@ import { ClientsModule } from './clients/clients.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { BrandKitModule } from './brand-kit/brand-kit.module.js';
 import { MediaModule } from './media/media.module.js';
+import { ApprovalsModule } from './approvals/approvals.module.js';
+import { ContentModule } from './content/content.module.js';
+import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 
@@ -23,6 +26,9 @@ import { AppController } from './app.controller.js';
     AuditModule,
     BrandKitModule,
     MediaModule,
+    ApprovalsModule,
+    ContentModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
