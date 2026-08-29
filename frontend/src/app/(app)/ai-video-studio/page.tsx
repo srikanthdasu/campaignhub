@@ -74,9 +74,9 @@ export default function AiVideoStudioPage() {
         <h1 className="text-2xl font-semibold text-neutral-50">AI Video Studio</h1>
         <p className="text-sm text-neutral-400">From idea to ready-to-publish video.</p>
         <p className="mt-2 text-xs text-amber-300/80">
-          No Google Cloud / Vertex AI (Veo) credentials are configured yet, so script and
-          storyboard steps use simulated AI text, the stock library is a small fixed catalog,
-          and Preview/Export produce a placeholder clip instead of a real render.
+          No Google Cloud / Vertex AI (Veo) credentials are configured yet, so the stock library
+          is a small fixed catalog and Preview/Export produce a placeholder clip instead of a
+          real render. Script generation uses real AI.
         </p>
       </motion.div>
 

@@ -47,11 +47,6 @@ export default function AiStrategyPage() {
           AI uses permitted context, produces traceable outputs, and improves through measured
           feedback.
         </p>
-        <p className="mt-2 text-xs text-amber-300/80">
-          No Anthropic API key is configured, so generated strategy text below comes from
-          heuristics rather than a real Claude call. The Context → Plan → Generate → Review →
-          Learn approval gate is fully functional regardless of which provider is behind it.
-        </p>
       </motion.div>
 
       {clients && clients.length === 0 ? (

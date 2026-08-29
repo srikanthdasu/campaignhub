@@ -102,10 +102,6 @@ export default function AiCaptionsPage() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">AI Captions</h1>
         <p className="text-sm text-neutral-400">From idea to perfect captions.</p>
-        <p className="mt-2 text-xs text-amber-300/80">
-          No Anthropic API key is configured, so captions below are generated from heuristics,
-          not a real Claude call — swap in a key later with no UI changes needed.
-        </p>
       </motion.div>
 
       {clients && clients.length === 0 ? (

@@ -39,11 +39,6 @@ export default function AiAssistantPage() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">AI Assistant</h1>
         <p className="text-sm text-neutral-400">Ask anything about marketing, campaigns, or content.</p>
-        <p className="mt-2 text-xs text-amber-300/80">
-          No Anthropic API key is configured, so answers below are generated from simple
-          heuristics rather than a real Claude call — the response shape matches what a real
-          call would return, and can be swapped in later.
-        </p>
       </motion.div>
 
       {clients && clients.length === 0 ? (
