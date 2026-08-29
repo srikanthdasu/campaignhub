@@ -18,6 +18,10 @@ import {
   CheckSquare,
   Share2,
   Inbox,
+  Bot,
+  Sparkles,
+  Video,
+  Brain,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -49,6 +53,14 @@ const sections: { label: string; links: NavLink[] }[] = [
     ],
   },
   {
+    label: 'AI Studio',
+    links: [
+      { href: '/ai-assistant', label: 'AI Assistant', icon: Bot, adminOnly: false },
+      { href: '/ai-captions', label: 'AI Captions', icon: Sparkles, adminOnly: false },
+      { href: '/ai-video-studio', label: 'AI Video Studio', icon: Video, adminOnly: false },
+    ],
+  },
+  {
     label: 'Engagement',
     links: [
       { href: '/unified-inbox', label: 'Unified Inbox', icon: Inbox, adminOnly: false },
@@ -59,6 +71,7 @@ const sections: { label: string; links: NavLink[] }[] = [
     label: 'Business',
     links: [
       { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
+      { href: '/ai-strategy', label: 'AI Strategy & Governance', icon: Brain, adminOnly: false },
       { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
     ],
   },

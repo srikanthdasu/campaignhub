@@ -52,6 +52,10 @@ model Client {
   mediaAssets    MediaAsset[]
   socialAccounts SocialAccount[]
   inboxMessages  InboxMessage[]
+  aiConversations   AiConversation[]
+  aiCaptions        AiCaption[]
+  aiVideoProjects   AiVideoProject[]
+  aiStrategyRequests AiStrategyRequest[]
 
   @@index([agencyId])
   @@map("clients")
@@ -77,6 +81,10 @@ model User {
   contentCreated  ContentItem[]      @relation("ContentCreatedBy")
   approvalSteps   ApprovalStep[]     @relation("ApprovalApprover")
   socialConnected SocialAccount[]    @relation("SocialConnectedBy")
+  aiConversationsStarted AiConversation[]    @relation("AiConversationCreatedBy")
+  aiCaptionsCreated      AiCaption[]         @relation("AiCaptionCreatedBy")
+  aiVideoProjectsCreated AiVideoProject[]    @relation("AiVideoCreatedBy")
+  aiStrategyRequestsMade AiStrategyRequest[] @relation("AiStrategyCreatedBy")
 
   @@index([agencyId])
   @@map("users")
@@ -370,4 +378,138 @@ model ScheduledPost {
   @@index([contentItemId])
   @@index([scheduledTime])
   @@map("scheduled_posts")
+}
+
+// --- Phase 4 — AI layer -------------------------------------------------
+// Text/reasoning features (AI Assistant, AI Captions, AI Strategy & Governance) call the
+// Claude API per the spec. No Anthropic API key is configured in this environment, so every
+// service below returns clearly-labelled simulated responses generated from simple heuristics
+// over the input — the response shape matches what a real Claude call would return, so wiring
+// in a real key later is a service-layer change only, not a schema or API-contract change.
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+}
+
+model AiConversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("AiConversationCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  messages AiMessage[]
+
+  @@index([clientId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           AiMessageRole
+  content        String
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+// A "generate" call returns candidate variants without persisting anything (mirrors the
+// book's Generate -> Customize steps, which are exploratory). Saving is a separate, explicit
+// action — the row below only exists once the user picks (and can edit) a favorite.
+model AiCaption {
+  id          String          @id @default(uuid()) @db.Uuid
+  clientId    String          @map("client_id") @db.Uuid
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  input       String
+  tone        String          @default("Friendly")
+  platform    SocialPlatform?
+  text        String
+  hashtags    String[]
+  createdById String?         @map("created_by") @db.Uuid
+  createdBy   User?           @relation("AiCaptionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([clientId])
+  @@map("ai_captions")
+}
+
+// AI Video Studio's 8-step pipeline (Idea -> Script -> Storyboard -> Assets -> Enhance ->
+// Preview -> Export -> Publish) collapses into one project row whose fields fill in as the
+// user advances through steps, rather than one table per step. The stock media library the
+// book shows in step 4 is a small fixed catalog (see ai-video-studio.constants.ts on the
+// frontend) rather than a real licensed stock API, and "render" produces a placeholder clip
+// instead of a real Veo call — both flagged in-UI, matching the Google Cloud/Veo credential
+// gap the spec itself notes as an open decision.
+enum AiVideoStep {
+  IDEA
+  SCRIPT
+  STORYBOARD
+  ASSETS
+  ENHANCE
+  PREVIEW
+  EXPORT
+  PUBLISHED
+}
+
+model AiVideoProject {
+  id           String      @id @default(uuid()) @db.Uuid
+  clientId     String      @map("client_id") @db.Uuid
+  client       Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title        String
+  idea         String?
+  script       String?
+  scenes       Json?
+  assets       Json?
+  enhancements Json?
+  step         AiVideoStep @default(IDEA)
+  previewUrl   String?     @map("preview_url")
+  exportFormat String?     @map("export_format")
+  publishedAt  DateTime?   @map("published_at")
+  createdById  String?     @map("created_by") @db.Uuid
+  createdBy    User?       @relation("AiVideoCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@map("ai_video_projects")
+}
+
+// Matches the book's 5-step AI Strategy & Governance flow: Context (permitted data sources) ->
+// Plan (stated goal) -> Generate (AI output) -> Review (human approve/reject, the "governance"
+// half) -> Learn (feedback rating folded back in). Review is a required human gate before a
+// strategy counts as usable — this is the module's whole point per the diagram's tagline
+// ("AI uses permitted context, produces traceable outputs and improves through measured
+// feedback").
+enum AiStrategyStatus {
+  DRAFT
+  GENERATED
+  APPROVED
+  REJECTED
+}
+
+model AiStrategyRequest {
+  id             String           @id @default(uuid()) @db.Uuid
+  clientId       String           @map("client_id") @db.Uuid
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title          String
+  context        Json?
+  goal           String?
+  output         String?
+  status         AiStrategyStatus @default(DRAFT)
+  reviewNote     String?          @map("review_note")
+  feedbackRating Int?             @map("feedback_rating")
+  createdById    String?          @map("created_by") @db.Uuid
+  createdBy      User?            @relation("AiStrategyCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@map("ai_strategy_requests")
 }
