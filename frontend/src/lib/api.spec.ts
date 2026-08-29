@@ -23,9 +23,7 @@ describe('api client', () => {
 
   it('attaches the current access token as a Bearer header', async () => {
     setAccessToken('token-123');
-    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
-      Promise.resolve(jsonResponse(200, { ok: true })),
-    );
+    const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(200, { ok: true })));
     vi.stubGlobal('fetch', fetchMock);
 
     await api.get('/whoami');
@@ -35,7 +33,7 @@ describe('api client', () => {
   });
 
   it('omits the Authorization header when there is no token', async () => {
-    const fetchMock = vi.fn((_url: string, _init?: RequestInit) => Promise.resolve(jsonResponse(200, {})));
+    const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(200, {})));
     vi.stubGlobal('fetch', fetchMock);
 
     await api.get('/public');
