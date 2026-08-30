@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { extname } from 'path';
+import { dirname, extname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { diskStorage } from 'multer';
 import type { Request } from 'express';
 import { MediaType } from '../generated/prisma/client.js';
@@ -7,7 +8,12 @@ import { MediaType } from '../generated/prisma/client.js';
 // Local-disk storage for Phase 2 dev. The spec calls for Azure Blob Storage in production —
 // swapping the multer storage engine and MediaAsset.storageUrl scheme is the only change needed
 // once that's wired up; nothing else in this module assumes a local path.
-export const UPLOAD_DIR = './uploads';
+//
+// Resolved from this module's own location rather than process.cwd() — the combined production
+// server (combined-server.ts) may be launched with a working directory other than backend/, and
+// this has to land in the same physical folder create-app.ts serves /uploads from either way.
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+export const UPLOAD_DIR = join(MODULE_DIR, '..', '..', 'uploads'); // backend/dist/media/../../uploads
 
 export const mediaMulterStorage = diskStorage({
   destination: UPLOAD_DIR,

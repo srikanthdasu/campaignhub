@@ -7,7 +7,6 @@ import { LoginDto } from './dto/login.dto.js';
 import { Public } from '../common/decorators/public.decorator.js';
 
 const REFRESH_COOKIE = 'refresh_token';
-const REFRESH_COOKIE_PATH = '/auth';
 
 @Controller('auth')
 export class AuthController {
@@ -16,12 +15,20 @@ export class AuthController {
     private config: ConfigService,
   ) {}
 
+  // Must match wherever this controller actually ends up mounted — local dev has no API_PREFIX
+  // so this is plain /auth; the combined production server sets API_PREFIX=api, making the real
+  // route /api/auth/refresh, and the cookie's path has to match or the browser won't send it.
+  private get refreshCookiePath(): string {
+    const prefix = this.config.get<string>('API_PREFIX', '');
+    return `${prefix ? `/${prefix}` : ''}/auth`;
+  }
+
   private setRefreshCookie(res: Response, tokens: TokenPair) {
     res.cookie(REFRESH_COOKIE, tokens.refreshToken, {
       httpOnly: true,
       secure: this.config.get('NODE_ENV') === 'production',
       sameSite: 'lax',
-      path: REFRESH_COOKIE_PATH,
+      path: this.refreshCookiePath,
       expires: tokens.refreshTokenExpiresAt,
     });
   }
@@ -66,6 +73,6 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.[REFRESH_COOKIE];
     await this.authService.logout(token);
-    res.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE, { path: this.refreshCookiePath });
   }
 }

@@ -1,0 +1,74 @@
+name: Build and deploy to Azure Web App - campaignhub-app2
+
+on:
+  push:
+    branches:
+      - main
+      - rebuild
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          # Baked into the client bundle at build time — the combined server (below) mounts
+          # the API under /api on the same origin/port as the frontend in production, so this
+          # is a same-origin relative path, not the separate-port URL local dev uses.
+          NEXT_PUBLIC_API_URL: /api
+        run: npm run build
+
+      - name: Stage deployment package
+        run: |
+          mkdir -p deploy/backend deploy/frontend
+          cp -r backend/dist deploy/backend/dist
+          cp -r backend/node_modules deploy/backend/node_modules
+          cp backend/package.json deploy/backend/package.json
+          mkdir -p deploy/backend/uploads
+          cp -r frontend/.next deploy/frontend/.next
+          cp -r frontend/node_modules deploy/frontend/node_modules
+          cp -r frontend/public deploy/frontend/public
+          cp frontend/package.json deploy/frontend/package.json
+          cp frontend/next.config.ts deploy/frontend/next.config.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: deploy
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'campaignhub-app2'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
