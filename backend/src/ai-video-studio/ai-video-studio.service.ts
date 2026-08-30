@@ -1,8 +1,12 @@
+import { randomUUID } from 'crypto';
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { parseModelJson } from '../ai-common/parse-model-json.js';
+import { UPLOAD_DIR } from '../media/media-storage.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
 import { UpdateStoryboardDto } from './dto/update-storyboard.dto.js';
@@ -13,11 +17,10 @@ import { AiVideoStep } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 // No Google Cloud / Vertex AI credentials are configured (spec itself notes the Veo provider
-// choice is undecided pending GCP credit confirmation), so "render" and "export" produce a
-// placeholder thumbnail instead of a real video file. Script generation calls a real model
-// (Azure AI Foundry); storyboard/asset selection/enhancements are user-driven, not AI-generated,
-// so there's nothing to simulate there either way.
-const PLACEHOLDER_PREVIEW_URL = '/brand/emblem.png';
+// choice is undecided pending GCP credit confirmation), so "export" produces a placeholder
+// instead of a real video file. Script generation and the render preview image both call real
+// models (Azure AI Foundry); storyboard/asset selection/enhancements are user-driven, not
+// AI-generated, so there's nothing to simulate there either way.
 
 interface ScriptScene {
   title: string;
@@ -140,16 +143,33 @@ export class AiVideoStudioService {
   }
 
   async render(clientId: string, id: string, actorId: string) {
-    await this.requireInClient(id, clientId);
+    const existing = await this.requireInClient(id, clientId);
+    const scenes = (existing.scenes as unknown as ScriptScene[] | null) ?? [];
+    const subject = existing.idea || existing.title;
+    const prompt = [
+      `A vibrant, high-production-value social media video thumbnail concept for: ${subject}.`,
+      scenes[0] ? `Opening scene: ${scenes[0].description}.` : null,
+      'Eye-catching, professional photography style, no text or logos overlaid.',
+    ]
+      .filter((line): line is string => !!line)
+      .join(' ');
+
+    const imageBuffer = await this.foundry.generateImage(prompt);
+    const filename = `${randomUUID()}.png`;
+    await writeFile(join(UPLOAD_DIR, filename), imageBuffer);
+    const previewUrl = `/uploads/${filename}`;
+
     const project = await this.prisma.aiVideoProject.update({
       where: { id },
-      data: { previewUrl: PLACEHOLDER_PREVIEW_URL, step: AiVideoStep.PREVIEW },
+      data: { previewUrl, step: AiVideoStep.PREVIEW },
     });
     await this.audit.log({
       userId: actorId,
       action: 'AI_VIDEO_RENDERED',
       entityType: 'ai_video_project',
       entityId: id,
+      // The preview image itself is real AI-generated content now — "simulated" still applies
+      // to the overall feature (this produces one still image, not an actual rendered video).
       metadata: { simulated: true },
     });
     return project;
