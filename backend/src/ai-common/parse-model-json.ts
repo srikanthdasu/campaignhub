@@ -6,7 +6,8 @@ export function stripCodeFence(raw: string): string {
   return raw
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '');
+    .replace(/\s*```\s*$/i, '')
+    .trim();
 }
 
 export function parseModelJson<T>(raw: string, isValid: (value: unknown) => value is T): T {
