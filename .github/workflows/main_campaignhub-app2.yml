@@ -49,7 +49,7 @@ jobs:
           cp -r backend/node_modules deploy/backend/node_modules
           cp backend/package.json deploy/backend/package.json
           mkdir -p deploy/backend/uploads
-          cp -r frontend/.next deploy/frontend/.next
+          cp -r frontend/build-output deploy/frontend/build-output
           cp -r frontend/node_modules deploy/frontend/node_modules
           cp -r frontend/public deploy/frontend/public
           cp frontend/package.json deploy/frontend/package.json
