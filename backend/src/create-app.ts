@@ -26,7 +26,12 @@ export async function createApp(): Promise<NestExpressApplication> {
 
   // crossOriginResourcePolicy relaxed so the frontend (a different origin in local dev) can
   // render uploaded media via <img>/<video> src — CORS below still governs actual API calls.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // CSP disabled: helmet's default script-src 'self' blocks Next.js's required inline hydration
+  // scripts, which broke the combined server's frontend in production (React error #412 — found
+  // via real browser console, not curl, which doesn't execute JS or enforce CSP at all). This
+  // API never served HTML/inline scripts before the combined server existed, so CSP was doing
+  // nothing for it either way; it only ever mattered once we started serving the frontend too.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
   app.use(cookieParser());
   app.enableCors({
     origin: config.get<string>('CORS_ORIGIN', 'http://localhost:3000'),
