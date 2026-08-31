@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, Upload, FileText, Music } from 'lucide-react';
-import { api, ApiError, API_URL } from '@/lib/api';
+import { api, ApiError, MEDIA_BASE_URL } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -161,13 +161,13 @@ export default function MediaLibraryPage() {
                           {asset.type === 'IMAGE' || asset.type === 'GIF' ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={`${API_URL}${asset.storageUrl}`}
+                              src={`${MEDIA_BASE_URL}${asset.storageUrl}`}
                               alt={asset.fileName}
                               className="h-full w-full object-cover"
                             />
                           ) : asset.type === 'VIDEO' ? (
                             <video
-                              src={`${API_URL}${asset.storageUrl}`}
+                              src={`${MEDIA_BASE_URL}${asset.storageUrl}`}
                               className="h-full w-full object-cover"
                             />
                           ) : (

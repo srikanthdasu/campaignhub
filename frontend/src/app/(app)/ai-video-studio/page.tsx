@@ -2,8 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, MEDIA_BASE_URL } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -497,12 +496,13 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                     <h3 className="text-sm font-semibold text-neutral-50">Preview</h3>
                     {active.previewUrl ? (
                       <div className="flex items-center gap-3">
-                        <Image
-                          src={active.previewUrl}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`${MEDIA_BASE_URL}${active.previewUrl}`}
                           alt="Simulated render preview"
                           width={64}
                           height={64}
-                          className="rounded-xl border border-white/10"
+                          className="rounded-xl border border-white/10 object-cover"
                         />
                         <Badge tone="warning">Simulated render — not a real video file</Badge>
                       </div>
