@@ -28,3 +28,26 @@ describe('RazorpayService.verifyPaymentSignature', () => {
     expect(service.verifyPaymentSignature('order_1', 'pay_1', 'not-a-real-signature')).toBe(false);
   });
 });
+
+describe('RazorpayService.createOrder', () => {
+  it("surfaces Razorpay's own error description instead of just the HTTP status", async () => {
+    const service = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          json: () =>
+            Promise.resolve({ error: { description: 'receipt: the length must be no more than 56.' } }),
+        }),
+      ),
+    );
+
+    await expect(service.createOrder(999, 'a'.repeat(60))).rejects.toThrow(
+      'receipt: the length must be no more than 56.',
+    );
+
+    vi.unstubAllGlobals();
+  });
+});

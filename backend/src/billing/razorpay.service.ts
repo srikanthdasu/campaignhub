@@ -37,7 +37,11 @@ export class RazorpayService {
     }
 
     if (!res.ok) {
-      throw new BadGatewayException(`Razorpay order creation failed (${res.status}). Please try again.`);
+      const body = (await res.json().catch(() => null)) as { error?: { description?: string } } | null;
+      const detail = body?.error?.description;
+      throw new BadGatewayException(
+        detail ? `Razorpay order creation failed: ${detail}` : `Razorpay order creation failed (${res.status}).`,
+      );
     }
 
     return (await res.json()) as RazorpayOrder;

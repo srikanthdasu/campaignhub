@@ -42,7 +42,9 @@ export class BillingService {
   /** Step 1 of checkout: opens a real Razorpay order for the frontend to hand to Checkout.js. */
   async createCheckoutOrder(agencyId: string, dto: SubscribeDto) {
     const amount = resolvePlanAmount(dto);
-    const order = await this.razorpay.createOrder(amount, `agency_${agencyId}_${Date.now()}`);
+    // Razorpay caps "receipt" at 56 characters — a UUID (36) + "-" + a 13-digit timestamp is 50,
+    // safely under that without needing to truncate anything meaningful out of it.
+    const order = await this.razorpay.createOrder(amount, `${agencyId}-${Date.now()}`);
     return { orderId: order.id, amount, currency: order.currency, keyId: this.razorpay.keyId };
   }
 
