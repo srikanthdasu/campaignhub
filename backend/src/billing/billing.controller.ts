@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { BillingService } from './billing.service.js';
 import { SubscribeDto } from './dto/subscribe.dto.js';
+import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -31,10 +32,16 @@ export class BillingController {
     return this.billingService.listInvoices(user.agencyId!);
   }
 
-  @Post('subscribe')
+  @Post('checkout')
   @Roles(Role.OWNER)
-  subscribe(@CurrentUser() user: AuthenticatedUser, @Body() dto: SubscribeDto) {
-    return this.billingService.subscribe(user.agencyId!, user.sub, dto);
+  createCheckoutOrder(@CurrentUser() user: AuthenticatedUser, @Body() dto: SubscribeDto) {
+    return this.billingService.createCheckoutOrder(user.agencyId!, dto);
+  }
+
+  @Post('checkout/verify')
+  @Roles(Role.OWNER)
+  confirmSubscription(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConfirmCheckoutDto) {
+    return this.billingService.confirmSubscription(user.agencyId!, user.sub, dto);
   }
 
   @Post('cancel')

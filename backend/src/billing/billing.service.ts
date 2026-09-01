@@ -1,15 +1,27 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { RazorpayService } from './razorpay.service.js';
 import { SubscribeDto } from './dto/subscribe.dto.js';
+import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto.js';
 import { GST_RATE, PLANS } from './billing.constants.js';
 import { SubscriptionStatus } from '../generated/prisma/client.js';
+
+function resolvePlanAmount(dto: { plan: string; billingCycle: 'MONTHLY' | 'YEARLY' }) {
+  const planDef = PLANS.find((p) => p.plan === dto.plan);
+  if (!planDef) throw new BadRequestException('Unknown plan');
+  if (planDef.priceMonthlyInr === null) {
+    throw new BadRequestException('Enterprise pricing is custom — contact sales instead of self-serve checkout');
+  }
+  return dto.billingCycle === 'YEARLY' ? planDef.priceYearlyInr! : planDef.priceMonthlyInr;
+}
 
 @Injectable()
 export class BillingService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private razorpay: RazorpayService,
   ) {}
 
   getPlans() {
@@ -27,19 +39,23 @@ export class BillingService {
     });
   }
 
-  /**
-   * No Razorpay/Stripe credentials exist in this environment, so this marks the subscription
-   * active and issues a GST invoice without calling a real payment gateway — the checkout step
-   * is simulated, everything around it (plan record, invoice, GST math) is real.
-   */
-  async subscribe(agencyId: string, actorId: string, dto: SubscribeDto) {
-    const planDef = PLANS.find((p) => p.plan === dto.plan);
-    if (!planDef) throw new BadRequestException('Unknown plan');
-    if (planDef.priceMonthlyInr === null) {
-      throw new BadRequestException('Enterprise pricing is custom — contact sales instead of self-serve checkout');
-    }
+  /** Step 1 of checkout: opens a real Razorpay order for the frontend to hand to Checkout.js. */
+  async createCheckoutOrder(agencyId: string, dto: SubscribeDto) {
+    const amount = resolvePlanAmount(dto);
+    const order = await this.razorpay.createOrder(amount, `agency_${agencyId}_${Date.now()}`);
+    return { orderId: order.id, amount, currency: order.currency, keyId: this.razorpay.keyId };
+  }
 
-    const amount = dto.billingCycle === 'YEARLY' ? planDef.priceYearlyInr! : planDef.priceMonthlyInr;
+  /**
+   * Step 2: activates the subscription and issues a GST invoice, but only after verifying the
+   * payment signature Razorpay's callback returned — that's what proves a real (test-mode)
+   * charge happened rather than the client just claiming success.
+   */
+  async confirmSubscription(agencyId: string, actorId: string, dto: ConfirmCheckoutDto) {
+    const verified = this.razorpay.verifyPaymentSignature(dto.orderId, dto.paymentId, dto.signature);
+    if (!verified) throw new BadRequestException('Payment verification failed');
+
+    const amount = resolvePlanAmount(dto);
     const gstAmount = Math.round(amount * GST_RATE * 100) / 100;
     const periodDays = dto.billingCycle === 'YEARLY' ? 365 : 30;
     const currentPeriodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000);
@@ -52,12 +68,14 @@ export class BillingService {
         status: SubscriptionStatus.ACTIVE,
         billingCycle: dto.billingCycle,
         currentPeriodEnd,
+        paymentProviderRef: dto.paymentId,
       },
       update: {
         plan: dto.plan,
         status: SubscriptionStatus.ACTIVE,
         billingCycle: dto.billingCycle,
         currentPeriodEnd,
+        paymentProviderRef: dto.paymentId,
       },
     });
 
@@ -77,7 +95,7 @@ export class BillingService {
       action: 'SUBSCRIPTION_ACTIVATED',
       entityType: 'subscription',
       entityId: subscription.id,
-      metadata: { plan: dto.plan, billingCycle: dto.billingCycle, amount, simulated: true },
+      metadata: { plan: dto.plan, billingCycle: dto.billingCycle, amount, razorpayPaymentId: dto.paymentId },
     });
 
     return { subscription, invoice };

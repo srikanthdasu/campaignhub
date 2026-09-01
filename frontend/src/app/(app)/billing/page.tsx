@@ -10,6 +10,41 @@ import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { Check } from 'lucide-react';
 
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => { open(): void };
+  }
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: { name?: string; email?: string };
+  theme?: { color?: string };
+  handler: (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => void;
+  modal?: { ondismiss?: () => void };
+}
+
+let razorpayScriptPromise: Promise<void> | null = null;
+
+function loadRazorpayScript(): Promise<void> {
+  if (window.Razorpay) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
+
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
+    document.body.appendChild(script);
+  });
+  return razorpayScriptPromise;
+}
+
 type Plan = 'STARTER' | 'GROWTH' | 'ENTERPRISE';
 type SubStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED' | 'PAUSED';
 
@@ -79,11 +114,43 @@ export default function BillingPage() {
     setError(null);
     setBusy(true);
     try {
-      await api.post('/billing/subscribe', { plan, billingCycle: cycle, gstNumber: gstNumber || undefined });
-      load();
+      const order = await api.post<{ orderId: string; amount: number; currency: string; keyId: string }>(
+        '/billing/checkout',
+        { plan, billingCycle: cycle, gstNumber: gstNumber || undefined },
+      );
+      await loadRazorpayScript();
+
+      const razorpay = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount * 100,
+        currency: order.currency,
+        name: 'CampaignHub AI',
+        description: `${plan} — ${cycle === 'MONTHLY' ? 'Monthly' : 'Yearly'} subscription`,
+        order_id: order.orderId,
+        prefill: { name: user?.name, email: user?.email },
+        theme: { color: '#5b63f5' },
+        modal: { ondismiss: () => setBusy(false) },
+        handler: async (response) => {
+          try {
+            await api.post('/billing/checkout/verify', {
+              plan,
+              billingCycle: cycle,
+              gstNumber: gstNumber || undefined,
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+            });
+            load();
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Payment succeeded but activation failed — contact support');
+          } finally {
+            setBusy(false);
+          }
+        },
+      });
+      razorpay.open();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to subscribe');
-    } finally {
+      setError(err instanceof ApiError ? err.message : 'Failed to start checkout');
       setBusy(false);
     }
   }
@@ -107,9 +174,8 @@ export default function BillingPage() {
         <h1 className="text-2xl font-semibold text-neutral-50">Billing &amp; Subscriptions</h1>
         <p className="text-sm text-neutral-400">Simple plans. Secure payments. Seamless experience.</p>
         <p className="mt-2 text-xs text-amber-300/80">
-          No Razorpay or Stripe credentials are configured yet, so checkout marks the
-          subscription active without calling a real payment gateway. The plan record and GST
-          invoice below are real and stored — only the charge itself is simulated.
+          Checkout runs through Razorpay in test mode — use a test card, no real money moves.
+          Every plan record, invoice, and payment ID below is real.
         </p>
       </motion.div>
 
