@@ -141,7 +141,7 @@ export function AppNav() {
   }
 
   return (
-    <nav className="card-surface flex w-64 shrink-0 flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-5">
+    <nav className="card-surface flex h-full min-h-0 w-64 shrink-0 flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-5">
       <div className="mb-8">
         <Image
           src="/brand/logo-wide.png"
