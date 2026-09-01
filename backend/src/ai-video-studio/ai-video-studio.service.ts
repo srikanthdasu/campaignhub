@@ -1,12 +1,9 @@
-import { randomUUID } from 'crypto';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { parseModelJson } from '../ai-common/parse-model-json.js';
-import { UPLOAD_DIR } from '../media/media-storage.js';
+import { BlobStorageService } from '../media/blob-storage.service.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
 import { UpdateStoryboardDto } from './dto/update-storyboard.dto.js';
@@ -52,6 +49,7 @@ export class AiVideoStudioService {
     private prisma: PrismaService,
     private audit: AuditService,
     private foundry: AzureAiFoundryService,
+    private blobStorage: BlobStorageService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateVideoProjectDto) {
@@ -155,9 +153,7 @@ export class AiVideoStudioService {
       .join(' ');
 
     const imageBuffer = await this.foundry.generateImage(prompt);
-    const filename = `${randomUUID()}.png`;
-    await writeFile(join(UPLOAD_DIR, filename), imageBuffer);
-    const previewUrl = `/uploads/${filename}`;
+    const previewUrl = await this.blobStorage.upload(imageBuffer, '.png', 'image/png');
 
     const project = await this.prisma.aiVideoProject.update({
       where: { id },

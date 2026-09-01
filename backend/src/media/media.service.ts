@@ -1,16 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { extname } from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { UpdateMediaDto } from './dto/update-media.dto.js';
-import { mediaTypeFromMimetype, UPLOAD_DIR } from './media-storage.js';
+import { mediaTypeFromMimetype } from './media-storage.js';
+import { BlobStorageService } from './blob-storage.service.js';
 
 @Injectable()
 export class MediaService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private blobStorage: BlobStorageService,
   ) {}
 
   async recordUpload(
@@ -19,11 +20,17 @@ export class MediaService {
     file: Express.Multer.File,
     folder?: string,
   ) {
+    const storageUrl = await this.blobStorage.upload(
+      file.buffer,
+      extname(file.originalname),
+      file.mimetype,
+    );
+
     const asset = await this.prisma.mediaAsset.create({
       data: {
         clientId,
         type: mediaTypeFromMimetype(file.mimetype),
-        storageUrl: `/uploads/${file.filename}`,
+        storageUrl,
         fileName: file.originalname,
         folder,
         tags: [],
@@ -60,13 +67,7 @@ export class MediaService {
     const asset = await this.requireInClient(id, clientId);
 
     await this.prisma.mediaAsset.delete({ where: { id } });
-
-    try {
-      const fileName = asset.storageUrl.split('/').pop();
-      if (fileName) await unlink(join(UPLOAD_DIR, fileName));
-    } catch {
-      // best-effort — an already-missing file on disk shouldn't block deleting the record
-    }
+    await this.blobStorage.remove(asset.storageUrl);
 
     await this.audit.log({
       userId: actorId,

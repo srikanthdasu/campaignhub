@@ -1,26 +1,20 @@
-import { randomUUID } from 'crypto';
-import { dirname, extname, join } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import type { Request } from 'express';
 import { MediaType } from '../generated/prisma/client.js';
 
-// Local-disk storage for Phase 2 dev. The spec calls for Azure Blob Storage in production —
-// swapping the multer storage engine and MediaAsset.storageUrl scheme is the only change needed
-// once that's wired up; nothing else in this module assumes a local path.
-//
 // Resolved from this module's own location rather than process.cwd() — the combined production
 // server (combined-server.ts) may be launched with a working directory other than backend/, and
 // this has to land in the same physical folder create-app.ts serves /uploads from either way.
+// Only actually used as a destination when BlobStorageService falls back to local disk (no
+// Azure Storage account configured, i.e. local dev) — see blob-storage.service.ts.
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 export const UPLOAD_DIR = join(MODULE_DIR, '..', '..', 'uploads'); // backend/dist/media/../../uploads
 
-export const mediaMulterStorage = diskStorage({
-  destination: UPLOAD_DIR,
-  filename: (_req, file, cb) => {
-    cb(null, `${randomUUID()}${extname(file.originalname)}`);
-  },
-});
+// In-memory rather than disk: the file's buffer goes to BlobStorageService.upload(), which
+// decides where it actually lands (Blob Storage in production, local disk in dev).
+export const mediaMulterStorage = memoryStorage();
 
 const ALLOWED_MIME_PREFIXES = ['image/', 'video/', 'audio/'];
 const ALLOWED_DOCUMENT_MIMES = new Set(['application/pdf']);

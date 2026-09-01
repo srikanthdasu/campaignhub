@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { api, ApiError, MEDIA_BASE_URL } from '@/lib/api';
+import { api, ApiError, resolveMediaUrl } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -498,7 +498,7 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                       <div className="flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`${MEDIA_BASE_URL}${active.previewUrl}`}
+                          src={resolveMediaUrl(active.previewUrl)}
                           alt="Simulated render preview"
                           width={64}
                           height={64}

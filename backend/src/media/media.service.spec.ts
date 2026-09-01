@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MediaService } from './media.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { BlobStorageService } from './blob-storage.service.js';
 
 function buildService(overrides: { asset?: any } = {}) {
   const asset = overrides.asset ?? { id: 'asset-1', clientId: 'client-1', storageUrl: '/uploads/x.png' };
@@ -13,8 +14,13 @@ function buildService(overrides: { asset?: any } = {}) {
       delete: vi.fn(() => Promise.resolve({})),
     },
   };
-  const service = new MediaService(prisma as unknown as PrismaService, audit as unknown as AuditService);
-  return { service, prisma, audit, asset };
+  const blobStorage = { upload: vi.fn(() => Promise.resolve('/uploads/new.png')), remove: vi.fn(() => Promise.resolve()) };
+  const service = new MediaService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    blobStorage as unknown as BlobStorageService,
+  );
+  return { service, prisma, audit, asset, blobStorage };
 }
 
 describe('MediaService', () => {

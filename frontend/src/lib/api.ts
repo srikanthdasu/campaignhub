@@ -1,11 +1,17 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-// Uploaded files (media assets, AI-generated previews) are served as static assets at
-// "/uploads" directly on the API origin, outside the "/api" prefix — so their base URL is
-// API_URL with any trailing "/api" stripped, not API_URL itself. In local dev API_URL is
-// already the bare origin (e.g. http://localhost:3001) so this is a no-op; in production
-// API_URL is the relative path "/api", so this resolves to "" (same-origin root).
-export const MEDIA_BASE_URL = API_URL.replace(/\/api\/?$/, '');
+// Local-disk fallback uploads (no Azure Storage account configured — local dev only) are
+// served as static assets at "/uploads" directly on the API origin, outside the "/api" prefix —
+// so their base URL is API_URL with any trailing "/api" stripped, not API_URL itself. In local
+// dev API_URL is already the bare origin (e.g. http://localhost:3001) so this is a no-op; in
+// production API_URL is the relative path "/api", so this resolves to "" (same-origin root).
+const MEDIA_BASE_URL = API_URL.replace(/\/api\/?$/, '');
+
+// Blob Storage URLs (the production path) are already absolute — resolving them against
+// MEDIA_BASE_URL would prepend the API origin onto a different host and break the link.
+export function resolveMediaUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `${MEDIA_BASE_URL}${url}`;
+}
 
 export class ApiError extends Error {
   status: number;

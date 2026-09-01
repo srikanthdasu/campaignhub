@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('fs/promises', () => ({ writeFile: vi.fn(() => Promise.resolve()) }));
-
-import { writeFile } from 'fs/promises';
 import { AiVideoStudioService } from './ai-video-studio.service.js';
 import { AiVideoStep } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import type { BlobStorageService } from '../media/blob-storage.service.js';
 
 const VALID_SCRIPT_REPLY = JSON.stringify({
   script: 'Scene 1: intro. Scene 2: product.',
@@ -38,12 +35,17 @@ function buildService(overrides: { project?: any; scriptReply?: string } = {}) {
     chat: vi.fn(() => Promise.resolve(overrides.scriptReply ?? VALID_SCRIPT_REPLY)),
     generateImage: vi.fn(() => Promise.resolve(Buffer.from('fake-png-bytes'))),
   };
+  const blobStorage = {
+    upload: vi.fn(() => Promise.resolve('/uploads/fake-generated.png')),
+    remove: vi.fn(() => Promise.resolve()),
+  };
   const service = new AiVideoStudioService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     foundry as unknown as AzureAiFoundryService,
+    blobStorage as unknown as BlobStorageService,
   );
-  return { service, prisma, audit, foundry, project };
+  return { service, prisma, audit, foundry, blobStorage, project };
 }
 
 describe('AiVideoStudioService — tenant scoping', () => {
@@ -106,18 +108,15 @@ describe('AiVideoStudioService.generateScript', () => {
 });
 
 describe('AiVideoStudioService.render', () => {
-  it('generates a real preview image, writes it to disk, and stores its /uploads URL', async () => {
-    const { service, prisma } = buildService();
+  it('generates a real preview image, uploads it, and stores the returned URL', async () => {
+    const { service, prisma, blobStorage } = buildService();
     const project = await service.render('client-1', 'proj-1', 'actor-1');
 
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    const [path, buffer] = vi.mocked(writeFile).mock.calls[0];
-    expect(String(path)).toMatch(/uploads[\\/].+\.png$/);
-    expect(buffer).toEqual(Buffer.from('fake-png-bytes'));
+    expect(blobStorage.upload).toHaveBeenCalledWith(Buffer.from('fake-png-bytes'), '.png', 'image/png');
 
     expect(prisma.aiVideoProject.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ previewUrl: expect.stringMatching(/^\/uploads\/.+\.png$/), step: AiVideoStep.PREVIEW }),
+        data: expect.objectContaining({ previewUrl: '/uploads/fake-generated.png', step: AiVideoStep.PREVIEW }),
       }),
     );
     expect(project.step).toBe(AiVideoStep.PREVIEW);
