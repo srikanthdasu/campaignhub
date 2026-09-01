@@ -13,6 +13,13 @@ import * as THREE from 'three';
 // measurement forever, leaving a visible gap below the canvas. Comparing against the live window
 // size every frame and correcting on drift is self-healing regardless of what caused the mismatch
 // or when — the check is just two integer comparisons, negligible next to the rest of the frame.
+// Matches the same window.visualViewport-first measurement the outer wrapper div (in index.tsx)
+// sizes itself with, so the canvas and its container always agree exactly on pixel dimensions.
+function currentViewportSize() {
+  const vv = window.visualViewport;
+  return { width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight };
+}
+
 function ManualResizer() {
   const { gl, camera, size } = useThree();
 
@@ -25,19 +32,25 @@ function ManualResizer() {
   }
 
   useEffect(() => {
-    applySize(window.innerWidth, window.innerHeight);
+    const { width, height } = currentViewportSize();
+    applySize(width, height);
     function onResize() {
-      applySize(window.innerWidth, window.innerHeight);
+      const { width, height } = currentViewportSize();
+      applySize(width, height);
     }
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, camera]);
 
   useFrame(() => {
-    const { innerWidth, innerHeight } = window;
-    if (size.width !== innerWidth || size.height !== innerHeight) {
-      applySize(innerWidth, innerHeight);
+    const { width, height } = currentViewportSize();
+    if (size.width !== width || size.height !== height) {
+      applySize(width, height);
     }
   });
 

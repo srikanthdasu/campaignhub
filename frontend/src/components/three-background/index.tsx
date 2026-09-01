@@ -26,14 +26,36 @@ class WebGLErrorBoundary extends Component<{ children: ReactNode }, { failed: bo
   }
 }
 
-export function ThreeBackground() {
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [gaveUp, setGaveUp] = useState(false);
+function useViewportSize() {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    function measure() {
+      // visualViewport reflects the actually-visible area (accounts for on-screen keyboards,
+      // mobile browser chrome show/hide) more reliably than window.innerHeight on some devices;
+      // fall back to innerWidth/innerHeight where it's unavailable (older browsers).
+      const vv = window.visualViewport;
+      setSize({ width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight });
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  return size;
+}
+
+export function ThreeBackground() {
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const viewport = useViewportSize();
+
+  useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReduceMotion(query.matches);
     const listener = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
@@ -44,18 +66,27 @@ export function ThreeBackground() {
   // If the WebGL context never reports back as created — a broken/unsupported environment,
   // rather than just a slow one — stop rendering it instead of leaving a dead canvas in the DOM.
   useEffect(() => {
-    if (!mounted || ready) return;
+    if (!viewport || ready) return;
     const timer = setTimeout(() => setGaveUp(true), READY_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [mounted, ready]);
+  }, [viewport, ready]);
 
-  if (!mounted || gaveUp) return null;
+  if (!viewport || gaveUp) return null;
 
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000"
-      style={{ opacity: ready ? 0.8 : 0 }}
+      className="pointer-events-none transition-opacity duration-1000"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: `${viewport.width}px`,
+        height: `${viewport.height}px`,
+        zIndex: 0,
+        opacity: ready ? 0.8 : 0,
+        overflow: 'hidden',
+      }}
     >
       <WebGLErrorBoundary>
         <ThreeBackgroundScene reduceMotion={reduceMotion} onReady={() => setReady(true)} />
