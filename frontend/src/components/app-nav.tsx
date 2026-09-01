@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -124,6 +125,15 @@ export function AppNav() {
   const admin = isAgencyAdmin(user?.role as Role | undefined);
   const isClient = user?.role === 'CLIENT';
   const navSections = isClient ? clientSections : sections;
+  const activeLinkRef = useRef<HTMLLIElement>(null);
+
+  // The sidebar scrolls independently of the page and can be taller than the viewport (System
+  // Health, AI Studio, etc. push Insights/Business further down) — without this, navigating to
+  // a link near the bottom leaves its highlight scrolled out of view, so it looks like nothing
+  // is selected even though the route did change.
+  useEffect(() => {
+    activeLinkRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [pathname]);
 
   async function onLogout() {
     await logout();
@@ -157,7 +167,7 @@ export function AppNav() {
                   const active = pathname === link.href;
                   const Icon = link.icon;
                   return (
-                    <li key={link.href} className="relative">
+                    <li key={link.href} ref={active ? activeLinkRef : undefined} className="relative">
                       {active && (
                         <motion.span
                           layoutId="nav-active-pill"
