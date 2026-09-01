@@ -7,23 +7,40 @@ import * as THREE from 'three';
 // R3F normally sizes the canvas via a ResizeObserver on its parent. Some embedded/CDP-driven
 // browser contexts never fire that observer at all (confirmed directly — a bare ResizeObserver
 // on a freshly-observed element never called back), which leaves the canvas stuck at the
-// default 300x150. Driving gl.setSize() explicitly from the window's own dimensions sidesteps
-// the observer entirely, so sizing works regardless of whether that environment quirk is present.
+// default 300x150. A single mount-time gl.setSize() call isn't reliable either — if it runs
+// before the page's layout has fully settled (web fonts swapping in, a scrollbar appearing,
+// anything that reflows height without firing a window "resize" event), it locks in a too-short
+// measurement forever, leaving a visible gap below the canvas. Comparing against the live window
+// size every frame and correcting on drift is self-healing regardless of what caused the mismatch
+// or when — the check is just two integer comparisons, negligible next to the rest of the frame.
 function ManualResizer() {
-  const { gl, camera } = useThree();
-  useEffect(() => {
-    function resize() {
-      const { innerWidth, innerHeight } = window;
-      gl.setSize(innerWidth, innerHeight, true);
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.aspect = innerWidth / innerHeight;
-        camera.updateProjectionMatrix();
-      }
+  const { gl, camera, size } = useThree();
+
+  function applySize(width: number, height: number) {
+    gl.setSize(width, height, true);
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
     }
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
+  }
+
+  useEffect(() => {
+    applySize(window.innerWidth, window.innerHeight);
+    function onResize() {
+      applySize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, camera]);
+
+  useFrame(() => {
+    const { innerWidth, innerHeight } = window;
+    if (size.width !== innerWidth || size.height !== innerHeight) {
+      applySize(innerWidth, innerHeight);
+    }
+  });
+
   return null;
 }
 
