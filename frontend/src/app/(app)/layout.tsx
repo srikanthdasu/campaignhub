@@ -40,7 +40,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen flex-1 overflow-hidden">
+    <div className="flex h-screen overflow-hidden">
       <AppNav />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-end border-b border-white/10 px-6 py-3 lg:px-10">
