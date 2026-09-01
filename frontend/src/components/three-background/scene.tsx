@@ -7,54 +7,54 @@ import * as THREE from 'three';
 // R3F normally sizes the canvas via a ResizeObserver on its parent. Some embedded/CDP-driven
 // browser contexts never fire that observer at all (confirmed directly — a bare ResizeObserver
 // on a freshly-observed element never called back), which leaves the canvas stuck at the
-// default 300x150. A single mount-time gl.setSize() call isn't reliable either — if it runs
-// before the page's layout has fully settled (web fonts swapping in, a scrollbar appearing,
-// anything that reflows height without firing a window "resize" event), it locks in a too-short
-// measurement forever, leaving a visible gap below the canvas. Comparing against the live window
-// size every frame and correcting on drift is self-healing regardless of what caused the mismatch
-// or when — the check is just two integer comparisons, negligible next to the rest of the frame.
-// Matches the same window.visualViewport-first measurement the outer wrapper div (in index.tsx)
-// sizes itself with, so the canvas and its container always agree exactly on pixel dimensions.
-function currentViewportSize() {
-  const vv = window.visualViewport;
-  const rawWidth = vv?.width ?? window.innerWidth;
-  const rawHeight = vv?.height ?? window.innerHeight;
-  // Matches index.tsx's own rounding/padding exactly — the canvas must never end up smaller
-  // than its wrapper, or the wrapper's padding just relocates the gap to canvas's own edge.
-  return { width: Math.ceil(rawWidth) + 2, height: Math.ceil(rawHeight) + 2 };
-}
-
+// default 300x150.
+//
+// This deliberately does NOT set canvas.style.width/height (updateStyle: false below) — the
+// canvas's CSS size is left alone to inherit 100%/100% from its parent exactly like R3F sets up
+// by default, and the parent (index.tsx) is sized with pure CSS 100vw/100vh, not a JS-measured
+// pixel value. Earlier versions computed pixel dimensions from window.innerWidth/innerHeight or
+// window.visualViewport and applied them directly — that was the actual bug: it worked in every
+// environment tested but still under-measured the true viewport for this user in production,
+// consistently, on every page, for reasons that never reproduced anywhere it could be debugged.
+// Measuring the canvas's own already-rendered parent element instead of the window removes that
+// whole class of failure — whatever the parent's true on-screen size is (browser-computed, zoom-
+// correct, by definition exact), that's what gets used, so there's nothing left to mismeasure.
+// gl.setSize() here only sets the internal drawing-buffer RESOLUTION (for sharpness), never the
+// visible CSS size.
 function ManualResizer() {
   const { gl, camera, size } = useThree();
 
   function applySize(width: number, height: number) {
-    gl.setSize(width, height, true);
+    gl.setSize(width, height, false);
     if (camera instanceof THREE.PerspectiveCamera) {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
   }
 
+  function measureParent() {
+    const parent = gl.domElement.parentElement;
+    if (!parent) return null;
+    const rect = parent.getBoundingClientRect();
+    return { width: Math.round(rect.width), height: Math.round(rect.height) };
+  }
+
   useEffect(() => {
-    const { width, height } = currentViewportSize();
-    applySize(width, height);
+    const measured = measureParent();
+    if (measured) applySize(measured.width, measured.height);
     function onResize() {
-      const { width, height } = currentViewportSize();
-      applySize(width, height);
+      const measured = measureParent();
+      if (measured) applySize(measured.width, measured.height);
     }
     window.addEventListener('resize', onResize);
-    window.visualViewport?.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.visualViewport?.removeEventListener('resize', onResize);
-    };
+    return () => window.removeEventListener('resize', onResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, camera]);
 
   useFrame(() => {
-    const { width, height } = currentViewportSize();
-    if (size.width !== width || size.height !== height) {
-      applySize(width, height);
+    const measured = measureParent();
+    if (measured && (size.width !== measured.width || size.height !== measured.height)) {
+      applySize(measured.width, measured.height);
     }
   });
 
