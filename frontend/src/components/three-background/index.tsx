@@ -35,7 +35,12 @@ function useViewportSize() {
       // mobile browser chrome show/hide) more reliably than window.innerHeight on some devices;
       // fall back to innerWidth/innerHeight where it's unavailable (older browsers).
       const vv = window.visualViewport;
-      setSize({ width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight });
+      const rawWidth = vv?.width ?? window.innerWidth;
+      const rawHeight = vv?.height ?? window.innerHeight;
+      // visualViewport dimensions are fractional (e.g. 750.4px) — rounding down and then sizing
+      // to fit left a hairline gap at the edge. Round up and pad by a couple of px so the layer
+      // always overshoots the true viewport slightly rather than ever falling a pixel short.
+      setSize({ width: Math.ceil(rawWidth) + 2, height: Math.ceil(rawHeight) + 2 });
     }
     measure();
     window.addEventListener('resize', measure);

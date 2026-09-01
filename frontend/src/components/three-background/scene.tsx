@@ -17,7 +17,11 @@ import * as THREE from 'three';
 // sizes itself with, so the canvas and its container always agree exactly on pixel dimensions.
 function currentViewportSize() {
   const vv = window.visualViewport;
-  return { width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight };
+  const rawWidth = vv?.width ?? window.innerWidth;
+  const rawHeight = vv?.height ?? window.innerHeight;
+  // Matches index.tsx's own rounding/padding exactly — the canvas must never end up smaller
+  // than its wrapper, or the wrapper's padding just relocates the gap to canvas's own edge.
+  return { width: Math.ceil(rawWidth) + 2, height: Math.ceil(rawHeight) + 2 };
 }
 
 function ManualResizer() {
