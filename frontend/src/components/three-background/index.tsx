@@ -41,13 +41,20 @@ export function ThreeBackground() {
     return () => query.removeEventListener('change', listener);
   }, []);
 
+  // Temporary diagnostic aid: visiting any page with ?debugbg=1 outlines the background layer's
+  // real boundary in solid lime. If a gap is visible outside the outline, it's not this
+  // component's sizing at all — the outline itself would prove that in one screenshot instead of
+  // guessing again. Remove once the reported gap is confirmed resolved.
+  const debugOutline = typeof window !== 'undefined' && window.location.search.includes('debugbg=1');
+
   // If the WebGL context never reports back as created — a broken/unsupported environment,
   // rather than just a slow one — stop rendering it instead of leaving a dead canvas in the DOM.
+  // Skipped in debug mode so the outline stays visible even if WebGL itself never comes up.
   useEffect(() => {
-    if (!mounted || ready) return;
+    if (!mounted || ready || debugOutline) return;
     const timer = setTimeout(() => setGaveUp(true), READY_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [mounted, ready]);
+  }, [mounted, ready, debugOutline]);
 
   if (!mounted || gaveUp) return null;
 
@@ -59,12 +66,22 @@ export function ThreeBackground() {
     // left for a JS timing race or a zoom-level quirk to get wrong.
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000"
-      style={{ width: '100vw', height: '100vh', opacity: ready ? 0.8 : 0, overflow: 'hidden' }}
+      className="pointer-events-none fixed inset-0 z-0"
+      style={{
+        width: '100vw',
+        height: '100vh',
+        overflow: 'hidden',
+        // Always full-opacity regardless of WebGL readiness, so the outline itself is a reliable
+        // ground truth of this element's real boundary — it must never be invisible on its own.
+        outline: debugOutline ? '4px solid lime' : undefined,
+        outlineOffset: debugOutline ? '-4px' : undefined,
+      }}
     >
-      <WebGLErrorBoundary>
-        <ThreeBackgroundScene reduceMotion={reduceMotion} onReady={() => setReady(true)} />
-      </WebGLErrorBoundary>
+      <div className="h-full w-full transition-opacity duration-1000" style={{ opacity: ready ? 0.8 : 0 }}>
+        <WebGLErrorBoundary>
+          <ThreeBackgroundScene reduceMotion={reduceMotion} onReady={() => setReady(true)} />
+        </WebGLErrorBoundary>
+      </div>
     </div>
   );
 }
