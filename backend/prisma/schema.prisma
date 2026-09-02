@@ -353,6 +353,7 @@ model SocialAccount {
   scheduledPosts ScheduledPost[]
   inboxMessages  InboxMessage[]
 
+  @@unique([clientId, platform, externalAccountId])
   @@index([clientId])
   @@map("social_accounts")
 }

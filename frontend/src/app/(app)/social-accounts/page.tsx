@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
@@ -36,7 +37,11 @@ export default function SocialAccountsPage() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [accounts, setAccounts] = useState<SocialAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>('INSTAGRAM');
   const [label, setLabel] = useState('');
@@ -51,6 +56,37 @@ export default function SocialAccountsPage() {
   useEffect(() => {
     if (selectedClientId) load(selectedClientId);
   }, [selectedClientId]);
+
+  // Facebook's OAuth dialog redirects the whole browser back to this exact page — the result
+  // arrives as a query param, not a normal API response, since there's no in-page JS context left
+  // to hand a result to after that round trip. router.replace strips it once read so a refresh
+  // doesn't re-show the same message.
+  useEffect(() => {
+    const connected = searchParams.get('connected');
+    const connectError = searchParams.get('connect_error');
+    if (connected) {
+      setNotice(`${connected.charAt(0).toUpperCase()}${connected.slice(1)} account connected.`);
+      if (selectedClientId) load(selectedClientId);
+      router.replace('/social-accounts');
+    } else if (connectError) {
+      setError(connectError);
+      router.replace('/social-accounts');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  async function onConnectFacebook() {
+    if (!selectedClientId) return;
+    setError(null);
+    setConnecting(true);
+    try {
+      const { url } = await api.get<{ url: string }>(`/clients/${selectedClientId}/social-accounts/facebook/connect`);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to start Facebook connection');
+      setConnecting(false);
+    }
+  }
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -91,8 +127,8 @@ export default function SocialAccountsPage() {
           Track which platform accounts each client publishes to.
         </p>
         <p className="mt-2 text-xs text-amber-300/80">
-          Accounts are added manually for now — real OAuth connections need a registered
-          developer app per platform, which isn&apos;t set up yet.
+          Facebook connects via real Meta OAuth below. Other platforms are still added manually —
+          each needs its own registered developer app, which isn&apos;t set up yet.
         </p>
       </motion.div>
 
@@ -111,6 +147,19 @@ export default function SocialAccountsPage() {
           )}
 
           <AnimatePresence>
+            {notice && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300"
+              >
+                {notice}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
             {error && (
               <motion.p
                 initial={{ opacity: 0, height: 0 }}
@@ -124,8 +173,22 @@ export default function SocialAccountsPage() {
           </AnimatePresence>
 
           <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+            <Card padding="lg" className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">Facebook</h2>
+                <p className="text-xs text-neutral-400">
+                  Connect a real Facebook account via Meta login.
+                </p>
+              </div>
+              <Button size="sm" loading={connecting} onClick={onConnectFacebook}>
+                Connect Facebook
+              </Button>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
             <Card padding="lg">
-              <h2 className="mb-4 text-sm font-semibold text-neutral-50">Add an account</h2>
+              <h2 className="mb-4 text-sm font-semibold text-neutral-50">Add an account manually</h2>
               <form onSubmit={onAdd} className="flex items-end gap-3">
                 <Select
                   label="Platform"
