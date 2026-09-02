@@ -101,9 +101,17 @@ function ParticleField({ reduceMotion }: { reduceMotion: boolean }) {
       const radius = 8 + Math.random() * 14;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
+      // Confirmed via a debug outline that the canvas itself was always correctly sized to the
+      // full viewport — the "gap" users saw was this particle field being visually sparse near
+      // the top/bottom edges, not a sizing bug. Two compounding causes: the old *0.6 flattened
+      // the Y spread, and the camera's vertical FOV is the tighter constraint on a wide monitor
+      // (horizontal FOV grows with aspect ratio, vertical doesn't) — so a vertically-compressed
+      // field left exactly the top/bottom edges thin on wide/short windows. Now stretched to 1.3x
+      // instead of flattened. The -14 offset (was -6) keeps the whole radius 8-22 sphere at
+      // z < camera's z=12, so no particles land behind the camera and go to waste.
       positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 0.6;
-      positions[i * 3 + 2] = radius * Math.cos(phi) - 6;
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 1.3;
+      positions[i * 3 + 2] = radius * Math.cos(phi) - 14;
 
       const color = palette[i % palette.length];
       colors[i * 3] = color.r;
