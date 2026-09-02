@@ -72,7 +72,10 @@ export class MetaOAuthService {
       client_id: this.appId,
       redirect_uri: this.redirectUri,
       state: this.encodeState(state),
-      scope: 'email,public_profile',
+      // "email" isn't active for this app in Meta's dashboard yet (returns "Invalid Scopes:
+      // email" — confirmed live). public_profile alone needs no extra approval and is enough to
+      // get a real connected account working now; add email back once that's sorted on Meta's side.
+      scope: 'public_profile',
       response_type: 'code',
     });
     return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
