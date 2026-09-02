@@ -87,6 +87,42 @@ function softCircleTexture() {
   return texture;
 }
 
+function ambientGlowTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(91,99,245,0.5)');
+  gradient.addColorStop(0.45, 'rgba(91,99,245,0.28)');
+  gradient.addColorStop(0.75, 'rgba(232,121,249,0.14)');
+  gradient.addColorStop(1, 'rgba(7,8,15,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// A particle field is randomly distributed by nature — no matter how it's tuned, some run of
+// bad luck leaves a patch thin, and that patch reads as "the background isn't there" even though
+// it technically is (confirmed with a debug outline — the canvas covers the full viewport; the
+// particles inside it just don't). This plane sits behind everything and guarantees a constant
+// soft glow across the *entire* frame regardless of where particles happen to land, particle
+// count, aspect ratio, or camera FOV — the particles add detail on top of an already-lit scene
+// instead of being the only source of light in it. Sized and placed generously oversized for the
+// frustum at this depth so it can never fail to fill the frame on any real aspect ratio.
+function AmbientGlow() {
+  const texture = useMemo(() => ambientGlowTexture(), []);
+  return (
+    <mesh position={[0, 0, -30]}>
+      <planeGeometry args={[220, 220]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} />
+    </mesh>
+  );
+}
+
 function ParticleField({ reduceMotion }: { reduceMotion: boolean }) {
   const pointsRef = useRef<THREE.Points>(null);
   const texture = useMemo(() => softCircleTexture(), []);
@@ -196,6 +232,7 @@ export function ThreeBackgroundScene({
       onCreated={onReady}
     >
       <ManualResizer />
+      <AmbientGlow />
       <ParticleField reduceMotion={reduceMotion} />
       <DriftingOrb position={[-6, 3, -8]} scale={3.2} color={ACCENT_DEEP} speed={0.15} reduceMotion={reduceMotion} />
       <DriftingOrb position={[7, -2, -10]} scale={2.6} color={FUCHSIA} speed={0.12} reduceMotion={reduceMotion} />
