@@ -26,7 +26,12 @@ declare global {
       init: (options: { appId: string; version: string; xfbml?: boolean }) => void;
       login: (
         callback: (response: { authResponse?: { code?: string } }) => void,
-        options: { config_id: string; response_type: string; override_default_response_type: boolean },
+        options: {
+          config_id: string;
+          response_type: string;
+          override_default_response_type: boolean;
+          extras?: { setup: Record<string, never> };
+        },
       ) => void;
     };
   }
@@ -179,7 +184,12 @@ export default function SocialAccountsPage() {
     // callback here must stay a plain synchronous function, with the async work delegated out.
     window.FB.login((response) => {
       handleWhatsAppLoginResponse(response);
-    }, { config_id: WHATSAPP_CONFIG_ID, response_type: 'code', override_default_response_type: true });
+    }, {
+      config_id: WHATSAPP_CONFIG_ID,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: { setup: {} },
+    });
   }
 
   async function handleWhatsAppLoginResponse(response: { authResponse?: { code?: string } }) {
