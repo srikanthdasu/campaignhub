@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { SocialAccountsService } from './social-accounts.service.js';
 import { MetaOAuthService } from './meta-oauth.service.js';
+import { InstagramOAuthService } from './instagram-oauth.service.js';
 import { CreateSocialAccountDto } from './dto/create-social-account.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -17,6 +18,7 @@ export class SocialAccountsController {
   constructor(
     private socialAccountsService: SocialAccountsService,
     private metaOAuth: MetaOAuthService,
+    private instagramOAuth: InstagramOAuthService,
   ) {}
 
   @Post()
@@ -36,6 +38,13 @@ export class SocialAccountsController {
   @Roles(...CAN_MANAGE)
   connectFacebook(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
     const url = this.metaOAuth.buildAuthUrl({ clientId, actorId: user.sub });
+    return { url };
+  }
+
+  @Get('instagram/connect')
+  @Roles(...CAN_MANAGE)
+  connectInstagram(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
+    const url = this.instagramOAuth.buildAuthUrl({ clientId, actorId: user.sub });
     return { url };
   }
 

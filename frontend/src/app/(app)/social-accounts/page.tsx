@@ -39,7 +39,8 @@ export default function SocialAccountsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connectingFacebook, setConnectingFacebook] = useState(false);
+  const [connectingInstagram, setConnectingInstagram] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -78,13 +79,26 @@ export default function SocialAccountsPage() {
   async function onConnectFacebook() {
     if (!selectedClientId) return;
     setError(null);
-    setConnecting(true);
+    setConnectingFacebook(true);
     try {
       const { url } = await api.get<{ url: string }>(`/clients/${selectedClientId}/social-accounts/facebook/connect`);
       window.location.href = url;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to start Facebook connection');
-      setConnecting(false);
+      setConnectingFacebook(false);
+    }
+  }
+
+  async function onConnectInstagram() {
+    if (!selectedClientId) return;
+    setError(null);
+    setConnectingInstagram(true);
+    try {
+      const { url } = await api.get<{ url: string }>(`/clients/${selectedClientId}/social-accounts/instagram/connect`);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to start Instagram connection');
+      setConnectingInstagram(false);
     }
   }
 
@@ -180,8 +194,22 @@ export default function SocialAccountsPage() {
                   Connect a real Facebook account via Meta login.
                 </p>
               </div>
-              <Button size="sm" loading={connecting} onClick={onConnectFacebook}>
+              <Button size="sm" loading={connectingFacebook} onClick={onConnectFacebook}>
                 Connect Facebook
+              </Button>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+            <Card padding="lg" className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">Instagram</h2>
+                <p className="text-xs text-neutral-400">
+                  Connect a real Instagram Business or Creator account.
+                </p>
+              </div>
+              <Button size="sm" loading={connectingInstagram} onClick={onConnectInstagram}>
+                Connect Instagram
               </Button>
             </Card>
           </motion.div>
