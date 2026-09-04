@@ -17,7 +17,7 @@ import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 // Public, client-facing identifiers for the WhatsApp Embedded Signup JS SDK popup — not secrets
 // (the app secret used to exchange the resulting code for a token stays server-side only).
 const WHATSAPP_APP_ID = '1412830383946851';
-const WHATSAPP_CONFIG_ID = '2967740513612505';
+const WHATSAPP_CONFIG_ID = '2037537230301004';
 
 declare global {
   interface Window {
