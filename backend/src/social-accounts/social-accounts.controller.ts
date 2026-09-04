@@ -2,12 +2,14 @@ import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/c
 import { SocialAccountsService } from './social-accounts.service.js';
 import { MetaOAuthService } from './meta-oauth.service.js';
 import { InstagramOAuthService } from './instagram-oauth.service.js';
+import { WhatsAppOAuthService } from './whatsapp-oauth.service.js';
 import { CreateSocialAccountDto } from './dto/create-social-account.dto.js';
+import { ConnectWhatsAppDto } from './dto/connect-whatsapp.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { Role } from '../generated/prisma/client.js';
+import { Role, SocialPlatform } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER];
@@ -19,6 +21,7 @@ export class SocialAccountsController {
     private socialAccountsService: SocialAccountsService,
     private metaOAuth: MetaOAuthService,
     private instagramOAuth: InstagramOAuthService,
+    private whatsAppOAuth: WhatsAppOAuthService,
   ) {}
 
   @Post()
@@ -46,6 +49,27 @@ export class SocialAccountsController {
   connectInstagram(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
     const url = this.instagramOAuth.buildAuthUrl({ clientId, actorId: user.sub });
     return { url };
+  }
+
+  // Unlike the Facebook/Instagram connectors, WhatsApp Embedded Signup never leaves this page — the
+  // Meta JS SDK popup hands the frontend a code directly, so this is a normal authenticated POST
+  // rather than a public redirect-callback route.
+  @Post('whatsapp/connect')
+  @Roles(...CAN_MANAGE)
+  async connectWhatsApp(
+    @Param('clientId') clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ConnectWhatsAppDto,
+  ) {
+    const accessToken = await this.whatsAppOAuth.exchangeCodeForToken(dto.code);
+    return this.socialAccountsService.createFromOAuth(
+      clientId,
+      user.sub,
+      SocialPlatform.WHATSAPP,
+      `WhatsApp (${dto.phoneNumberId})`,
+      dto.phoneNumberId,
+      accessToken,
+    );
   }
 
   @Get()

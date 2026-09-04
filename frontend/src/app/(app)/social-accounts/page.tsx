@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -13,6 +13,24 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+
+// Public, client-facing identifiers for the WhatsApp Embedded Signup JS SDK popup — not secrets
+// (the app secret used to exchange the resulting code for a token stays server-side only).
+const WHATSAPP_APP_ID = '1412830383946851';
+const WHATSAPP_CONFIG_ID = '2967740513612505';
+
+declare global {
+  interface Window {
+    fbAsyncInit?: () => void;
+    FB?: {
+      init: (options: { appId: string; version: string; xfbml?: boolean }) => void;
+      login: (
+        callback: (response: { authResponse?: { code?: string } }) => void,
+        options: { config_id: string; response_type: string; override_default_response_type: boolean },
+      ) => void;
+    };
+  }
+}
 
 const PLATFORMS = [
   'INSTAGRAM',
@@ -41,8 +59,12 @@ export default function SocialAccountsPage() {
   const [creating, setCreating] = useState(false);
   const [connectingFacebook, setConnectingFacebook] = useState(false);
   const [connectingInstagram, setConnectingInstagram] = useState(false);
+  const [connectingWhatsApp, setConnectingWhatsApp] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const waPhoneNumberIdRef = useRef<string | null>(null);
+  const waResolveRef = useRef<((id: string | null) => void) | null>(null);
 
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>('INSTAGRAM');
   const [label, setLabel] = useState('');
@@ -57,6 +79,47 @@ export default function SocialAccountsPage() {
   useEffect(() => {
     if (selectedClientId) load(selectedClientId);
   }, [selectedClientId]);
+
+  // WhatsApp Embedded Signup runs inside a JS SDK popup rather than a page redirect, so the SDK
+  // needs to be loaded once up front.
+  useEffect(() => {
+    if (document.getElementById('facebook-jssdk')) return;
+    window.fbAsyncInit = () => {
+      window.FB?.init({ appId: WHATSAPP_APP_ID, version: 'v21.0', xfbml: false });
+    };
+    const script = document.createElement('script');
+    script.id = 'facebook-jssdk';
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
+
+  // The popup reports the chosen phone_number_id via postMessage, arriving independently of (and
+  // usually just before) FB.login's own callback — stash it in a ref that onConnectWhatsApp reads.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== 'https://www.facebook.com' || typeof event.data !== 'string') return;
+      let data: unknown;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        (data as Record<string, unknown>).type === 'WA_EMBEDDED_SIGNUP' &&
+        (data as Record<string, unknown>).event === 'FINISH'
+      ) {
+        const phoneNumberId = (data as { data?: { phone_number_id?: string } }).data?.phone_number_id ?? null;
+        waPhoneNumberIdRef.current = phoneNumberId;
+        waResolveRef.current?.(phoneNumberId);
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Facebook's OAuth dialog redirects the whole browser back to this exact page — the result
   // arrives as a query param, not a normal API response, since there's no in-page JS context left
@@ -102,6 +165,52 @@ export default function SocialAccountsPage() {
     }
   }
 
+  function onConnectWhatsApp() {
+    if (!selectedClientId || !window.FB) {
+      setError('WhatsApp login is still loading — please try again in a moment.');
+      return;
+    }
+    setError(null);
+    setConnectingWhatsApp(true);
+    waPhoneNumberIdRef.current = null;
+
+    window.FB.login(
+      async (response) => {
+        const code = response.authResponse?.code;
+        if (!code) {
+          setError('WhatsApp connection was cancelled or failed');
+          setConnectingWhatsApp(false);
+          return;
+        }
+
+        const phoneNumberId =
+          waPhoneNumberIdRef.current ??
+          (await new Promise<string | null>((resolve) => {
+            waResolveRef.current = resolve;
+            setTimeout(() => resolve(null), 5000);
+          }));
+        waResolveRef.current = null;
+
+        if (!phoneNumberId) {
+          setError('Did not receive a WhatsApp phone number from Meta. Please try again.');
+          setConnectingWhatsApp(false);
+          return;
+        }
+
+        try {
+          await api.post(`/clients/${selectedClientId}/social-accounts/whatsapp/connect`, { code, phoneNumberId });
+          setNotice('WhatsApp account connected.');
+          load(selectedClientId);
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Failed to connect WhatsApp account');
+        } finally {
+          setConnectingWhatsApp(false);
+        }
+      },
+      { config_id: WHATSAPP_CONFIG_ID, response_type: 'code', override_default_response_type: true },
+    );
+  }
+
   async function onAdd(e: FormEvent) {
     e.preventDefault();
     if (!selectedClientId) return;
@@ -141,8 +250,9 @@ export default function SocialAccountsPage() {
           Track which platform accounts each client publishes to.
         </p>
         <p className="mt-2 text-xs text-amber-300/80">
-          Facebook connects via real Meta OAuth below. Other platforms are still added manually —
-          each needs its own registered developer app, which isn&apos;t set up yet.
+          Facebook, Instagram, and WhatsApp connect via real Meta login below. Other platforms are
+          still added manually — each needs its own registered developer app, which isn&apos;t set
+          up yet.
         </p>
       </motion.div>
 
@@ -210,6 +320,20 @@ export default function SocialAccountsPage() {
               </div>
               <Button size="sm" loading={connectingInstagram} onClick={onConnectInstagram}>
                 Connect Instagram
+              </Button>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+            <Card padding="lg" className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">WhatsApp</h2>
+                <p className="text-xs text-neutral-400">
+                  Connect a real WhatsApp Business Account via Meta.
+                </p>
+              </div>
+              <Button size="sm" loading={connectingWhatsApp} onClick={onConnectWhatsApp}>
+                Connect WhatsApp
               </Button>
             </Card>
           </motion.div>
