@@ -174,41 +174,46 @@ export default function SocialAccountsPage() {
     setConnectingWhatsApp(true);
     waPhoneNumberIdRef.current = null;
 
-    window.FB.login(
-      async (response) => {
-        const code = response.authResponse?.code;
-        if (!code) {
-          setError('WhatsApp connection was cancelled or failed');
-          setConnectingWhatsApp(false);
-          return;
-        }
+    // FB.login's own SDK code rejects an `async` function passed directly as the callback (throws
+    // "Expression is of type asyncfunction, not function" from inside its minified source) — the
+    // callback here must stay a plain synchronous function, with the async work delegated out.
+    window.FB.login((response) => {
+      handleWhatsAppLoginResponse(response);
+    }, { config_id: WHATSAPP_CONFIG_ID, response_type: 'code', override_default_response_type: true });
+  }
 
-        const phoneNumberId =
-          waPhoneNumberIdRef.current ??
-          (await new Promise<string | null>((resolve) => {
-            waResolveRef.current = resolve;
-            setTimeout(() => resolve(null), 5000);
-          }));
-        waResolveRef.current = null;
+  async function handleWhatsAppLoginResponse(response: { authResponse?: { code?: string } }) {
+    const code = response.authResponse?.code;
+    if (!code) {
+      setError('WhatsApp connection was cancelled or failed');
+      setConnectingWhatsApp(false);
+      return;
+    }
 
-        if (!phoneNumberId) {
-          setError('Did not receive a WhatsApp phone number from Meta. Please try again.');
-          setConnectingWhatsApp(false);
-          return;
-        }
+    const phoneNumberId =
+      waPhoneNumberIdRef.current ??
+      (await new Promise<string | null>((resolve) => {
+        waResolveRef.current = resolve;
+        setTimeout(() => resolve(null), 5000);
+      }));
+    waResolveRef.current = null;
 
-        try {
-          await api.post(`/clients/${selectedClientId}/social-accounts/whatsapp/connect`, { code, phoneNumberId });
-          setNotice('WhatsApp account connected.');
-          load(selectedClientId);
-        } catch (err) {
-          setError(err instanceof ApiError ? err.message : 'Failed to connect WhatsApp account');
-        } finally {
-          setConnectingWhatsApp(false);
-        }
-      },
-      { config_id: WHATSAPP_CONFIG_ID, response_type: 'code', override_default_response_type: true },
-    );
+    if (!phoneNumberId) {
+      setError('Did not receive a WhatsApp phone number from Meta. Please try again.');
+      setConnectingWhatsApp(false);
+      return;
+    }
+
+    if (!selectedClientId) return;
+    try {
+      await api.post(`/clients/${selectedClientId}/social-accounts/whatsapp/connect`, { code, phoneNumberId });
+      setNotice('WhatsApp account connected.');
+      load(selectedClientId);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to connect WhatsApp account');
+    } finally {
+      setConnectingWhatsApp(false);
+    }
   }
 
   async function onAdd(e: FormEvent) {
