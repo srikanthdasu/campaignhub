@@ -65,6 +65,7 @@ export default function SocialAccountsPage() {
   const [connectingFacebook, setConnectingFacebook] = useState(false);
   const [connectingInstagram, setConnectingInstagram] = useState(false);
   const [connectingWhatsApp, setConnectingWhatsApp] = useState(false);
+  const [connectingLinkedIn, setConnectingLinkedIn] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -170,6 +171,19 @@ export default function SocialAccountsPage() {
     }
   }
 
+  async function onConnectLinkedIn() {
+    if (!selectedClientId) return;
+    setError(null);
+    setConnectingLinkedIn(true);
+    try {
+      const { url } = await api.get<{ url: string }>(`/clients/${selectedClientId}/social-accounts/linkedin/connect`);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to start LinkedIn connection');
+      setConnectingLinkedIn(false);
+    }
+  }
+
   function onConnectWhatsApp() {
     if (!selectedClientId || !window.FB) {
       setError('WhatsApp login is still loading — please try again in a moment.');
@@ -265,9 +279,9 @@ export default function SocialAccountsPage() {
           Track which platform accounts each client publishes to.
         </p>
         <p className="mt-2 text-xs text-amber-300/80">
-          Facebook, Instagram, and WhatsApp connect via real Meta login below. Other platforms are
-          still added manually — each needs its own registered developer app, which isn&apos;t set
-          up yet.
+          Facebook, Instagram, WhatsApp, and LinkedIn connect via real login below. Other
+          platforms are still added manually — each needs its own registered developer app, which
+          isn&apos;t set up yet.
         </p>
       </motion.div>
 
@@ -335,6 +349,20 @@ export default function SocialAccountsPage() {
               </div>
               <Button size="sm" loading={connectingInstagram} onClick={onConnectInstagram}>
                 Connect Instagram
+              </Button>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+            <Card padding="lg" className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">LinkedIn</h2>
+                <p className="text-xs text-neutral-400">
+                  Connect a real LinkedIn account via LinkedIn login.
+                </p>
+              </div>
+              <Button size="sm" loading={connectingLinkedIn} onClick={onConnectLinkedIn}>
+                Connect LinkedIn
               </Button>
             </Card>
           </motion.div>
