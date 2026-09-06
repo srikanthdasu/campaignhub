@@ -8,6 +8,8 @@ import { InstagramOAuthService } from './instagram-oauth.service.js';
 import { WhatsAppOAuthService } from './whatsapp-oauth.service.js';
 import { LinkedInOAuthCallbackController } from './linkedin-oauth-callback.controller.js';
 import { LinkedInOAuthService } from './linkedin-oauth.service.js';
+import { XOAuthCallbackController } from './x-oauth-callback.controller.js';
+import { XOAuthService } from './x-oauth.service.js';
 import { AuditModule } from '../audit/audit.module.js';
 
 @Module({
@@ -17,6 +19,7 @@ import { AuditModule } from '../audit/audit.module.js';
     MetaOAuthCallbackController,
     InstagramOAuthCallbackController,
     LinkedInOAuthCallbackController,
+    XOAuthCallbackController,
   ],
   providers: [
     SocialAccountsService,
@@ -24,6 +27,7 @@ import { AuditModule } from '../audit/audit.module.js';
     InstagramOAuthService,
     WhatsAppOAuthService,
     LinkedInOAuthService,
+    XOAuthService,
   ],
 })
 export class SocialAccountsModule {}

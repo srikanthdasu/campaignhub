@@ -11,13 +11,15 @@ export interface OAuthState {
 // state (same approach as RazorpayService's payment signature) is what proves which client/user
 // initiated the connection and stops a forged state from attaching a hijacked code to a client
 // the requester doesn't actually have access to.
-export function encodeOAuthState(state: OAuthState, secret: string): string {
+// Generic over T so connectors that need extra fields in the signed state (e.g. X's PKCE code
+// verifier, which has nowhere else to live across the redirect) can extend OAuthState.
+export function encodeOAuthState<T extends OAuthState>(state: T, secret: string): string {
   const payload = Buffer.from(JSON.stringify(state)).toString('base64url');
   const signature = createHmac('sha256', secret).update(payload).digest('base64url');
   return `${payload}.${signature}`;
 }
 
-export function decodeOAuthState(encoded: string, secret: string): OAuthState {
+export function decodeOAuthState<T extends OAuthState = OAuthState>(encoded: string, secret: string): T {
   const [payload, signature] = encoded.split('.');
   if (!payload || !signature) throw new BadRequestException('Invalid OAuth state');
 
@@ -28,5 +30,5 @@ export function decodeOAuthState(encoded: string, secret: string): OAuthState {
     throw new BadRequestException('Invalid OAuth state');
   }
 
-  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as OAuthState;
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as T;
 }

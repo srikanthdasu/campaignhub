@@ -66,6 +66,7 @@ export default function SocialAccountsPage() {
   const [connectingInstagram, setConnectingInstagram] = useState(false);
   const [connectingWhatsApp, setConnectingWhatsApp] = useState(false);
   const [connectingLinkedIn, setConnectingLinkedIn] = useState(false);
+  const [connectingX, setConnectingX] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -240,6 +241,19 @@ export default function SocialAccountsPage() {
     }
   }
 
+  async function onConnectX() {
+    if (!selectedClientId) return;
+    setError(null);
+    setConnectingX(true);
+    try {
+      const { url } = await api.get<{ url: string }>(`/clients/${selectedClientId}/social-accounts/x/connect`);
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to start X connection');
+      setConnectingX(false);
+    }
+  }
+
   async function onAdd(e: FormEvent) {
     e.preventDefault();
     if (!selectedClientId) return;
@@ -363,6 +377,20 @@ export default function SocialAccountsPage() {
               </div>
               <Button size="sm" loading={connectingLinkedIn} onClick={onConnectLinkedIn}>
                 Connect LinkedIn
+              </Button>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+            <Card padding="lg" className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-50">X</h2>
+                <p className="text-xs text-neutral-400">
+                  Connect a real X (Twitter) account via X login.
+                </p>
+              </div>
+              <Button size="sm" loading={connectingX} onClick={onConnectX}>
+                Connect X
               </Button>
             </Card>
           </motion.div>

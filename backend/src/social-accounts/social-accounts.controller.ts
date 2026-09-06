@@ -4,6 +4,7 @@ import { MetaOAuthService } from './meta-oauth.service.js';
 import { InstagramOAuthService } from './instagram-oauth.service.js';
 import { WhatsAppOAuthService } from './whatsapp-oauth.service.js';
 import { LinkedInOAuthService } from './linkedin-oauth.service.js';
+import { XOAuthService } from './x-oauth.service.js';
 import { CreateSocialAccountDto } from './dto/create-social-account.dto.js';
 import { ConnectWhatsAppDto } from './dto/connect-whatsapp.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
@@ -24,6 +25,7 @@ export class SocialAccountsController {
     private instagramOAuth: InstagramOAuthService,
     private whatsAppOAuth: WhatsAppOAuthService,
     private linkedInOAuth: LinkedInOAuthService,
+    private xOAuth: XOAuthService,
   ) {}
 
   @Post()
@@ -57,6 +59,13 @@ export class SocialAccountsController {
   @Roles(...CAN_MANAGE)
   connectLinkedIn(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
     const url = this.linkedInOAuth.buildAuthUrl({ clientId, actorId: user.sub });
+    return { url };
+  }
+
+  @Get('x/connect')
+  @Roles(...CAN_MANAGE)
+  connectX(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
+    const url = this.xOAuth.buildAuthUrl({ clientId, actorId: user.sub });
     return { url };
   }
 
