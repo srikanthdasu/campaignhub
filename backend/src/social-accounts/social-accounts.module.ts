@@ -10,6 +10,8 @@ import { LinkedInOAuthCallbackController } from './linkedin-oauth-callback.contr
 import { LinkedInOAuthService } from './linkedin-oauth.service.js';
 import { XOAuthCallbackController } from './x-oauth-callback.controller.js';
 import { XOAuthService } from './x-oauth.service.js';
+import { YouTubeOAuthCallbackController } from './youtube-oauth-callback.controller.js';
+import { YouTubeOAuthService } from './youtube-oauth.service.js';
 import { AuditModule } from '../audit/audit.module.js';
 
 @Module({
@@ -20,6 +22,7 @@ import { AuditModule } from '../audit/audit.module.js';
     InstagramOAuthCallbackController,
     LinkedInOAuthCallbackController,
     XOAuthCallbackController,
+    YouTubeOAuthCallbackController,
   ],
   providers: [
     SocialAccountsService,
@@ -28,6 +31,7 @@ import { AuditModule } from '../audit/audit.module.js';
     WhatsAppOAuthService,
     LinkedInOAuthService,
     XOAuthService,
+    YouTubeOAuthService,
   ],
 })
 export class SocialAccountsModule {}

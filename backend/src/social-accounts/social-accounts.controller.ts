@@ -5,6 +5,7 @@ import { InstagramOAuthService } from './instagram-oauth.service.js';
 import { WhatsAppOAuthService } from './whatsapp-oauth.service.js';
 import { LinkedInOAuthService } from './linkedin-oauth.service.js';
 import { XOAuthService } from './x-oauth.service.js';
+import { YouTubeOAuthService } from './youtube-oauth.service.js';
 import { CreateSocialAccountDto } from './dto/create-social-account.dto.js';
 import { ConnectWhatsAppDto } from './dto/connect-whatsapp.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
@@ -26,6 +27,7 @@ export class SocialAccountsController {
     private whatsAppOAuth: WhatsAppOAuthService,
     private linkedInOAuth: LinkedInOAuthService,
     private xOAuth: XOAuthService,
+    private youTubeOAuth: YouTubeOAuthService,
   ) {}
 
   @Post()
@@ -66,6 +68,13 @@ export class SocialAccountsController {
   @Roles(...CAN_MANAGE)
   connectX(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
     const url = this.xOAuth.buildAuthUrl({ clientId, actorId: user.sub });
+    return { url };
+  }
+
+  @Get('youtube/connect')
+  @Roles(...CAN_MANAGE)
+  connectYouTube(@Param('clientId') clientId: string, @CurrentUser() user: AuthenticatedUser) {
+    const url = this.youTubeOAuth.buildAuthUrl({ clientId, actorId: user.sub });
     return { url };
   }
 
