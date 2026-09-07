@@ -50,6 +50,12 @@ interface Member {
   role: string;
 }
 
+interface MediaAssetOption {
+  id: string;
+  fileName: string;
+  storageUrl: string;
+}
+
 export default function ContentPlannerPage() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [items, setItems] = useState<ContentItem[] | null>(null);
@@ -60,6 +66,8 @@ export default function ContentPlannerPage() {
   const [type, setType] = useState<(typeof CONTENT_TYPES)[number]>('CAPTION');
   const [body, setBody] = useState('');
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [mediaAssets, setMediaAssets] = useState<MediaAssetOption[]>([]);
+  const [mediaAssetId, setMediaAssetId] = useState<string>('');
 
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [approverIds, setApproverIds] = useState<string[]>([]);
@@ -79,6 +87,10 @@ export default function ContentPlannerPage() {
       .get<Member[]>(`/clients/${selectedClientId}/access`)
       .then(setMembers)
       .catch(() => setMembers([]));
+    api
+      .get<MediaAssetOption[]>(`/clients/${selectedClientId}/media`)
+      .then(setMediaAssets)
+      .catch(() => setMediaAssets([]));
   }, [selectedClientId]);
 
   function togglePlatform(p: string) {
@@ -91,9 +103,15 @@ export default function ContentPlannerPage() {
     setError(null);
     setCreating(true);
     try {
-      await api.post(`/clients/${selectedClientId}/content`, { type, body, platforms });
+      await api.post(`/clients/${selectedClientId}/content`, {
+        type,
+        body,
+        platforms,
+        mediaAssetId: mediaAssetId || undefined,
+      });
       setBody('');
       setPlatforms([]);
+      setMediaAssetId('');
       loadItems(selectedClientId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create content');
@@ -207,6 +225,24 @@ export default function ContentPlannerPage() {
                     ))}
                   </div>
                 </div>
+
+                <Select
+                  label="Media (optional — required for Instagram)"
+                  value={mediaAssetId}
+                  onChange={(e) => setMediaAssetId(e.target.value)}
+                >
+                  <option value="">No media</option>
+                  {mediaAssets.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.fileName}
+                    </option>
+                  ))}
+                </Select>
+                {mediaAssets.length === 0 && (
+                  <p className="text-xs text-neutral-500">
+                    No media uploaded for this client yet — upload one in Media Library first.
+                  </p>
+                )}
 
                 <Button type="submit" loading={creating}>
                   {creating ? 'Creating…' : 'Create draft'}
