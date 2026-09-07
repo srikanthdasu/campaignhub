@@ -7,6 +7,11 @@ interface InstagramContainerResponse {
   error?: { message?: string };
 }
 
+interface InstagramContainerStatusResponse {
+  status_code?: 'IN_PROGRESS' | 'FINISHED' | 'ERROR' | 'EXPIRED' | 'PUBLISHED';
+  error?: { message?: string };
+}
+
 interface InstagramPublishResponse {
   id?: string;
   error?: { message?: string };
@@ -14,16 +19,43 @@ interface InstagramPublishResponse {
 
 export class InstagramPublishError extends Error {}
 
+const CONTAINER_POLL_INTERVAL_MS = 2000;
+const CONTAINER_POLL_MAX_ATTEMPTS = 15;
+
 @Injectable()
 export class InstagramPublishService {
   /**
-   * Two-step Content Publishing API: create a media container from a publicly reachable image
-   * URL, then publish that container. Instagram has no text-only post type — a caption alone,
-   * with no image, has nothing to attach it to and can't be published this way.
+   * Three-step Content Publishing API: create a media container from a publicly reachable image
+   * URL, wait for Instagram to finish processing it (publishing an IN_PROGRESS container fails
+   * with "Media ID is not available"), then publish it. Instagram has no text-only post type —
+   * a caption alone, with no image, has nothing to attach it to and can't be published this way.
    */
   async publishImage(igUserId: string, accessToken: string, imageUrl: string, caption: string): Promise<string> {
     const containerId = await this.createContainer(igUserId, accessToken, imageUrl, caption);
+    await this.waitForContainerReady(containerId, accessToken);
     return this.publishContainer(igUserId, accessToken, containerId);
+  }
+
+  private async waitForContainerReady(containerId: string, accessToken: string): Promise<void> {
+    for (let attempt = 0; attempt < CONTAINER_POLL_MAX_ATTEMPTS; attempt++) {
+      const params = new URLSearchParams({ fields: 'status_code', access_token: accessToken });
+
+      let res: Response;
+      try {
+        res = await fetch(`https://graph.instagram.com/${GRAPH_VERSION}/${containerId}?${params.toString()}`);
+      } catch {
+        throw new InstagramPublishError('Could not reach Instagram to check the post status.');
+      }
+      const data = (await res.json()) as InstagramContainerStatusResponse;
+
+      if (data.status_code === 'FINISHED') return;
+      if (data.status_code === 'ERROR' || data.status_code === 'EXPIRED') {
+        throw new InstagramPublishError(data.error?.message ?? 'Instagram failed to process the media');
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, CONTAINER_POLL_INTERVAL_MS));
+    }
+    throw new InstagramPublishError('Instagram took too long to process the media — try again shortly.');
   }
 
   private async createContainer(
