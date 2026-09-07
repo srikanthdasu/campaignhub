@@ -200,8 +200,17 @@ export class SchedulerService {
       );
     }
 
+    // Manually-added placeholder rows (no OAuth token) can coexist with a real connected
+    // account for the same client — without this filter, an arbitrary row could win over the
+    // one that actually has a usable token.
     const account = await this.prisma.socialAccount.findFirst({
-      where: { clientId: content.clientId, platform: SocialPlatform.INSTAGRAM },
+      where: {
+        clientId: content.clientId,
+        platform: SocialPlatform.INSTAGRAM,
+        accessTokenEncrypted: { not: null },
+        externalAccountId: { not: null },
+      },
+      orderBy: { connectedAt: 'desc' },
     });
     if (!account?.accessTokenEncrypted || !account.externalAccountId) {
       throw new InstagramPublishError('No connected Instagram account found for this client.');
