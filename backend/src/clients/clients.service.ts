@@ -15,7 +15,19 @@ export class ClientsService {
 
   async create(agencyId: string, actorId: string, dto: CreateClientDto) {
     const client = await this.prisma.client.create({
-      data: { agencyId, name: dto.name, brandKitId: dto.brandKitId },
+      data: {
+        agencyId,
+        name: dto.name,
+        brandKitId: dto.brandKitId,
+        contactName: dto.contactName,
+        contactEmail: dto.contactEmail,
+        phone: dto.phone,
+        website: dto.website,
+        businessType: dto.businessType,
+        industry: dto.industry,
+        notes: dto.notes,
+        plan: dto.plan,
+      },
     });
 
     await this.audit.log({
@@ -56,7 +68,19 @@ export class ClientsService {
 
     const client = await this.prisma.client.update({
       where: { id: clientId },
-      data: { name: dto.name, brandKitId: dto.brandKitId },
+      data: {
+        name: dto.name,
+        brandKitId: dto.brandKitId,
+        contactName: dto.contactName,
+        contactEmail: dto.contactEmail,
+        phone: dto.phone,
+        website: dto.website,
+        businessType: dto.businessType,
+        industry: dto.industry,
+        notes: dto.notes,
+        plan: dto.plan,
+        status: dto.status,
+      },
     });
 
     await this.audit.log({

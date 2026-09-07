@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, resolveMediaUrl } from '@/lib/api';
 import { ROLE_LABELS, Role } from '@/lib/roles';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
+const PLANS = ['BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'] as const;
+const STATUSES = ['ACTIVE', 'PENDING_ONBOARDING', 'INACTIVE', 'BLOCKED'] as const;
+type ClientPlan = (typeof PLANS)[number];
+type ClientStatus = (typeof STATUSES)[number];
+
+const STATUS_TONE: Record<ClientStatus, 'accent' | 'success' | 'warning' | 'danger' | 'neutral'> = {
+  ACTIVE: 'success',
+  PENDING_ONBOARDING: 'warning',
+  INACTIVE: 'neutral',
+  BLOCKED: 'danger',
+};
+
+const STATUS_LABELS: Record<ClientStatus, string> = {
+  ACTIVE: 'Active',
+  PENDING_ONBOARDING: 'Pending onboarding',
+  INACTIVE: 'Inactive',
+  BLOCKED: 'Blocked',
+};
+
 interface Client {
   id: string;
   name: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  phone: string | null;
+  website: string | null;
+  businessType: string | null;
+  industry: string | null;
+  notes: string | null;
+  plan: ClientPlan;
+  status: ClientStatus;
   createdAt: string;
 }
 
@@ -26,10 +54,37 @@ interface Member {
 }
 
 interface BrandKit {
+  logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
   voiceGuidelines: string | null;
   aiContext: string | null;
+}
+
+interface ClientDetailsForm {
+  contactName: string;
+  contactEmail: string;
+  phone: string;
+  website: string;
+  businessType: string;
+  industry: string;
+  notes: string;
+  plan: ClientPlan;
+  status: ClientStatus;
+}
+
+function toDetailsForm(client: Client): ClientDetailsForm {
+  return {
+    contactName: client.contactName ?? '',
+    contactEmail: client.contactEmail ?? '',
+    phone: client.phone ?? '',
+    website: client.website ?? '',
+    businessType: client.businessType ?? '',
+    industry: client.industry ?? '',
+    notes: client.notes ?? '',
+    plan: client.plan,
+    status: client.status,
+  };
 }
 
 export default function AgencyAdminPage() {
@@ -43,12 +98,16 @@ export default function AgencyAdminPage() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [accessLoading, setAccessLoading] = useState(false);
   const [brandKit, setBrandKit] = useState<BrandKit>({
+    logoUrl: null,
     primaryColor: '',
     secondaryColor: '',
     voiceGuidelines: '',
     aiContext: '',
   });
   const [savingBrandKit, setSavingBrandKit] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [details, setDetails] = useState<ClientDetailsForm | null>(null);
+  const [savingDetails, setSavingDetails] = useState(false);
 
   function loadClients() {
     api
@@ -89,15 +148,52 @@ export default function AgencyAdminPage() {
       setAccess(list);
       const kit = await api.get<BrandKit | null>(`/clients/${clientId}/brand-kit`);
       setBrandKit({
+        logoUrl: kit?.logoUrl ?? null,
         primaryColor: kit?.primaryColor ?? '',
         secondaryColor: kit?.secondaryColor ?? '',
         voiceGuidelines: kit?.voiceGuidelines ?? '',
         aiContext: kit?.aiContext ?? '',
       });
+      const client = clients?.find((c) => c.id === clientId);
+      if (client) setDetails(toDetailsForm(client));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load client access');
     } finally {
       setAccessLoading(false);
+    }
+  }
+
+  async function onSaveDetails(clientId: string) {
+    if (!details) return;
+    setSavingDetails(true);
+    setError(null);
+    try {
+      const updated = await api.patch<Client>(`/clients/${clientId}`, details);
+      setClients((prev) => prev?.map((c) => (c.id === clientId ? updated : c)) ?? null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save client details');
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
+  async function onUploadLogo(clientId: string, file: File) {
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('folder', 'logos');
+      const asset = await api.upload<{ storageUrl: string }>(`/clients/${clientId}/media`, form);
+      const updatedKit = await api.put<BrandKit>(`/clients/${clientId}/brand-kit`, {
+        ...brandKit,
+        logoUrl: asset.storageUrl,
+      });
+      setBrandKit(updatedKit);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
     }
   }
 
@@ -206,7 +302,11 @@ export default function AgencyAdminPage() {
                       onClick={() => toggleClient(client.id)}
                       className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-medium text-neutral-50"
                     >
-                      {client.name}
+                      <span className="flex items-center gap-2">
+                        {client.name}
+                        <Badge tone="neutral">{client.plan}</Badge>
+                        <Badge tone={STATUS_TONE[client.status]}>{STATUS_LABELS[client.status]}</Badge>
+                      </span>
                       <span className="text-xs font-normal text-accent-300">
                         {expandedClientId === client.id ? 'Hide access' : 'Manage access'}
                       </span>
@@ -282,10 +382,133 @@ export default function AgencyAdminPage() {
                               </Button>
                             </div>
 
+                            {details && (
+                              <div className="border-t border-white/10 pt-4">
+                                <p className="mb-3 text-xs font-medium text-neutral-300">Client details</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <Input
+                                    placeholder="Contact name"
+                                    value={details.contactName}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, contactName: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Input
+                                    type="email"
+                                    placeholder="Contact email"
+                                    value={details.contactEmail}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, contactEmail: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Input
+                                    placeholder="Phone"
+                                    value={details.phone}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, phone: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Input
+                                    placeholder="Website"
+                                    value={details.website}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, website: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Input
+                                    placeholder="Business type"
+                                    value={details.businessType}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, businessType: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Input
+                                    placeholder="Industry"
+                                    value={details.industry}
+                                    onChange={(e) =>
+                                      setDetails((prev) => (prev ? { ...prev, industry: e.target.value } : prev))
+                                    }
+                                  />
+                                  <Select
+                                    value={details.plan}
+                                    onChange={(e) =>
+                                      setDetails((prev) =>
+                                        prev ? { ...prev, plan: e.target.value as ClientPlan } : prev,
+                                      )
+                                    }
+                                  >
+                                    {PLANS.map((p) => (
+                                      <option key={p} value={p}>
+                                        {p}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                  <Select
+                                    value={details.status}
+                                    onChange={(e) =>
+                                      setDetails((prev) =>
+                                        prev ? { ...prev, status: e.target.value as ClientStatus } : prev,
+                                      )
+                                    }
+                                  >
+                                    {STATUSES.map((s) => (
+                                      <option key={s} value={s}>
+                                        {STATUS_LABELS[s]}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </div>
+                                <textarea
+                                  placeholder="Notes"
+                                  value={details.notes}
+                                  onChange={(e) =>
+                                    setDetails((prev) => (prev ? { ...prev, notes: e.target.value } : prev))
+                                  }
+                                  rows={2}
+                                  className="mt-3 w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="mt-3"
+                                  loading={savingDetails}
+                                  onClick={() => onSaveDetails(client.id)}
+                                >
+                                  Save details
+                                </Button>
+                              </div>
+                            )}
+
                             <div className="border-t border-white/10 pt-4">
                               <p className="mb-3 text-xs font-medium text-neutral-300">
                                 Brand kit
                               </p>
+                              <div className="mb-3 flex items-center gap-3">
+                                {brandKit.logoUrl ? (
+                                  <img
+                                    src={resolveMediaUrl(brandKit.logoUrl)}
+                                    alt="Client logo"
+                                    className="h-12 w-12 rounded-lg border border-white/12 object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-white/15 text-[10px] text-neutral-500">
+                                    No logo
+                                  </div>
+                                )}
+                                <label className="cursor-pointer text-xs font-medium text-accent-300 hover:underline">
+                                  {uploadingLogo ? 'Uploading…' : 'Upload logo'}
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingLogo}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      e.target.value = '';
+                                      if (file) onUploadLogo(client.id, file);
+                                    }}
+                                  />
+                                </label>
+                              </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <Input
                                   placeholder="Primary color (#1D4ED8)"

@@ -40,12 +40,36 @@ model Agency {
   @@map("agencies")
 }
 
+enum ClientPlan {
+  BASIC
+  PRO
+  BUSINESS
+  ENTERPRISE
+  CUSTOM
+}
+
+enum ClientStatus {
+  ACTIVE
+  PENDING_ONBOARDING
+  INACTIVE
+  BLOCKED
+}
+
 model Client {
-  id        String   @id @default(uuid()) @db.Uuid
-  agencyId  String   @map("agency_id") @db.Uuid
-  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String       @id @default(uuid()) @db.Uuid
+  agencyId     String       @map("agency_id") @db.Uuid
+  agency       Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  name         String
+  contactName  String?      @map("contact_name")
+  contactEmail String?      @map("contact_email")
+  phone        String?
+  website      String?
+  businessType String?      @map("business_type")
+  industry     String?
+  notes        String?
+  plan         ClientPlan   @default(BASIC)
+  status       ClientStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at")
 
   userAccess     UserClientAccess[]
   brandKit       BrandKit?
