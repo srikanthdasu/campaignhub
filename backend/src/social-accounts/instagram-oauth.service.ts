@@ -49,7 +49,9 @@ export class InstagramOAuthService {
       client_id: this.appId,
       redirect_uri: this.redirectUri,
       state: this.encodeState(state),
-      scope: 'instagram_business_basic',
+      // content_publish is what lets CampaignHub actually post on the user's behalf later —
+      // basic alone only allows reading the connected profile.
+      scope: 'instagram_business_basic,instagram_business_content_publish',
       response_type: 'code',
     });
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;

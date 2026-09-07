@@ -24,6 +24,7 @@ interface ScheduledPost {
   platform: string;
   scheduledTime: string;
   status: 'PENDING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
+  errorMessage: string | null;
   contentItem: { id: string; type: string; body: string | null };
 }
 
@@ -235,6 +236,9 @@ export default function SchedulerPage() {
                           <p className="mt-1 text-xs text-neutral-500">
                             {new Date(post.scheduledTime).toLocaleString()}
                           </p>
+                          {post.status === 'FAILED' && post.errorMessage && (
+                            <p className="mt-1 text-xs text-red-400">{post.errorMessage}</p>
+                          )}
                         </div>
                         {post.status === 'PENDING' && (
                           <div className="flex shrink-0 gap-2">

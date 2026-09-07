@@ -44,7 +44,7 @@ describe('InstagramOAuthService.buildAuthUrl', () => {
     expect(url.origin + url.pathname).toBe('https://www.instagram.com/oauth/authorize');
     expect(url.searchParams.get('client_id')).toBe('ig-app-id');
     expect(url.searchParams.get('redirect_uri')).toBe('https://app.example.com/api/social-accounts/instagram/callback');
-    expect(url.searchParams.get('scope')).toBe('instagram_business_basic');
+    expect(url.searchParams.get('scope')).toBe('instagram_business_basic,instagram_business_content_publish');
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(service.decodeState(url.searchParams.get('state')!)).toEqual({ clientId: 'client-1', actorId: 'actor-1' });
   });

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SchedulerService } from './scheduler.service.js';
-import { ContentStatus, ScheduledPostStatus } from '../generated/prisma/client.js';
+import { ContentStatus, ScheduledPostStatus, SocialPlatform } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { ConfigService } from '@nestjs/config';
+import type { InstagramPublishService } from '../social-accounts/instagram-publish.service.js';
 
 function buildService(overrides: { count?: number } = {}) {
   const audit = { log: vi.fn() };
@@ -10,16 +12,26 @@ function buildService(overrides: { count?: number } = {}) {
     scheduledPost: {
       findMany: vi.fn(() =>
         Promise.resolve([
-          { id: 'post-1', contentItemId: 'content-1' },
-          { id: 'post-2', contentItemId: 'content-1' },
+          { id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.FACEBOOK },
+          { id: 'post-2', contentItemId: 'content-1', platform: SocialPlatform.FACEBOOK },
         ]),
       ),
-      update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED })),
+      findUniqueOrThrow: vi.fn((args: { where: { id: string } }) =>
+        Promise.resolve({ id: args.where.id, platform: SocialPlatform.FACEBOOK }),
+      ),
+      update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, errorMessage: null })),
       count: vi.fn(() => Promise.resolve(overrides.count ?? 0)),
     },
     contentItem: { update: vi.fn(() => Promise.resolve({})) },
   };
-  const service = new SchedulerService(prisma as unknown as PrismaService, audit as unknown as AuditService);
+  const config = { getOrThrow: vi.fn() };
+  const instagramPublish = { publishImage: vi.fn() };
+  const service = new SchedulerService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    config as unknown as ConfigService,
+    instagramPublish as unknown as InstagramPublishService,
+  );
   return { service, prisma, audit };
 }
 
@@ -37,7 +49,10 @@ describe('SchedulerService.autoPublishDuePosts', () => {
     );
     expect(prisma.scheduledPost.update).toHaveBeenCalledTimes(2);
     expect(audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'SCHEDULED_POST_PUBLISHED', metadata: { auto: true } }),
+      expect.objectContaining({
+        action: 'SCHEDULED_POST_PUBLISHED',
+        metadata: expect.objectContaining({ auto: true }),
+      }),
     );
   });
 
@@ -63,10 +78,22 @@ describe('SchedulerService.autoPublishDuePosts', () => {
   it('does nothing when no posts are due', async () => {
     const audit = { log: vi.fn() };
     const prisma = {
-      scheduledPost: { findMany: vi.fn(() => Promise.resolve([])), update: vi.fn(), count: vi.fn() },
+      scheduledPost: {
+        findMany: vi.fn(() => Promise.resolve([])),
+        findUniqueOrThrow: vi.fn(),
+        update: vi.fn(),
+        count: vi.fn(),
+      },
       contentItem: { update: vi.fn() },
     };
-    const service = new SchedulerService(prisma as unknown as PrismaService, audit as unknown as AuditService);
+    const config = { getOrThrow: vi.fn() };
+    const instagramPublish = { publishImage: vi.fn() };
+    const service = new SchedulerService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      config as unknown as ConfigService,
+      instagramPublish as unknown as InstagramPublishService,
+    );
 
     const count = await service.autoPublishDuePosts();
 

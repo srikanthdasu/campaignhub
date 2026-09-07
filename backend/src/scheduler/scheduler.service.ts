@@ -1,8 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateScheduleDto } from './dto/create-schedule.dto.js';
-import { ContentStatus, Role, ScheduledPostStatus } from '../generated/prisma/client.js';
+import { ContentStatus, Role, ScheduledPostStatus, SocialPlatform } from '../generated/prisma/client.js';
+import { decryptToken } from '../social-accounts/token-crypto.js';
+import { InstagramPublishService, InstagramPublishError } from '../social-accounts/instagram-publish.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER];
@@ -12,6 +15,8 @@ export class SchedulerService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private config: ConfigService,
+    private instagramPublish: InstagramPublishService,
   ) {}
 
   async schedule(clientId: string, contentItemId: string, user: AuthenticatedUser, dto: CreateScheduleDto) {
@@ -109,10 +114,8 @@ export class SchedulerService {
   }
 
   /**
-   * No OAuth publishing integration exists yet (Phase 3), so publishing itself is simulated —
-   * but which posts get published is now real: `autoPublishDuePosts` below runs on a schedule
-   * and publishes whatever is actually due, same as this manual action would, so scheduled
-   * content publishes on time even with nobody watching the app.
+   * Instagram actually publishes for real now (see publishPost); every other platform still
+   * simulates — same scheduling/cron mechanics, just no real API call underneath yet.
    */
   async markPublished(id: string, user: AuthenticatedUser) {
     const post = await this.requireAccess(id, user);
@@ -124,9 +127,10 @@ export class SchedulerService {
 
     await this.audit.log({
       userId: user.sub,
-      action: 'SCHEDULED_POST_PUBLISHED',
+      action: updated.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
       entityType: 'scheduled_post',
       entityId: id,
+      metadata: updated.errorMessage ? { errorMessage: updated.errorMessage } : undefined,
     });
 
     return updated;
@@ -139,12 +143,12 @@ export class SchedulerService {
     });
 
     for (const post of due) {
-      await this.publishPost(post.id, post.contentItemId);
+      const result = await this.publishPost(post.id, post.contentItemId);
       await this.audit.log({
-        action: 'SCHEDULED_POST_PUBLISHED',
+        action: result.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
         entityType: 'scheduled_post',
         entityId: post.id,
-        metadata: { auto: true },
+        metadata: { auto: true, errorMessage: result.errorMessage ?? undefined },
       });
     }
 
@@ -152,9 +156,23 @@ export class SchedulerService {
   }
 
   private async publishPost(id: string, contentItemId: string) {
+    const post = await this.prisma.scheduledPost.findUniqueOrThrow({ where: { id } });
+
+    if (post.platform === SocialPlatform.INSTAGRAM) {
+      try {
+        await this.publishToInstagram(contentItemId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to publish to Instagram';
+        return this.prisma.scheduledPost.update({
+          where: { id },
+          data: { status: ScheduledPostStatus.FAILED, errorMessage: message },
+        });
+      }
+    }
+
     const updated = await this.prisma.scheduledPost.update({
       where: { id },
-      data: { status: ScheduledPostStatus.PUBLISHED, publishedAt: new Date() },
+      data: { status: ScheduledPostStatus.PUBLISHED, publishedAt: new Date(), errorMessage: null },
     });
 
     const remaining = await this.prisma.scheduledPost.count({
@@ -168,6 +186,36 @@ export class SchedulerService {
     }
 
     return updated;
+  }
+
+  private async publishToInstagram(contentItemId: string) {
+    const content = await this.prisma.contentItem.findUniqueOrThrow({
+      where: { id: contentItemId },
+      include: { mediaAsset: true },
+    });
+
+    if (!content.mediaAsset) {
+      throw new InstagramPublishError(
+        'Instagram requires an image or video — this content has no media attached.',
+      );
+    }
+
+    const account = await this.prisma.socialAccount.findFirst({
+      where: { clientId: content.clientId, platform: SocialPlatform.INSTAGRAM },
+    });
+    if (!account?.accessTokenEncrypted || !account.externalAccountId) {
+      throw new InstagramPublishError('No connected Instagram account found for this client.');
+    }
+
+    const encryptionKey = this.config.getOrThrow<string>('TOKEN_ENCRYPTION_KEY');
+    const accessToken = decryptToken(account.accessTokenEncrypted, encryptionKey);
+
+    await this.instagramPublish.publishImage(
+      account.externalAccountId,
+      accessToken,
+      content.mediaAsset.storageUrl,
+      content.body ?? '',
+    );
   }
 
   private async requireAccess(id: string, user: AuthenticatedUser) {
