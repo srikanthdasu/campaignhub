@@ -15,6 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService } from './media.service.js';
 import { UpdateMediaDto } from './dto/update-media.dto.js';
+import { GenerateImageDto } from './dto/generate-image.dto.js';
 import { mediaMulterStorage, mediaMulterFileFilter } from './media-storage.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -43,6 +44,15 @@ export class MediaController {
     @Body('folder') folder?: string,
   ) {
     return this.mediaService.recordUpload(clientId, user.sub, file, folder);
+  }
+
+  @Post('generate-image')
+  generateImage(
+    @Param('clientId') clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateImageDto,
+  ) {
+    return this.mediaService.generateImage(clientId, user.sub, dto.prompt);
   }
 
   @Get()

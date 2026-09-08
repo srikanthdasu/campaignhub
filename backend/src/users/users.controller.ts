@@ -4,6 +4,8 @@ import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { CreateMemberDto } from './dto/create-member.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { UpdateActiveDto } from './dto/update-active.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -23,6 +25,11 @@ export class UsersController {
   @Patch('me')
   updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateMe(user.sub, dto);
+  }
+
+  @Patch('me/password')
+  changeOwnPassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
+    return this.usersService.changeOwnPassword(user.sub, dto);
   }
 
   @Get()
@@ -45,6 +52,16 @@ export class UsersController {
     @Body() dto: UpdateRoleDto,
   ) {
     return this.usersService.updateRole(user.agencyId!, user.sub, user.role, targetUserId, dto.role);
+  }
+
+  @Patch(':id/password')
+  @Roles(Role.OWNER, Role.ADMIN)
+  resetMemberPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') targetUserId: string,
+    @Body() dto: ResetPasswordDto,
+  ) {
+    return this.usersService.resetMemberPassword(user.agencyId!, user.sub, targetUserId, dto.newPassword);
   }
 
   @Patch(':id/active')

@@ -4,12 +4,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateMemberDto } from './dto/create-member.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { Role, type Prisma } from '../generated/prisma/client.js';
 
 const BCRYPT_ROUNDS = 12;
@@ -184,6 +186,34 @@ export class UsersService {
     });
 
     return user;
+  }
+
+  async changeOwnPassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const matches = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!matches) throw new UnauthorizedException('Current password is incorrect');
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+
+    await this.audit.log({ userId, action: 'PASSWORD_CHANGED', entityType: 'user', entityId: userId });
+  }
+
+  /** Owner/Admin override — resets a member's password directly, no current password needed. */
+  async resetMemberPassword(agencyId: string, actorId: string, targetUserId: string, newPassword: string) {
+    await this.requireAgencyMember(agencyId, targetUserId);
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.prisma.user.update({ where: { id: targetUserId }, data: { passwordHash } });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'PASSWORD_RESET_BY_ADMIN',
+      entityType: 'user',
+      entityId: targetUserId,
+    });
   }
 
   private async requireAgencyMember(agencyId: string, userId: string) {

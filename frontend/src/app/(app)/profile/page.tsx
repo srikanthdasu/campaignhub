@@ -30,6 +30,12 @@ export default function ProfilePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   useEffect(() => {
     api
       .get<Profile>('/users/me')
@@ -58,6 +64,23 @@ export default function ProfilePage() {
       setError(err instanceof ApiError ? err.message : 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onChangePassword(e: FormEvent) {
+    e.preventDefault();
+    setChangingPassword(true);
+    setPasswordError(null);
+    setPasswordMessage(null);
+    try {
+      await api.patch('/users/me/password', { currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setPasswordMessage('Password changed.');
+    } catch (err) {
+      setPasswordError(err instanceof ApiError ? err.message : 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -137,6 +160,43 @@ export default function ProfilePage() {
 
             <Button type="submit" loading={saving}>
               {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </form>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+        <Card padding="lg">
+          <h2 className="mb-4 text-sm font-semibold text-neutral-50">Change password</h2>
+          <form onSubmit={onChangePassword} className="space-y-4">
+            {passwordError && (
+              <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300">
+                {passwordError}
+              </p>
+            )}
+            {passwordMessage && (
+              <p className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300">
+                {passwordMessage}
+              </p>
+            )}
+            <Input
+              type="password"
+              label="Current password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+            <Input
+              type="password"
+              label="New password"
+              required
+              minLength={10}
+              hint="At least 10 characters."
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <Button type="submit" loading={changingPassword}>
+              {changingPassword ? 'Changing…' : 'Change password'}
             </Button>
           </form>
         </Card>

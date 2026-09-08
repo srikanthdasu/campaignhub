@@ -31,6 +31,10 @@ export default function MembersAdminPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('CREATOR');
 
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   function loadMembers() {
     api
       .get<Member[]>('/users')
@@ -73,6 +77,21 @@ export default function MembersAdminPage() {
       loadMembers();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to update member status');
+    }
+  }
+
+  async function onResetPassword(id: string) {
+    if (!resetPassword) return;
+    setResetting(true);
+    setError(null);
+    try {
+      await api.patch(`/users/${id}/password`, { newPassword: resetPassword });
+      setResettingId(null);
+      setResetPassword('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to reset password');
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -159,33 +178,73 @@ export default function MembersAdminPage() {
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: DURATION.base, ease: EASE_SOFT }}
                 >
-                  <Card padding="md" className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-50">{m.name}</p>
-                      <p className="text-xs text-neutral-400">{m.email}</p>
+                  <Card padding="md">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-neutral-50">{m.name}</p>
+                        <p className="text-xs text-neutral-400">{m.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={m.role}
+                          onChange={(e) => onRoleChange(m.id, e.target.value as Role)}
+                          disabled={m.id === currentUser?.id}
+                          className="py-1.5 text-xs"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABELS[r]}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setResettingId(resettingId === m.id ? null : m.id)}
+                        >
+                          Reset password
+                        </Button>
+                        <Button
+                          variant={m.isActive ? 'secondary' : 'primary'}
+                          size="sm"
+                          onClick={() => onToggleActive(m.id, m.isActive)}
+                          disabled={m.id === currentUser?.id}
+                        >
+                          {m.isActive ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={m.role}
-                        onChange={(e) => onRoleChange(m.id, e.target.value as Role)}
-                        disabled={m.id === currentUser?.id}
-                        className="py-1.5 text-xs"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_LABELS[r]}
-                          </option>
-                        ))}
-                      </Select>
-                      <Button
-                        variant={m.isActive ? 'secondary' : 'primary'}
-                        size="sm"
-                        onClick={() => onToggleActive(m.id, m.isActive)}
-                        disabled={m.id === currentUser?.id}
-                      >
-                        {m.isActive ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    </div>
+
+                    <AnimatePresence>
+                      {resettingId === m.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="mt-3 overflow-hidden border-t border-white/10 pt-3"
+                        >
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <Input
+                                type="password"
+                                placeholder="New password (10+ characters)"
+                                minLength={10}
+                                value={resetPassword}
+                                onChange={(e) => setResetPassword(e.target.value)}
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              loading={resetting}
+                              disabled={resetPassword.length < 10}
+                              onClick={() => onResetPassword(m.id)}
+                            >
+                              Confirm
+                            </Button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </Card>
                 </motion.li>
               ))}

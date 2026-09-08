@@ -108,6 +108,7 @@ export default function AgencyAdminPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [details, setDetails] = useState<ClientDetailsForm | null>(null);
   const [savingDetails, setSavingDetails] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   function loadClients() {
     api
@@ -133,6 +134,102 @@ export default function AgencyAdminPage() {
       setError(err instanceof ApiError ? err.message : 'Failed to create client');
     } finally {
       setCreating(false);
+    }
+  }
+
+  const CSV_COLUMNS = [
+    'name',
+    'contactName',
+    'contactEmail',
+    'phone',
+    'website',
+    'businessType',
+    'industry',
+    'plan',
+  ] as const;
+
+  function csvEscape(value: string): string {
+    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  }
+
+  function onExportCsv() {
+    if (!clients?.length) return;
+    const rows = [
+      CSV_COLUMNS.join(','),
+      ...clients.map((c) =>
+        CSV_COLUMNS.map((col) => csvEscape(String(c[col as keyof Client] ?? ''))).join(','),
+      ),
+    ];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clients.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Minimal CSV row parser — handles quoted fields containing commas, not full RFC 4180 (no
+  // embedded newlines inside a quoted field), which is enough for the flat contact/business
+  // fields this import supports.
+  function parseCsvLine(line: string): string[] {
+    const cells: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"' && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else if (ch === '"') {
+          inQuotes = false;
+        } else {
+          current += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        cells.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    cells.push(current);
+    return cells;
+  }
+
+  async function onImportCsv(file: File) {
+    setImporting(true);
+    setError(null);
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) throw new Error('CSV has no data rows');
+
+      const header = parseCsvLine(lines[0]).map((h) => h.trim());
+      for (const line of lines.slice(1)) {
+        const cells = parseCsvLine(line);
+        const row: Record<string, string> = {};
+        header.forEach((h, i) => (row[h] = cells[i] ?? ''));
+        if (!row.name) continue;
+        await api.post('/clients', {
+          name: row.name,
+          contactName: row.contactName || undefined,
+          contactEmail: row.contactEmail || undefined,
+          phone: row.phone || undefined,
+          website: row.website || undefined,
+          businessType: row.businessType || undefined,
+          industry: row.industry || undefined,
+          plan: PLANS.includes(row.plan as ClientPlan) ? row.plan : undefined,
+        });
+      }
+      loadClients();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to import CSV');
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -272,6 +369,28 @@ export default function AgencyAdminPage() {
               Add client
             </Button>
           </form>
+          <div className="mt-3 flex items-center gap-3 border-t border-white/10 pt-3">
+            <Button type="button" variant="secondary" size="sm" onClick={onExportCsv} disabled={!clients?.length}>
+              Export CSV
+            </Button>
+            <label className="cursor-pointer text-xs font-medium text-accent-300 hover:underline">
+              {importing ? 'Importing…' : 'Import CSV'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={importing}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) onImportCsv(file);
+                }}
+              />
+            </label>
+            <span className="text-xs text-neutral-500">
+              Columns: name, contactName, contactEmail, phone, website, businessType, industry, plan
+            </span>
+          </div>
         </Card>
       </motion.div>
 

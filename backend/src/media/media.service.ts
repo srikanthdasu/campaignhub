@@ -5,6 +5,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { UpdateMediaDto } from './dto/update-media.dto.js';
 import { mediaTypeFromMimetype } from './media-storage.js';
 import { BlobStorageService } from './blob-storage.service.js';
+import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { MediaType } from '../generated/prisma/client.js';
 
 @Injectable()
 export class MediaService {
@@ -12,7 +14,36 @@ export class MediaService {
     private prisma: PrismaService,
     private audit: AuditService,
     private blobStorage: BlobStorageService,
+    private foundry: AzureAiFoundryService,
   ) {}
+
+  async generateImage(clientId: string, actorId: string, prompt: string) {
+    const imageBuffer = await this.foundry.generateImage(prompt);
+    const storageUrl = await this.blobStorage.upload(imageBuffer, '.png', 'image/png');
+
+    const asset = await this.prisma.mediaAsset.create({
+      data: {
+        clientId,
+        type: MediaType.IMAGE,
+        storageUrl,
+        fileName: `${prompt.slice(0, 60).trim() || 'ai-generated'}.png`,
+        tags: [],
+        aiProvider: 'azure-ai-foundry',
+        prompt,
+        uploadedById: actorId,
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'MEDIA_AI_GENERATED',
+      entityType: 'media_asset',
+      entityId: asset.id,
+      metadata: { prompt },
+    });
+
+    return asset;
+  }
 
   async recordUpload(
     clientId: string,
