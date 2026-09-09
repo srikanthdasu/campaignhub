@@ -88,6 +88,14 @@ export default function SocialAccountsPage() {
     if (selectedClientId) load(selectedClientId);
   }, [selectedClientId]);
 
+  // Deep-linked from elsewhere (e.g. the client onboarding wizard's "Connect Accounts" step)
+  // with ?client=<id> to land here with the right client already selected.
+  useEffect(() => {
+    const clientParam = searchParams.get('client');
+    if (clientParam) setSelectedClientId(clientParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // WhatsApp Embedded Signup runs inside a JS SDK popup rather than a page redirect, so the SDK
   // needs to be loaded once up front.
   useEffect(() => {

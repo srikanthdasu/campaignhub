@@ -66,6 +66,11 @@ model Client {
   website      String?
   businessType String?      @map("business_type")
   industry     String?
+  address      String?
+  timeZone     String?      @map("time_zone")
+  currency     String?
+  defaultLanguage String?   @map("default_language")
+  allowClientPortalAccess Boolean @default(true) @map("allow_client_portal_access")
   notes        String?
   plan         ClientPlan   @default(BASIC)
   status       ClientStatus @default(ACTIVE)

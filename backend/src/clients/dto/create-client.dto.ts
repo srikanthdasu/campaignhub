@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ClientPlan } from '../../generated/prisma/client.js';
 
 export class CreateClientDto {
@@ -39,6 +39,30 @@ export class CreateClientDto {
   @IsString()
   @MaxLength(100)
   industry?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  timeZone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  defaultLanguage?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowClientPortalAccess?: boolean;
 
   @IsOptional()
   @IsString()

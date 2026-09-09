@@ -47,6 +47,13 @@ export class ClientAccessGuard implements CanActivate {
       throw new ForbiddenException('You do not have access to this client');
     }
 
+    // The agency's own team keeps working the account even while portal access is off for the
+    // client — this only gates the client's own users, matching the "Allow Client Portal Access"
+    // toggle's intent (temporarily lock the client out without touching internal access grants).
+    if (user.role === Role.CLIENT && !client.allowClientPortalAccess) {
+      throw new ForbiddenException('Client portal access is currently disabled for this client');
+    }
+
     return true;
   }
 }
