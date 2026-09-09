@@ -1,55 +1,13 @@
-'use client';
+import { ReactNode } from 'react';
+import { AppShell } from './app-shell';
 
-import { ReactNode, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
-import { AppNav } from '@/components/app-nav';
-import { NotificationBell } from '@/components/notification-bell';
-import { PageTransition } from '@/components/ui/page-transition';
-import { Skeleton } from '@/components/ui/skeleton';
-
-function AppShellSkeleton() {
-  return (
-    <div className="flex flex-1">
-      <div className="w-64 shrink-0 border-r border-white/10 p-4">
-        <Skeleton className="mb-6 h-5 w-32" />
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
-          ))}
-        </div>
-      </div>
-      <div className="flex-1 space-y-4 p-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    </div>
-  );
-}
+// Every page in this tree is a per-user authenticated dashboard fetching live data
+// client-side — there's no correct static shell to cache. Without this, Next statically
+// prerenders the shell once and keeps serving that snapshot indefinitely across deploys
+// (the running Azure worker doesn't always recycle on redeploy), so users can be stuck
+// looking at yesterday's build until something else busts the cache.
+export const dynamic = 'force-dynamic';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (status === 'unauthenticated') router.replace('/login');
-  }, [status, router]);
-
-  if (status !== 'authenticated') {
-    return <AppShellSkeleton />;
-  }
-
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <AppNav />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-end border-b border-white/10 px-6 py-3 lg:px-10">
-          <NotificationBell />
-        </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-10">
-          <PageTransition>{children}</PageTransition>
-        </main>
-      </div>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }
