@@ -11,6 +11,65 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import {
+  Building2,
+  LayoutList,
+  UserPlus,
+  ClipboardList,
+  Send,
+  Link2,
+  Palette,
+  CheckCircle2,
+  type LucideIcon,
+} from 'lucide-react';
+
+interface WorkflowStep {
+  n: number;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+}
+
+const WORKFLOW_STEPS: WorkflowStep[] = [
+  { n: 1, title: 'Go to Clients', description: 'Click Clients in the sidebar.', icon: Building2, color: '#6366f1' },
+  { n: 2, title: 'All Clients page', description: 'View every client, their plan and status.', icon: LayoutList, color: '#0ea5e9' },
+  { n: 3, title: 'Add Client', description: 'Create a new client record.', icon: UserPlus, color: '#10b981' },
+  { n: 4, title: 'Add Details', description: 'Contact info, business type, industry.', icon: ClipboardList, color: '#f59e0b' },
+  { n: 5, title: 'Invite Client User', description: 'Create their login under Members, grant access.', icon: Send, color: '#f43f5e' },
+  { n: 6, title: 'Connect Accounts', description: 'Link real social accounts for this client.', icon: Link2, color: '#d946ef' },
+  { n: 7, title: 'Set Brand Kit', description: 'Logo, colors, voice guidelines.', icon: Palette, color: '#8b5cf6' },
+  { n: 8, title: 'Ready to Use', description: 'Client can log in to their own portal.', icon: CheckCircle2, color: '#22c55e' },
+];
+
+function ClientWorkflowGuide() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {WORKFLOW_STEPS.map((step) => {
+        const Icon = step.icon;
+        return (
+          <div
+            key={step.n}
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5"
+            style={{ borderTopColor: step.color, borderTopWidth: 2 }}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                style={{ backgroundColor: step.color }}
+              >
+                {step.n}
+              </span>
+              <Icon className="h-4 w-4 shrink-0" style={{ color: step.color }} strokeWidth={2} />
+              <p className="truncate text-xs font-semibold text-neutral-100">{step.title}</p>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-neutral-400">{step.description}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const PLANS = ['BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'] as const;
 const STATUSES = ['ACTIVE', 'PENDING_ONBOARDING', 'INACTIVE', 'BLOCKED'] as const;
@@ -332,13 +391,17 @@ export default function AgencyAdminPage() {
       variants={staggerContainer(0.08)}
       initial="hidden"
       animate="show"
-      className="max-w-2xl space-y-8"
+      className="max-w-4xl space-y-8"
     >
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">Agency &amp; clients</h1>
         <p className="text-sm text-neutral-400">
           Create clients and control which members can access each one.
         </p>
+      </motion.div>
+
+      <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+        <ClientWorkflowGuide />
       </motion.div>
 
       <AnimatePresence>
