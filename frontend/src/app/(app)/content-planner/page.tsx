@@ -76,6 +76,11 @@ interface CaptionVariant {
   hashtags: string[];
 }
 
+interface CampaignOption {
+  id: string;
+  name: string;
+}
+
 function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string; icon: LucideIcon; color: string }) {
   return (
     <div className="mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
@@ -105,6 +110,8 @@ export default function ContentPlannerPage() {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [mediaAssets, setMediaAssets] = useState<MediaAssetOption[]>([]);
   const [mediaAssetId, setMediaAssetId] = useState<string>('');
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [campaignId, setCampaignId] = useState<string>('');
 
   const [aiTopic, setAiTopic] = useState('');
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
@@ -144,6 +151,10 @@ export default function ContentPlannerPage() {
       .then(setMembers)
       .catch(() => setMembers([]));
     loadMedia(selectedClientId);
+    api
+      .get<CampaignOption[]>(`/clients/${selectedClientId}/campaigns`)
+      .then(setCampaigns)
+      .catch(() => setCampaigns([]));
   }, [selectedClientId]);
 
   function togglePlatform(p: string) {
@@ -204,12 +215,14 @@ export default function ContentPlannerPage() {
         body: fullBody,
         platforms,
         mediaAssetId: mediaAssetId || undefined,
+        campaignId: campaignId || undefined,
       });
       setBody('');
       setHashtags('');
       setMentions('');
       setPlatforms([]);
       setMediaAssetId('');
+      setCampaignId('');
       loadItems(selectedClientId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create content');
@@ -385,6 +398,14 @@ export default function ContentPlannerPage() {
                 />
                 <Input placeholder="Hashtags" value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
                 <Input placeholder="Mentions" value={mentions} onChange={(e) => setMentions(e.target.value)} />
+                <Select value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+                  <option value="">No campaign</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </Card>
 
