@@ -315,9 +315,9 @@ export default function SocialAccountsPage() {
           Track which platform accounts each client publishes to.
         </p>
         <p className="mt-2 text-xs text-amber-300/80">
-          Facebook, Instagram, WhatsApp, and LinkedIn connect via real login below. Other
-          platforms are still added manually — each needs its own registered developer app, which
-          isn&apos;t set up yet.
+          Facebook, Instagram, LinkedIn, X, YouTube, and WhatsApp connect via real login below —
+          the account ID is captured automatically, nothing to type in. TikTok and Pinterest are
+          still added manually, since neither has a registered developer app yet.
         </p>
       </motion.div>
 
