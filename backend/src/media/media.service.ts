@@ -17,16 +17,23 @@ export class MediaService {
     private foundry: AzureAiFoundryService,
   ) {}
 
-  async generateImage(clientId: string, actorId: string, prompt: string) {
-    const imageBuffer = await this.foundry.generateImage(prompt);
+  async generateImage(
+    clientId: string,
+    actorId: string,
+    prompt: string,
+    options: { size?: string; folder?: string; campaignId?: string } = {},
+  ) {
+    const imageBuffer = await this.foundry.generateImage(prompt, options.size);
     const storageUrl = await this.blobStorage.upload(imageBuffer, '.png', 'image/png');
 
     const asset = await this.prisma.mediaAsset.create({
       data: {
         clientId,
+        campaignId: options.campaignId,
         type: MediaType.IMAGE,
         storageUrl,
         fileName: `${prompt.slice(0, 60).trim() || 'ai-generated'}.png`,
+        folder: options.folder,
         tags: [],
         aiProvider: 'azure-ai-foundry',
         prompt,
@@ -79,9 +86,9 @@ export class MediaService {
     return asset;
   }
 
-  async list(clientId: string, folder?: string) {
+  async list(clientId: string, folder?: string, campaignId?: string) {
     return this.prisma.mediaAsset.findMany({
-      where: { clientId, folder },
+      where: { clientId, folder, campaignId },
       orderBy: { createdAt: 'desc' },
     });
   }

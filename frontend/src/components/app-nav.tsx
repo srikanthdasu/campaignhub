@@ -21,6 +21,7 @@ import {
   Inbox,
   Bot,
   Sparkles,
+  ImagePlus,
   Video,
   Brain,
   Megaphone,
@@ -65,6 +66,7 @@ const sections: { label: string; links: NavLink[] }[] = [
     links: [
       { href: '/ai-assistant', label: 'AI Assistant', icon: Bot, adminOnly: false },
       { href: '/ai-captions', label: 'AI Captions', icon: Sparkles, adminOnly: false },
+      { href: '/ai-image-studio', label: 'AI Image', icon: ImagePlus, adminOnly: false },
       { href: '/ai-video-studio', label: 'AI Video Studio', icon: Video, adminOnly: false },
     ],
   },

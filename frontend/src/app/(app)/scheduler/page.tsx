@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
@@ -89,6 +90,16 @@ function isSameLocalDay(iso: string, ref: Date) {
 
 export default function SchedulerPage() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
+  const searchParams = useSearchParams();
+  const mediaParam = searchParams.get('media');
+
+  // Deep-linked from AI Image Studio's "Schedule It" — ?client=<id>&media=<id> lands here with
+  // the client selected; mediaParam flows down to prefill the "Create New" draft form below.
+  useEffect(() => {
+    const clientParam = searchParams.get('client');
+    if (clientParam) setSelectedClientId(clientParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <motion.div variants={staggerContainer(0.06)} initial="hidden" animate="show" className="max-w-[1500px] space-y-6">
@@ -109,7 +120,16 @@ export default function SchedulerPage() {
         </Card>
       ) : (
         <>
-          {selectedClientId && <SchedulerWorkspace key={selectedClientId} clientId={selectedClientId} clients={clients ?? []} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} />}
+          {selectedClientId && (
+            <SchedulerWorkspace
+              key={selectedClientId}
+              clientId={selectedClientId}
+              clients={clients ?? []}
+              selectedClientId={selectedClientId}
+              setSelectedClientId={setSelectedClientId}
+              prefillMediaAssetId={mediaParam}
+            />
+          )}
         </>
       )}
     </motion.div>
@@ -121,19 +141,23 @@ function SchedulerWorkspace({
   clients,
   selectedClientId,
   setSelectedClientId,
+  prefillMediaAssetId,
 }: {
   clientId: string;
   clients: { id: string; name: string }[];
   selectedClientId: string;
   setSelectedClientId: (id: string) => void;
+  prefillMediaAssetId: string | null;
 }) {
   const [approved, setApproved] = useState<ContentItem[] | null>(null);
   const [posts, setPosts] = useState<ScheduledPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [createTab, setCreateTab] = useState<'existing' | 'new'>('existing');
+  const [createTab, setCreateTab] = useState<'existing' | 'new'>(prefillMediaAssetId ? 'new' : 'existing');
   const [newType, setNewType] = useState<(typeof CONTENT_TYPES)[number]>('CAPTION');
   const [newBody, setNewBody] = useState('');
+  const [newMediaAssetId, setNewMediaAssetId] = useState(prefillMediaAssetId ?? '');
+  const [mediaAssets, setMediaAssets] = useState<{ id: string; fileName: string }[]>([]);
   const [creating, setCreating] = useState(false);
   const [createdNote, setCreatedNote] = useState<string | null>(null);
 
@@ -153,6 +177,10 @@ function SchedulerWorkspace({
       .get<ScheduledPost[]>(`/clients/${clientId}/scheduled-posts`)
       .then(setPosts)
       .catch(() => setPosts([]));
+    api
+      .get<{ id: string; fileName: string }[]>(`/clients/${clientId}/media`)
+      .then(setMediaAssets)
+      .catch(() => setMediaAssets([]));
   }
 
   useEffect(load, [clientId]);
@@ -174,8 +202,13 @@ function SchedulerWorkspace({
     setCreating(true);
     setCreatedNote(null);
     try {
-      await api.post(`/clients/${clientId}/content`, { type: newType, body: newBody });
+      await api.post(`/clients/${clientId}/content`, {
+        type: newType,
+        body: newBody,
+        mediaAssetId: newMediaAssetId || undefined,
+      });
       setNewBody('');
+      setNewMediaAssetId('');
       setCreatedNote('Draft created — submit it for approval in Content Planner before it can be scheduled here.');
       setCreateTab('existing');
     } catch (err) {
@@ -332,12 +365,28 @@ function SchedulerWorkspace({
                   rows={3}
                   className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
                 />
+                <Select value={newMediaAssetId} onChange={(e) => setNewMediaAssetId(e.target.value)}>
+                  <option value="">No media</option>
+                  {mediaAssets.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.fileName}
+                    </option>
+                  ))}
+                </Select>
                 <Button type="submit" size="sm" loading={creating} disabled={!newBody.trim()}>
                   Save Draft
                 </Button>
                 {createdNote && <p className="text-[11px] text-neutral-500">{createdNote}</p>}
                 <p className="text-[11px] text-neutral-500">
-                  Need AI captions or an AI image? Use <Link href="/content-planner" className="text-accent-300 hover:underline">Content Planner</Link>.
+                  Need a new AI image first? Generate one in{' '}
+                  <Link href="/ai-image-studio" className="text-accent-300 hover:underline">
+                    AI Image
+                  </Link>{' '}
+                  — it&apos;ll show up in the dropdown above. For AI captions, use{' '}
+                  <Link href="/ai-captions" className="text-accent-300 hover:underline">
+                    AI Captions
+                  </Link>{' '}
+                  and paste the text in.
                 </p>
               </form>
             )}

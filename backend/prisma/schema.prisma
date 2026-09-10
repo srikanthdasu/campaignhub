@@ -221,6 +221,7 @@ model Campaign {
 
   contentItems ContentItem[]
   adCampaigns  AdCampaign[]
+  mediaAssets  MediaAsset[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -238,6 +239,8 @@ model MediaAsset {
   id           String    @id @default(uuid()) @db.Uuid
   clientId     String    @map("client_id") @db.Uuid
   client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaignId   String?   @map("campaign_id") @db.Uuid
+  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   type         MediaType
   storageUrl   String    @map("storage_url")
   fileName     String    @map("file_name")
@@ -254,6 +257,7 @@ model MediaAsset {
   adCampaigns  AdCampaign[]
 
   @@index([clientId])
+  @@index([campaignId])
   @@map("media_assets")
 }
 

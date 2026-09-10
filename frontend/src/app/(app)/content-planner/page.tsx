@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
 import { useClientPicker } from '@/hooks/use-client-picker';
@@ -98,6 +99,7 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 
 export default function ContentPlannerPage() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<ContentItem[] | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +130,16 @@ export default function ContentPlannerPage() {
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduling, setScheduling] = useState(false);
   const [publishingNowId, setPublishingNowId] = useState<string | null>(null);
+
+  // Deep-linked from AI Image Studio's "Add to Content Planner" — ?client=<id>&media=<id> lands
+  // here with both already selected instead of the user having to hunt the image down again.
+  useEffect(() => {
+    const clientParam = searchParams.get('client');
+    const mediaParam = searchParams.get('media');
+    if (clientParam) setSelectedClientId(clientParam);
+    if (mediaParam) setMediaAssetId(mediaParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function loadItems(clientId: string) {
     api

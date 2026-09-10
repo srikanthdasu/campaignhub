@@ -52,12 +52,20 @@ export class MediaController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: GenerateImageDto,
   ) {
-    return this.mediaService.generateImage(clientId, user.sub, dto.prompt);
+    return this.mediaService.generateImage(clientId, user.sub, dto.prompt, {
+      size: dto.size,
+      folder: dto.folder,
+      campaignId: dto.campaignId,
+    });
   }
 
   @Get()
-  list(@Param('clientId') clientId: string, @Query('folder') folder?: string) {
-    return this.mediaService.list(clientId, folder);
+  list(
+    @Param('clientId') clientId: string,
+    @Query('folder') folder?: string,
+    @Query('campaignId') campaignId?: string,
+  ) {
+    return this.mediaService.list(clientId, folder, campaignId);
   }
 
   @Patch(':id')

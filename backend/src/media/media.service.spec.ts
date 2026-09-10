@@ -32,7 +32,7 @@ describe('MediaService.generateImage', () => {
     const { service, foundry, blobStorage, prisma } = buildService();
     const asset = await service.generateImage('client-1', 'actor-1', 'a red sports car');
 
-    expect(foundry.generateImage).toHaveBeenCalledWith('a red sports car');
+    expect(foundry.generateImage).toHaveBeenCalledWith('a red sports car', undefined);
     expect(blobStorage.upload).toHaveBeenCalled();
     expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -40,6 +40,22 @@ describe('MediaService.generateImage', () => {
       }),
     );
     expect(asset.id).toBe('asset-generated');
+  });
+
+  it('passes size, folder, and campaignId through when provided', async () => {
+    const { service, foundry, prisma } = buildService();
+    await service.generateImage('client-1', 'actor-1', 'a red sports car', {
+      size: '1792x1024',
+      folder: 'Campaign Assets',
+      campaignId: 'campaign-1',
+    });
+
+    expect(foundry.generateImage).toHaveBeenCalledWith('a red sports car', '1792x1024');
+    expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ folder: 'Campaign Assets', campaignId: 'campaign-1' }),
+      }),
+    );
   });
 });
 
