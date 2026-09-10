@@ -17,8 +17,18 @@ import {
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const APPROVAL_STEP_INCLUDE = {
-  steps: { orderBy: { stepOrder: 'asc' as const } },
-  contentItem: { include: { client: true } },
+  steps: {
+    orderBy: { stepOrder: 'asc' as const },
+    include: { approver: { select: { id: true, name: true } } },
+  },
+  contentItem: {
+    include: {
+      client: true,
+      campaign: { select: { id: true, name: true } },
+      createdBy: { select: { id: true, name: true } },
+      mediaAsset: { select: { id: true, storageUrl: true, fileName: true } },
+    },
+  },
 };
 
 @Injectable()

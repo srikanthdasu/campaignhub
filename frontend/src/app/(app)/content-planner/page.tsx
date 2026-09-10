@@ -125,6 +125,7 @@ export default function ContentPlannerPage() {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [approverIds, setApproverIds] = useState<string[]>([]);
   const [mode, setMode] = useState<'SEQUENTIAL' | 'PARALLEL'>('SEQUENTIAL');
+  const [approvalDueDate, setApprovalDueDate] = useState('');
 
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
   const [scheduleTime, setScheduleTime] = useState('');
@@ -253,9 +254,11 @@ export default function ContentPlannerPage() {
       await api.post(`/clients/${selectedClientId}/content/${id}/submit`, {
         approverIds,
         mode,
+        dueDate: approvalDueDate ? new Date(approvalDueDate).toISOString() : undefined,
       });
       setSubmittingId(null);
       setApproverIds([]);
+      setApprovalDueDate('');
       loadItems(selectedClientId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to submit for approval');
@@ -577,6 +580,13 @@ export default function ContentPlannerPage() {
                               </button>
                             ))}
                           </div>
+                          <input
+                            type="date"
+                            value={approvalDueDate}
+                            onChange={(e) => setApprovalDueDate(e.target.value)}
+                            placeholder="Due date (optional)"
+                            className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2 py-1 text-[11px] text-neutral-50 outline-none focus:border-accent-400"
+                          />
                           <Button size="sm" disabled={approverIds.length === 0} onClick={() => onSubmitForApproval(item.id)}>
                             Confirm
                           </Button>
