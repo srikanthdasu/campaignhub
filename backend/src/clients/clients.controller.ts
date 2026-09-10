@@ -3,6 +3,7 @@ import { ClientsService } from './clients.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
 import { GrantAccessDto } from './dto/grant-access.dto.js';
+import { UpdateAccessRoleDto } from './dto/update-access-role.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
@@ -31,6 +32,13 @@ export class ClientsController {
   @Roles(Role.OWNER, Role.ADMIN)
   listDeleted(@CurrentUser() user: AuthenticatedUser) {
     return this.clientsService.listDeleted(user.agencyId!);
+  }
+
+  // Same reason — "access-overview" would otherwise be swallowed by :id below.
+  @Get('access-overview')
+  @Roles(Role.OWNER, Role.ADMIN)
+  getAccessOverview(@CurrentUser() user: AuthenticatedUser) {
+    return this.clientsService.getAccessOverview(user.agencyId!);
   }
 
   @Get(':id')
@@ -77,7 +85,18 @@ export class ClientsController {
     @Param('id') id: string,
     @Body() dto: GrantAccessDto,
   ) {
-    return this.clientsService.grantAccess(user.agencyId!, user.sub, id, dto.userId);
+    return this.clientsService.grantAccess(user.agencyId!, user.sub, id, dto.userId, dto.role);
+  }
+
+  @Patch(':id/access/:userId')
+  @Roles(Role.OWNER, Role.ADMIN)
+  updateAccessRole(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateAccessRoleDto,
+  ) {
+    return this.clientsService.updateAccessRole(user.agencyId!, user.sub, id, userId, dto.role);
   }
 
   @Delete(':id/access/:userId')

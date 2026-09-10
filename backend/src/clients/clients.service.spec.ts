@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClientsService } from './clients.service.js';
-import { Role } from '../generated/prisma/client.js';
+import { ClientGroupRole, Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
@@ -9,7 +9,9 @@ function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser
   return { sub: 'user-1', email: 'a@b.com', role: Role.CREATOR, agencyId: 'agency-1', ...overrides };
 }
 
-function buildService(overrides: { client?: any; targetUser?: any } = {}) {
+function buildService(
+  overrides: { client?: any; targetUser?: any; existingAccess?: any } = {},
+) {
   const audit = { log: vi.fn() };
   const prisma = {
     client: {
@@ -23,13 +25,22 @@ function buildService(overrides: { client?: any; targetUser?: any } = {}) {
     },
     userClientAccess: {
       findMany: vi.fn(() => Promise.resolve([])),
+      findUnique: vi.fn(() =>
+        Promise.resolve(
+          'existingAccess' in overrides
+            ? overrides.existingAccess
+            : { userId: 'target-1', clientId: 'client-1', role: ClientGroupRole.VIEWER },
+        ),
+      ),
       upsert: vi.fn(() => Promise.resolve({})),
+      update: vi.fn(() => Promise.resolve({})),
       deleteMany: vi.fn(() => Promise.resolve({})),
     },
     user: {
       findUnique: vi.fn(() =>
         Promise.resolve(overrides.targetUser ?? { id: 'target-1', agencyId: 'agency-1' }),
       ),
+      findMany: vi.fn(() => Promise.resolve([])),
     },
   };
   const service = new ClientsService(prisma as unknown as PrismaService, audit as unknown as AuditService);
@@ -120,10 +131,26 @@ describe('ClientsService', () => {
       );
     });
 
-    it('grants access after confirming the target user is in the same agency', async () => {
+    it('grants access after confirming the target user is in the same agency, defaulting to VIEWER', async () => {
       const { service, prisma } = buildService({ targetUser: { id: 'target-1', agencyId: 'agency-1' } });
       await service.grantAccess('agency-1', 'actor-1', 'client-1', 'target-1');
-      expect(prisma.userClientAccess.upsert).toHaveBeenCalled();
+      expect(prisma.userClientAccess.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: { userId: 'target-1', clientId: 'client-1', role: ClientGroupRole.VIEWER },
+          update: { role: ClientGroupRole.VIEWER },
+        }),
+      );
+    });
+
+    it('grants access with an explicit per-client role', async () => {
+      const { service, prisma } = buildService({ targetUser: { id: 'target-1', agencyId: 'agency-1' } });
+      await service.grantAccess('agency-1', 'actor-1', 'client-1', 'target-1', ClientGroupRole.APPROVER);
+      expect(prisma.userClientAccess.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: { userId: 'target-1', clientId: 'client-1', role: ClientGroupRole.APPROVER },
+          update: { role: ClientGroupRole.APPROVER },
+        }),
+      );
     });
 
     it('rejects granting access to a user from a different agency', async () => {
@@ -140,6 +167,80 @@ describe('ClientsService', () => {
       expect(prisma.userClientAccess.deleteMany).toHaveBeenCalledWith({
         where: { userId: 'target-1', clientId: 'client-1' },
       });
+    });
+
+    it('lists access with the per-client accessRole flattened onto the user', async () => {
+      const { service, prisma } = buildService();
+      prisma.userClientAccess.findMany.mockResolvedValueOnce([
+        { role: ClientGroupRole.MANAGER, user: { id: 'u1', name: 'A', email: 'a@b.com', role: Role.CREATOR } },
+      ] as never);
+      const result = await service.listAccess('agency-1', 'client-1');
+      expect(result).toEqual([
+        { id: 'u1', name: 'A', email: 'a@b.com', role: Role.CREATOR, accessRole: ClientGroupRole.MANAGER },
+      ]);
+    });
+  });
+
+  describe('updateAccessRole', () => {
+    it('updates the role on an existing access grant', async () => {
+      const { service, prisma, audit } = buildService({
+        existingAccess: { userId: 'target-1', clientId: 'client-1', role: ClientGroupRole.VIEWER },
+      });
+      await service.updateAccessRole('agency-1', 'actor-1', 'client-1', 'target-1', ClientGroupRole.APPROVER);
+      expect(prisma.userClientAccess.update).toHaveBeenCalledWith({
+        where: { userId_clientId: { userId: 'target-1', clientId: 'client-1' } },
+        data: { role: ClientGroupRole.APPROVER },
+      });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'CLIENT_ACCESS_ROLE_CHANGED' }),
+      );
+    });
+
+    it('rejects updating a role when no access grant exists', async () => {
+      const { service, prisma } = buildService({ existingAccess: null });
+      await expect(
+        service.updateAccessRole('agency-1', 'actor-1', 'client-1', 'target-1', ClientGroupRole.APPROVER),
+      ).rejects.toThrow('This user does not have access to this client');
+      expect(prisma.userClientAccess.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAccessOverview', () => {
+    it('groups members by client and separates out unassigned members', async () => {
+      const { service, prisma } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        {
+          id: 'client-1',
+          name: 'Client One',
+          userAccess: [
+            {
+              userId: 'u1',
+              role: ClientGroupRole.MANAGER,
+              user: { id: 'u1', name: 'A', email: 'a@b.com', role: Role.CREATOR, isActive: true },
+            },
+          ],
+        },
+      ] as never);
+      prisma.user.findMany.mockResolvedValueOnce([
+        { id: 'u1', name: 'A', email: 'a@b.com', role: Role.CREATOR, isActive: true },
+        { id: 'u2', name: 'B', email: 'b@b.com', role: Role.OWNER, isActive: true },
+      ] as never);
+
+      const result = await service.getAccessOverview('agency-1');
+
+      expect(result.totalClients).toBe(1);
+      expect(result.totalMembers).toBe(2);
+      expect(result.unassignedCount).toBe(1);
+      expect(result.clients).toEqual([
+        {
+          id: 'client-1',
+          name: 'Client One',
+          members: [{ id: 'u1', name: 'A', email: 'a@b.com', role: Role.CREATOR, isActive: true, accessRole: ClientGroupRole.MANAGER }],
+        },
+      ]);
+      expect(result.unassigned).toEqual([
+        { id: 'u2', name: 'B', email: 'b@b.com', role: Role.OWNER, isActive: true },
+      ]);
     });
   });
 });

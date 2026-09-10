@@ -128,11 +128,18 @@ model User {
   @@map("users")
 }
 
+enum ClientGroupRole {
+  MANAGER
+  APPROVER
+  VIEWER
+}
+
 model UserClientAccess {
-  userId   String @map("user_id") @db.Uuid
-  clientId String @map("client_id") @db.Uuid
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId   String          @map("user_id") @db.Uuid
+  clientId String          @map("client_id") @db.Uuid
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client   Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  role     ClientGroupRole @default(VIEWER)
 
   @@id([userId, clientId])
   @@map("user_client_access")

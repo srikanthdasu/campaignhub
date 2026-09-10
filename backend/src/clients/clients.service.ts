@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
-import { Role } from '../generated/prisma/client.js';
+import { ClientGroupRole, Role } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 @Injectable()
@@ -179,10 +179,16 @@ export class ClientsService {
       include: { user: { select: { id: true, name: true, email: true, role: true } } },
     });
 
-    return access.map((a) => a.user);
+    return access.map((a) => ({ ...a.user, accessRole: a.role }));
   }
 
-  async grantAccess(agencyId: string, actorId: string, clientId: string, targetUserId: string) {
+  async grantAccess(
+    agencyId: string,
+    actorId: string,
+    clientId: string,
+    targetUserId: string,
+    role: ClientGroupRole = ClientGroupRole.VIEWER,
+  ) {
     await this.requireInAgency(agencyId, clientId);
 
     const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
@@ -192,8 +198,8 @@ export class ClientsService {
 
     await this.prisma.userClientAccess.upsert({
       where: { userId_clientId: { userId: targetUserId, clientId } },
-      create: { userId: targetUserId, clientId },
-      update: {},
+      create: { userId: targetUserId, clientId, role },
+      update: { role },
     });
 
     await this.audit.log({
@@ -201,7 +207,37 @@ export class ClientsService {
       action: 'CLIENT_ACCESS_GRANTED',
       entityType: 'client',
       entityId: clientId,
-      metadata: { targetUserId },
+      metadata: { targetUserId, role },
+    });
+  }
+
+  async updateAccessRole(
+    agencyId: string,
+    actorId: string,
+    clientId: string,
+    targetUserId: string,
+    role: ClientGroupRole,
+  ) {
+    await this.requireInAgency(agencyId, clientId);
+
+    const existing = await this.prisma.userClientAccess.findUnique({
+      where: { userId_clientId: { userId: targetUserId, clientId } },
+    });
+    if (!existing) {
+      throw new NotFoundException('This user does not have access to this client');
+    }
+
+    await this.prisma.userClientAccess.update({
+      where: { userId_clientId: { userId: targetUserId, clientId } },
+      data: { role },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'CLIENT_ACCESS_ROLE_CHANGED',
+      entityType: 'client',
+      entityId: clientId,
+      metadata: { targetUserId, role },
     });
   }
 
@@ -219,6 +255,46 @@ export class ClientsService {
       entityId: clientId,
       metadata: { targetUserId },
     });
+  }
+
+  /**
+   * One real round trip for the Members page's "grouped by client" view: every non-deleted
+   * client with its real access list, plus which agency members have no client grant at all
+   * (agency-wide staff like Owner/Admin usually fall here since they bypass per-client grants).
+   */
+  async getAccessOverview(agencyId: string) {
+    const [clients, allMembers] = await Promise.all([
+      this.prisma.client.findMany({
+        where: { agencyId, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          userAccess: {
+            include: { user: { select: { id: true, name: true, email: true, role: true, isActive: true } } },
+          },
+        },
+      }),
+      this.prisma.user.findMany({
+        where: { agencyId },
+        select: { id: true, name: true, email: true, role: true, isActive: true },
+      }),
+    ]);
+
+    const assignedUserIds = new Set(clients.flatMap((c) => c.userAccess.map((a) => a.userId)));
+    const unassigned = allMembers.filter((m) => !assignedUserIds.has(m.id));
+
+    return {
+      totalClients: clients.length,
+      totalMembers: allMembers.length,
+      unassignedCount: unassigned.length,
+      clients: clients.map((c) => ({
+        id: c.id,
+        name: c.name,
+        members: c.userAccess.map((a) => ({ ...a.user, accessRole: a.role })),
+      })),
+      unassigned,
+    };
   }
 
   private async requireInAgency(agencyId: string, clientId: string) {
