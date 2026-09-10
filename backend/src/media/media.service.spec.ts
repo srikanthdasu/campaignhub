@@ -11,8 +11,10 @@ function buildService(overrides: { asset?: any } = {}) {
   const prisma = {
     mediaAsset: {
       findUnique: vi.fn(() => Promise.resolve(asset)),
+      findMany: vi.fn(() => Promise.resolve([asset])),
       update: vi.fn((args: any) => Promise.resolve({ ...asset, ...args.data })),
       delete: vi.fn(() => Promise.resolve({})),
+      deleteMany: vi.fn(() => Promise.resolve({ count: 1 })),
       create: vi.fn((args: any) => Promise.resolve({ id: 'asset-generated', ...args.data })),
     },
   };
@@ -81,5 +83,35 @@ describe('MediaService', () => {
     expect(prisma.mediaAsset.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'asset-1' } }),
     );
+  });
+
+  it('passes title, description, and campaignId through on update', async () => {
+    const { service, prisma } = buildService();
+    await service.update('asset-1', 'client-1', {
+      title: 'New title',
+      description: 'A description',
+      campaignId: 'campaign-1',
+    } as any);
+    expect(prisma.mediaAsset.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'New title',
+          description: 'A description',
+          campaignId: 'campaign-1',
+        }),
+      }),
+    );
+  });
+
+  it('bulk-deletes only assets scoped to the correct client', async () => {
+    const { service, prisma, audit } = buildService();
+    const count = await service.bulkRemove(['asset-1'], 'client-1', 'actor-1');
+
+    expect(prisma.mediaAsset.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['asset-1'] }, clientId: 'client-1' },
+    });
+    expect(prisma.mediaAsset.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['asset-1'] } } });
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'MEDIA_BULK_DELETED' }));
+    expect(count).toBe(1);
   });
 });

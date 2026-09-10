@@ -42,8 +42,9 @@ export class MediaController {
     )
     file: Express.Multer.File,
     @Body('folder') folder?: string,
+    @Body('campaignId') campaignId?: string,
   ) {
-    return this.mediaService.recordUpload(clientId, user.sub, file, folder);
+    return this.mediaService.recordUpload(clientId, user.sub, file, folder, campaignId);
   }
 
   @Post('generate-image')
@@ -84,5 +85,14 @@ export class MediaController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.mediaService.remove(id, clientId, user.sub);
+  }
+
+  @Post('bulk-delete')
+  bulkRemove(
+    @Param('clientId') clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('ids') ids: string[],
+  ) {
+    return this.mediaService.bulkRemove(ids, clientId, user.sub);
   }
 }

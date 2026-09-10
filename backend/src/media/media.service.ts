@@ -33,6 +33,7 @@ export class MediaService {
         type: MediaType.IMAGE,
         storageUrl,
         fileName: `${prompt.slice(0, 60).trim() || 'ai-generated'}.png`,
+        fileSize: imageBuffer.length,
         folder: options.folder,
         tags: [],
         aiProvider: 'azure-ai-foundry',
@@ -57,6 +58,7 @@ export class MediaService {
     actorId: string,
     file: Express.Multer.File,
     folder?: string,
+    campaignId?: string,
   ) {
     const storageUrl = await this.blobStorage.upload(
       file.buffer,
@@ -67,9 +69,11 @@ export class MediaService {
     const asset = await this.prisma.mediaAsset.create({
       data: {
         clientId,
+        campaignId,
         type: mediaTypeFromMimetype(file.mimetype),
         storageUrl,
         fileName: file.originalname,
+        fileSize: file.size,
         folder,
         tags: [],
         uploadedById: actorId,
@@ -97,8 +101,29 @@ export class MediaService {
     await this.requireInClient(id, clientId);
     return this.prisma.mediaAsset.update({
       where: { id },
-      data: { folder: dto.folder, tags: dto.tags },
+      data: {
+        folder: dto.folder,
+        tags: dto.tags,
+        title: dto.title,
+        description: dto.description,
+        campaignId: dto.campaignId,
+      },
     });
+  }
+
+  async bulkRemove(ids: string[], clientId: string, actorId: string) {
+    const assets = await this.prisma.mediaAsset.findMany({ where: { id: { in: ids }, clientId } });
+    await this.prisma.mediaAsset.deleteMany({ where: { id: { in: assets.map((a) => a.id) } } });
+    await Promise.all(assets.map((a) => this.blobStorage.remove(a.storageUrl)));
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'MEDIA_BULK_DELETED',
+      entityType: 'media_asset',
+      metadata: { count: assets.length, ids: assets.map((a) => a.id) },
+    });
+
+    return assets.length;
   }
 
   async remove(id: string, clientId: string, actorId: string) {
@@ -118,7 +143,7 @@ export class MediaService {
   async incrementUsage(id: string) {
     await this.prisma.mediaAsset.update({
       where: { id },
-      data: { usageCount: { increment: 1 } },
+      data: { usageCount: { increment: 1 }, lastUsedAt: new Date() },
     });
   }
 

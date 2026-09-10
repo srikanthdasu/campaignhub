@@ -244,6 +244,9 @@ model MediaAsset {
   type         MediaType
   storageUrl   String    @map("storage_url")
   fileName     String    @map("file_name")
+  title        String?
+  description  String?
+  fileSize     Int?      @map("file_size")
   folder       String?
   tags         String[]
   aiProvider   String?   @map("ai_provider")
@@ -251,6 +254,7 @@ model MediaAsset {
   uploadedById String?   @map("uploaded_by") @db.Uuid
   uploadedBy   User?     @relation("MediaUploadedBy", fields: [uploadedById], references: [id])
   usageCount   Int       @default(0) @map("usage_count")
+  lastUsedAt   DateTime? @map("last_used_at")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   contentItems ContentItem[]
