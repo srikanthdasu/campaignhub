@@ -24,6 +24,7 @@ import { AdsModule } from './ads/ads.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 
@@ -53,6 +54,7 @@ import { AppController } from './app.controller.js';
     NotificationsModule,
     BillingModule,
     AnalyticsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
