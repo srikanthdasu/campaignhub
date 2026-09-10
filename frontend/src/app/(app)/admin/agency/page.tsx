@@ -22,8 +22,12 @@ import {
   ClipboardCheck,
   CheckCircle2,
   Copy,
+  Trash2,
+  RotateCcw,
   type LucideIcon,
 } from 'lucide-react';
+
+const DELETE_GRACE_DAYS = 15;
 
 const PLANS = ['BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'] as const;
 const STATUSES = ['ACTIVE', 'PENDING_ONBOARDING', 'INACTIVE', 'BLOCKED'] as const;
@@ -62,6 +66,15 @@ interface Client {
   plan: ClientPlan;
   status: ClientStatus;
   createdAt: string;
+}
+
+interface DeletedClient extends Client {
+  deletedAt: string;
+}
+
+function daysLeft(deletedAt: string): number {
+  const purgeAt = new Date(deletedAt).getTime() + DELETE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000)));
 }
 
 interface Member {
@@ -157,6 +170,11 @@ export default function AgencyAdminPage() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedClients, setDeletedClients] = useState<DeletedClient[] | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const [newClient, setNewClient] = useState({
     name: '',
@@ -227,7 +245,10 @@ export default function AgencyAdminPage() {
     setError(null);
     setCreatingClient(true);
     try {
-      const client = await api.post<Client>('/clients', newClient);
+      const client = await api.post<Client>('/clients', {
+        ...newClient,
+        contactEmail: newClient.contactEmail.trim() || undefined,
+      });
       setNewClient({ name: '', contactName: '', contactEmail: '', phone: '', website: '', plan: 'BASIC' });
       loadClients();
       await selectClient(client);
@@ -235,6 +256,53 @@ export default function AgencyAdminPage() {
       setError(err instanceof ApiError ? err.message : 'Failed to create client');
     } finally {
       setCreatingClient(false);
+    }
+  }
+
+  function loadDeleted() {
+    api
+      .get<DeletedClient[]>('/clients/deleted')
+      .then(setDeletedClients)
+      .catch(() => setDeletedClients([]));
+  }
+
+  function onToggleDeleted() {
+    const next = !showDeleted;
+    setShowDeleted(next);
+    if (next && deletedClients === null) loadDeleted();
+  }
+
+  async function onDeleteClient(id: string) {
+    setDeletingId(id);
+    setError(null);
+    try {
+      await api.delete(`/clients/${id}`);
+      setConfirmDeleteId(null);
+      if (activeClientId === id) {
+        setActiveClientId(null);
+        setActiveClient(null);
+        setDetails(null);
+      }
+      loadClients();
+      if (showDeleted) loadDeleted();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete client');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function onRestoreClient(id: string) {
+    setRestoringId(id);
+    setError(null);
+    try {
+      await api.post(`/clients/${id}/restore`, {});
+      loadDeleted();
+      loadClients();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to restore client');
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -467,19 +535,45 @@ export default function AgencyAdminPage() {
               <p className="py-2 text-xs text-neutral-500">No clients yet.</p>
             ) : (
               filteredClients.map((c) => (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => selectClient(c)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
+                  className={`group flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                     activeClientId === c.id ? 'bg-accent-500/20 text-accent-200' : 'text-neutral-300 hover:bg-white/[0.05]'
                   }`}
                 >
-                  <span className="truncate">{c.name}</span>
-                  <span className="flex shrink-0 gap-1">
-                    <Badge tone="neutral">{c.plan}</Badge>
-                    <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABELS[c.status]}</Badge>
-                  </span>
-                </button>
+                  <button onClick={() => selectClient(c)} className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left">
+                    <span className="truncate">{c.name}</span>
+                    <span className="flex shrink-0 gap-1">
+                      <Badge tone="neutral">{c.plan}</Badge>
+                      <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABELS[c.status]}</Badge>
+                    </span>
+                  </button>
+                  {confirmDeleteId === c.id ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => onDeleteClient(c.id)}
+                        disabled={deletingId === c.id}
+                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10"
+                      >
+                        {deletingId === c.id ? '…' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded px-1.5 py-0.5 text-[10px] text-neutral-400 hover:bg-white/[0.06]"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(c.id)}
+                      className="shrink-0 opacity-0 group-hover:opacity-100"
+                      title="Delete client"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -501,6 +595,43 @@ export default function AgencyAdminPage() {
                 }}
               />
             </label>
+          </div>
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <button
+              onClick={onToggleDeleted}
+              className="text-xs font-medium text-accent-300 hover:underline"
+            >
+              {showDeleted ? 'Hide' : 'View'} recently deleted{deletedClients ? ` (${deletedClients.length})` : ''}
+            </button>
+            {showDeleted && (
+              <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+                {deletedClients === null ? (
+                  <Skeleton className="h-8 w-full" />
+                ) : deletedClients.length === 0 ? (
+                  <p className="text-[11px] text-neutral-500">Nothing in the trash.</p>
+                ) : (
+                  deletedClients.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5 text-xs">
+                      <div className="min-w-0">
+                        <p className="truncate text-neutral-300">{c.name}</p>
+                        <p className="text-[10px] text-neutral-500">
+                          {daysLeft(c.deletedAt) > 0
+                            ? `Purges in ${daysLeft(c.deletedAt)} day${daysLeft(c.deletedAt) === 1 ? '' : 's'}`
+                            : 'Purging soon'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onRestoreClient(c.id)}
+                        disabled={restoringId === c.id}
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-white/12 px-2 py-1 text-[10px] font-medium text-neutral-300 hover:border-accent-400/40 hover:text-accent-200"
+                      >
+                        <RotateCcw className="h-3 w-3" /> {restoringId === c.id ? 'Restoring…' : 'Restore'}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </Card>
 

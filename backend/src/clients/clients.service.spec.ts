@@ -19,6 +19,7 @@ function buildService(overrides: { client?: any; targetUser?: any } = {}) {
       ),
       findMany: vi.fn(() => Promise.resolve([])),
       update: vi.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
+      deleteMany: vi.fn(() => Promise.resolve({ count: 0 })),
     },
     userClientAccess: {
       findMany: vi.fn(() => Promise.resolve([])),
@@ -41,7 +42,7 @@ describe('ClientsService', () => {
       const { service, prisma } = buildService();
       await service.listForUser(makeUser({ role: Role.OWNER }));
       expect(prisma.client.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { agencyId: 'agency-1' } }),
+        expect.objectContaining({ where: { agencyId: 'agency-1', deletedAt: null } }),
       );
     });
 
@@ -50,9 +51,64 @@ describe('ClientsService', () => {
       await service.listForUser(makeUser({ role: Role.CREATOR }));
       expect(prisma.client.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { agencyId: 'agency-1', userAccess: { some: { userId: 'user-1' } } },
+          where: { agencyId: 'agency-1', deletedAt: null, userAccess: { some: { userId: 'user-1' } } },
         }),
       );
+    });
+  });
+
+  describe('softDelete / restore / purgeExpired', () => {
+    it('soft-deletes a client by setting deletedAt', async () => {
+      const { service, prisma, audit } = buildService({ client: { id: 'client-1', agencyId: 'agency-1', deletedAt: null } });
+      await service.softDelete('agency-1', 'actor-1', 'client-1');
+      expect(prisma.client.update).toHaveBeenCalledWith({
+        where: { id: 'client-1' },
+        data: { deletedAt: expect.any(Date) },
+      });
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLIENT_DELETED' }));
+    });
+
+    it('rejects deleting a client that is already deleted', async () => {
+      const { service } = buildService({
+        client: { id: 'client-1', agencyId: 'agency-1', deletedAt: new Date() },
+      });
+      await expect(service.softDelete('agency-1', 'actor-1', 'client-1')).rejects.toThrow(
+        'Client is already deleted',
+      );
+    });
+
+    it('restores a soft-deleted client', async () => {
+      const { service, prisma, audit } = buildService({
+        client: { id: 'client-1', agencyId: 'agency-1', deletedAt: new Date() },
+      });
+      await service.restore('agency-1', 'actor-1', 'client-1');
+      expect(prisma.client.update).toHaveBeenCalledWith({ where: { id: 'client-1' }, data: { deletedAt: null } });
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLIENT_RESTORED' }));
+    });
+
+    it('rejects restoring a client that is not deleted', async () => {
+      const { service } = buildService({ client: { id: 'client-1', agencyId: 'agency-1', deletedAt: null } });
+      await expect(service.restore('agency-1', 'actor-1', 'client-1')).rejects.toThrow('Client is not deleted');
+    });
+
+    it('purges only clients past the grace period and audits the batch', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([{ id: 'client-1', name: 'Old Co' }] as never);
+      const count = await service.purgeExpired(15);
+      expect(prisma.client.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { deletedAt: { lt: expect.any(Date) } } }),
+      );
+      expect(prisma.client.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['client-1'] } } });
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLIENT_PURGED' }));
+      expect(count).toBe(1);
+    });
+
+    it('skips the delete and audit call when nothing is due for purge', async () => {
+      const { service, prisma, audit } = buildService();
+      const count = await service.purgeExpired(15);
+      expect(prisma.client.deleteMany).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+      expect(count).toBe(0);
     });
   });
 

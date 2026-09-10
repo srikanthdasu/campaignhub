@@ -48,7 +48,7 @@ export class ClientsService {
   async listForUser(user: AuthenticatedUser) {
     if (user.role === Role.OWNER || user.role === Role.ADMIN) {
       return this.prisma.client.findMany({
-        where: { agencyId: user.agencyId! },
+        where: { agencyId: user.agencyId!, deletedAt: null },
         orderBy: { createdAt: 'asc' },
       });
     }
@@ -56,10 +56,78 @@ export class ClientsService {
     return this.prisma.client.findMany({
       where: {
         agencyId: user.agencyId!,
+        deletedAt: null,
         userAccess: { some: { userId: user.sub } },
       },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  // Recoverable for GRACE_PERIOD_DAYS after softDelete — purgeExpired() (run daily by
+  // ClientsCronService) permanently removes anything past that window.
+  listDeleted(agencyId: string) {
+    return this.prisma.client.findMany({
+      where: { agencyId, deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+    });
+  }
+
+  async softDelete(agencyId: string, actorId: string, clientId: string) {
+    const client = await this.requireInAgency(agencyId, clientId);
+    if (client.deletedAt) {
+      throw new BadRequestException('Client is already deleted');
+    }
+
+    await this.prisma.client.update({ where: { id: clientId }, data: { deletedAt: new Date() } });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'CLIENT_DELETED',
+      entityType: 'client',
+      entityId: clientId,
+    });
+  }
+
+  async restore(agencyId: string, actorId: string, clientId: string) {
+    const client = await this.requireInAgency(agencyId, clientId);
+    if (!client.deletedAt) {
+      throw new BadRequestException('Client is not deleted');
+    }
+
+    const restored = await this.prisma.client.update({
+      where: { id: clientId },
+      data: { deletedAt: null },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'CLIENT_RESTORED',
+      entityType: 'client',
+      entityId: clientId,
+    });
+
+    return restored;
+  }
+
+  /** Called by ClientsCronService — no user in the loop, so no access check or actor on the audit entry. */
+  async purgeExpired(graceDays: number) {
+    const cutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000);
+    const due = await this.prisma.client.findMany({
+      where: { deletedAt: { lt: cutoff } },
+      select: { id: true, name: true },
+    });
+    if (due.length === 0) return 0;
+
+    await this.prisma.client.deleteMany({ where: { id: { in: due.map((c) => c.id) } } });
+
+    await this.audit.log({
+      action: 'CLIENT_PURGED',
+      entityType: 'client',
+      entityId: due.map((c) => c.id).join(','),
+      metadata: { count: due.length, names: due.map((c) => c.name) },
+    });
+
+    return due.length;
   }
 
   async findOne(clientId: string) {

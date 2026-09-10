@@ -26,6 +26,13 @@ export class ClientsController {
     return this.clientsService.listForUser(user);
   }
 
+  // Registered ahead of the :id route below — otherwise Nest would match "deleted" as an :id.
+  @Get('deleted')
+  @Roles(Role.OWNER, Role.ADMIN)
+  listDeleted(@CurrentUser() user: AuthenticatedUser) {
+    return this.clientsService.listDeleted(user.agencyId!);
+  }
+
   @Get(':id')
   @UseGuards(ClientAccessGuard)
   findOne(@Param('id') id: string) {
@@ -40,6 +47,19 @@ export class ClientsController {
     @Body() dto: UpdateClientDto,
   ) {
     return this.clientsService.update(user.agencyId!, user.sub, id, dto);
+  }
+
+  // Soft delete — recoverable for a grace period (see ClientsCronService) before permanent purge.
+  @Delete(':id')
+  @Roles(Role.OWNER, Role.ADMIN)
+  remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.clientsService.softDelete(user.agencyId!, user.sub, id);
+  }
+
+  @Post(':id/restore')
+  @Roles(Role.OWNER, Role.ADMIN)
+  restore(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.clientsService.restore(user.agencyId!, user.sub, id);
   }
 
   // Any client-scoped user can see who else has access — used to pick approvers when

@@ -75,6 +75,7 @@ model Client {
   plan         ClientPlan   @default(BASIC)
   status       ClientStatus @default(ACTIVE)
   createdAt    DateTime     @default(now()) @map("created_at")
+  deletedAt    DateTime?    @map("deleted_at")
 
   userAccess     UserClientAccess[]
   brandKit       BrandKit?
