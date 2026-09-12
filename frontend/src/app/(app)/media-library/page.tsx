@@ -24,6 +24,7 @@ import { useClientPicker } from '@/hooks/use-client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -360,12 +361,11 @@ export default function MediaLibraryPage() {
                       )}
                     </div>
                     <Input placeholder="Title" value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} />
-                    <textarea
+                    <Textarea
                       placeholder="Description"
                       value={descDraft}
                       onChange={(e) => setDescDraft(e.target.value)}
                       rows={2}
-                      className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
                     />
                     <Button
                       size="sm"

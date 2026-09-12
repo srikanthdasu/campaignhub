@@ -9,6 +9,7 @@ import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { Plus, Sparkles, Star, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
@@ -226,12 +227,11 @@ function StrategyWorkspace({ clientId }: { clientId: string }) {
                 placeholder="Goal / objective"
                 className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
-              <textarea
+              <Textarea
                 value={contextNote}
                 onChange={(e) => setContextNote(e.target.value)}
                 placeholder="Context (permitted data / notes)"
                 rows={2}
-                className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
               <Button type="submit" size="sm" className="w-full" loading={busy}>
                 <Plus className="h-3.5 w-3.5" /> Create
@@ -283,12 +283,11 @@ function StrategyWorkspace({ clientId }: { clientId: string }) {
                   <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">4. Review</p>
                   {canReview ? (
                     <>
-                      <textarea
+                      <Textarea
                         value={reviewNote}
                         onChange={(e) => setReviewNote(e.target.value)}
                         placeholder="Review note (optional)"
                         rows={2}
-                        className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
                       />
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => onReview('APPROVED')} loading={busy}>

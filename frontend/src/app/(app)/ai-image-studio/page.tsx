@@ -9,6 +9,7 @@ import { useClientPicker } from '@/hooks/use-client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
@@ -278,12 +279,11 @@ export default function AiImageStudioPage() {
                 <p className="text-xs text-neutral-500">Select a client first.</p>
               ) : (
                 <div className="space-y-2">
-                  <textarea
+                  <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Describe what you want — e.g. bright colors, sunglasses, beach background, discount text"
                     rows={3}
-                    className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
                   />
                   <div className="flex flex-wrap gap-1">
                     {SUGGESTED_PROMPTS.map((p) => (

@@ -8,6 +8,7 @@ import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { STOCK_CATALOG } from '@/lib/ai-video-stock';
@@ -334,12 +335,11 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                 required
                 className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
-              <textarea
+              <Textarea
                 value={newIdea}
                 onChange={(e) => setNewIdea(e.target.value)}
                 placeholder="Idea or topic"
                 rows={2}
-                className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
               <Button type="submit" size="sm" className="w-full" loading={busy}>
                 <Plus className="h-3.5 w-3.5" /> Create Project
@@ -407,11 +407,11 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                           onChange={(e) => updateScene(i, { title: e.target.value })}
                           className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-sm text-neutral-50 outline-none focus:border-accent-400"
                         />
-                        <textarea
+                        <Textarea
                           value={scene.description}
                           onChange={(e) => updateScene(i, { description: e.target.value })}
                           rows={2}
-                          className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs text-neutral-300 outline-none focus:border-accent-400"
+                          className="text-xs"
                         />
                         <div className="flex items-center gap-2 text-xs text-neutral-400">
                           <span>Duration (sec)</span>

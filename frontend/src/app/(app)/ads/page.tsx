@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { Plus, Rocket, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
@@ -361,13 +362,13 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
                   <div className="space-y-3">
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-neutral-300">Audience notes</label>
-                      <textarea
+                      <Textarea
                         defaultValue={active.audienceNotes ?? ''}
                         disabled={!editable}
                         onBlur={(e) => e.target.value !== (active.audienceNotes ?? '') && patch({ audienceNotes: e.target.value })}
                         rows={3}
                         placeholder="Who should this reach? e.g. Women 25-40, US, interested in fitness"
-                        className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400 disabled:opacity-50"
+                        className="disabled:opacity-50"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -391,13 +392,13 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
                 {activeTab === 'CREATIVE' && (
                   <div className="space-y-3">
                     <label className="mb-1.5 block text-sm font-medium text-neutral-300">Ad copy</label>
-                    <textarea
+                    <Textarea
                       defaultValue={active.creativeText ?? ''}
                       disabled={!editable}
                       onBlur={(e) => e.target.value !== (active.creativeText ?? '') && patch({ creativeText: e.target.value })}
                       rows={4}
                       placeholder="Write the ad copy…"
-                      className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400 disabled:opacity-50"
+                      className="disabled:opacity-50"
                     />
                   </div>
                 )}

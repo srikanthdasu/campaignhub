@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: campaignhub
-      POSTGRES_PASSWORD: campaignhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campaignhub}
       POSTGRES_DB: campaignhub
     ports:
       - "5432:5432"

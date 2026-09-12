@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table } from '@/components/ui/table';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { RequireRole } from '@/components/require-role';
 import { Role } from '@/lib/roles';
@@ -303,40 +304,26 @@ function BillingPageContent() {
                 <p className="text-sm text-neutral-400">No invoices yet.</p>
               </Card>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-white/10">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-neutral-500">
-                    <tr>
-                      <th className="px-4 py-2.5">Date</th>
-                      <th className="px-4 py-2.5">Amount</th>
-                      <th className="px-4 py-2.5">GST</th>
-                      <th className="px-4 py-2.5">Total</th>
-                      <th className="px-4 py-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-t border-white/5">
-                        <td className="px-4 py-2.5 text-neutral-300">
-                          {new Date(inv.issuedAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-2.5 text-neutral-300">
-                          {inv.currency} {inv.amount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-2.5 text-neutral-300">
-                          {inv.currency} {inv.gstAmount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-neutral-100">
-                          {inv.currency} {(inv.amount + inv.gstAmount).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <Badge tone={inv.status === 'PAID' ? 'success' : 'warning'}>{inv.status}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table
+                rowKey={(inv) => inv.id}
+                rows={invoices}
+                columns={[
+                  { key: 'date', header: 'Date', render: (inv) => new Date(inv.issuedAt).toLocaleDateString() },
+                  { key: 'amount', header: 'Amount', render: (inv) => `${inv.currency} ${inv.amount.toLocaleString('en-IN')}` },
+                  { key: 'gst', header: 'GST', render: (inv) => `${inv.currency} ${inv.gstAmount.toLocaleString('en-IN')}` },
+                  {
+                    key: 'total',
+                    header: 'Total',
+                    className: 'font-medium text-neutral-100',
+                    render: (inv) => `${inv.currency} ${(inv.amount + inv.gstAmount).toLocaleString('en-IN')}`,
+                  },
+                  {
+                    key: 'status',
+                    header: 'Status',
+                    render: (inv) => <Badge tone={inv.status === 'PAID' ? 'success' : 'warning'}>{inv.status}</Badge>,
+                  },
+                ]}
+              />
             )}
           </motion.div>
         </>

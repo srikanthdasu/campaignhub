@@ -8,6 +8,7 @@ import { ROLE_LABELS, ROLES, Role } from '@/lib/roles';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -756,12 +757,11 @@ function AgencyAdminPageContent() {
                 />
                 Allow Client Portal Access
               </label>
-              <textarea
+              <Textarea
                 placeholder="Notes"
                 value={details.notes}
                 onChange={(e) => setDetails((p) => (p ? { ...p, notes: e.target.value } : p))}
                 rows={2}
-                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
               <Button size="sm" className="w-full" loading={savingDetails} onClick={onSaveDetails}>
                 Save Details
@@ -925,12 +925,11 @@ function AgencyAdminPageContent() {
                   onChange={(e) => setBrandKit((p) => ({ ...p, secondaryColor: e.target.value }))}
                 />
               </div>
-              <textarea
+              <Textarea
                 placeholder="Voice guidelines"
                 value={brandKit.voiceGuidelines ?? ''}
                 onChange={(e) => setBrandKit((p) => ({ ...p, voiceGuidelines: e.target.value }))}
                 rows={2}
-                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
               />
               <Button size="sm" className="w-full" loading={savingBrandKit} onClick={onSaveBrandKit}>
                 Save Brand Kit

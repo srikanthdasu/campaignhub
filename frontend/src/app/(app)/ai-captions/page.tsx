@@ -8,6 +8,7 @@ import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
@@ -133,13 +134,12 @@ export default function AiCaptionsPage() {
             <Card padding="lg">
               <h2 className="mb-4 text-sm font-semibold text-neutral-50">Generate captions</h2>
               <form onSubmit={onGenerate} className="space-y-3">
-                <textarea
+                <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="What's the post about? e.g. New summer collection launch for women."
                   rows={3}
                   required
-                  className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <Select label="Tone" value={tone} onChange={(e) => setTone(e.target.value as (typeof TONES)[number])}>

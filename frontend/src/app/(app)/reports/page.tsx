@@ -7,10 +7,12 @@ import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Table } from '@/components/ui/table';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { Download } from 'lucide-react';
 
 type ReportKey = 'content' | 'campaigns' | 'ads' | 'approvals';
+type ReportTableRow = Record<string, unknown> & { __rowIndex: number };
 
 const REPORTS: { key: ReportKey; label: string; description: string }[] = [
   { key: 'content', label: 'Content Report', description: 'Every content item, its type, platforms, and status.' },
@@ -176,30 +178,16 @@ function ReportList({ clientId }: { clientId: string }) {
               <p className="text-sm text-neutral-400">No rows for this report yet.</p>
             </Card>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-white/10">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-white/[0.03] uppercase tracking-wider text-neutral-500">
-                  <tr>
-                    {Object.keys(preview.rows[0]).map((h) => (
-                      <th key={h} className="px-3 py-2">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((row, i) => (
-                    <tr key={i} className="border-t border-white/5">
-                      {Object.values(row).map((v, j) => (
-                        <td key={j} className="px-3 py-2 text-neutral-300">
-                          {String(v)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              size="xs"
+              rows={preview.rows.map((row, i) => ({ ...row, __rowIndex: i }))}
+              rowKey={(row) => String(row.__rowIndex)}
+              columns={Object.keys(preview.rows[0]).map((h) => ({
+                key: h,
+                header: h,
+                render: (row: ReportTableRow) => String(row[h]),
+              }))}
+            />
           )}
         </motion.div>
       )}
