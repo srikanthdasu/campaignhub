@@ -158,6 +158,8 @@ function CampaignsWorkspace({ clientId }: { clientId: string }) {
   const [newName, setNewName] = useState('');
   const [newObjective, setNewObjective] = useState('');
   const [newIdea, setNewIdea] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function loadCampaigns() {
     api.get<CampaignSummary[]>(`/clients/${clientId}/campaigns`).then(setCampaigns).catch(() => setCampaigns([]));
@@ -210,9 +212,18 @@ function CampaignsWorkspace({ clientId }: { clientId: string }) {
   }
 
   async function onDelete(id: string) {
-    await api.delete(`/clients/${clientId}/campaigns/${id}`);
-    if (active?.id === id) setActive(null);
-    loadCampaigns();
+    setError(null);
+    setDeletingId(id);
+    try {
+      await api.delete(`/clients/${clientId}/campaigns/${id}`);
+      if (active?.id === id) setActive(null);
+      setConfirmDeleteId(null);
+      loadCampaigns();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete campaign');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   function togglePlatform(p: (typeof PLATFORMS)[number]) {
@@ -295,9 +306,27 @@ function CampaignsWorkspace({ clientId }: { clientId: string }) {
                   <span className="shrink-0">
                     <Badge tone={STATUS_TONE[c.status]}>{c.status}</Badge>
                   </span>
-                  <button onClick={() => onDelete(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100">
-                    <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
-                  </button>
+                  {confirmDeleteId === c.id ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => onDelete(c.id)}
+                        disabled={deletingId === c.id}
+                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10"
+                      >
+                        {deletingId === c.id ? '…' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded px-1.5 py-0.5 text-[10px] text-neutral-400 hover:bg-white/[0.06]"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setConfirmDeleteId(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100" title="Delete campaign">
+                      <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
+                    </button>
+                  )}
                 </div>
               ))
             )}

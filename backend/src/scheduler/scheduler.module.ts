@@ -4,9 +4,10 @@ import { SchedulerCronService } from './scheduler-cron.service.js';
 import { SchedulerController } from './scheduler.controller.js';
 import { InstagramPublishService } from '../social-accounts/instagram-publish.service.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, NotificationsModule],
   controllers: [SchedulerController],
   providers: [SchedulerService, SchedulerCronService, InstagramPublishService],
 })

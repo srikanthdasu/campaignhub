@@ -20,7 +20,11 @@ const UPLOAD_DIR = join(MODULE_DIR, '..', 'uploads'); // backend/dist/../uploads
 // this factory is shared so both entry points get identical middleware/guards/pipes. Kept in its
 // own file with no top-level side effects, unlike main.ts, so importing it never starts a server.
 export async function createApp(): Promise<NestExpressApplication> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: true keeps req.rawBody (the exact bytes Nest's body parser received) available
+  // alongside the normal parsed req.body — needed to verify the Razorpay webhook's HMAC
+  // signature, which is computed over the raw payload and would mismatch against any
+  // re-serialization of the parsed object (different key order/whitespace = different bytes).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const apiPrefix = config.get<string>('API_PREFIX', '');
 

@@ -15,7 +15,7 @@ import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 interface Agency {
   id: string;
   name: string;
-  plan: string;
+  plan: string | null;
   subscriptionStatus: string;
   settings: { timezone?: string; brandColor?: string } | null;
 }
@@ -92,7 +92,7 @@ export default function SettingsPage() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">Agency settings</h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge tone="accent">{agency.plan}</Badge>
+          <Badge tone="accent">{agency.plan ?? 'No plan yet'}</Badge>
           <Badge tone="neutral">{agency.subscriptionStatus}</Badge>
         </div>
       </motion.div>

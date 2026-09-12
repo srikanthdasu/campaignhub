@@ -437,6 +437,11 @@ model ScheduledPost {
   status          ScheduledPostStatus @default(PENDING)
   publishedAt     DateTime?           @map("published_at")
   errorMessage    String?             @map("error_message")
+  // Set only on a real publish (Instagram today) — the platform's own ID for this post, so a
+  // later analytics pull or delete-on-platform action has something to reference back to.
+  externalPostId  String?             @map("external_post_id")
+  // Bounded manual retries for a FAILED post — see SchedulerService.MAX_RETRIES.
+  retryCount      Int                 @default(0) @map("retry_count")
   createdAt       DateTime            @default(now()) @map("created_at")
 
   @@index([contentItemId])
@@ -445,11 +450,9 @@ model ScheduledPost {
 }
 
 // --- Phase 4 — AI layer -------------------------------------------------
-// Text/reasoning features (AI Assistant, AI Captions, AI Strategy & Governance) call the
-// Claude API per the spec. No Anthropic API key is configured in this environment, so every
-// service below returns clearly-labelled simulated responses generated from simple heuristics
-// over the input — the response shape matches what a real Claude call would return, so wiring
-// in a real key later is a service-layer change only, not a schema or API-contract change.
+// Text/reasoning features (AI Assistant, AI Captions, AI Strategy & Governance) call Azure AI
+// Foundry (Llama-3.3-70B) for real — see ai-common/azure-ai-foundry.service.ts. Every response
+// below is a live model call, not a simulated/heuristic one.
 
 enum AiMessageRole {
   USER
@@ -585,6 +588,13 @@ model AiStrategyRequest {
 // No Meta/Google/TikTok Ads API credentials are configured in this environment, so Launch
 // marks the record launched rather than actually placing a paid ad buy — flagged in-UI, same
 // pattern as AI Video Studio's simulated render.
+//
+// Deliberately its own single approvedBy/approvedAt pair below rather than reusing
+// ApprovalFlow/ApprovalStep (the content approval model): an ad has exactly one review gate
+// before launch, not a multi-step sequential/parallel chain with several named reviewers — the
+// full flow model would add relations and states this object never needs. If ad approval ever
+// grows a real multi-reviewer requirement, that's the point to migrate it onto ApprovalFlow
+// rather than growing a second bespoke mechanism here.
 enum AdStatus {
   DRAFT
   PENDING_APPROVAL

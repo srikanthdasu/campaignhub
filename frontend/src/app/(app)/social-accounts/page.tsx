@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import {
   Users,
@@ -564,9 +565,7 @@ export default function SocialAccountsPage() {
                           <Badge tone="neutral">{account.platform}</Badge>
                           <span className="truncate text-xs text-neutral-200">{account.label}</span>
                         </div>
-                        <Button variant="secondary" size="sm" onClick={() => onRemove(account.id)}>
-                          Remove
-                        </Button>
+                        <ConfirmButton onConfirm={() => onRemove(account.id)}>Remove</ConfirmButton>
                       </motion.li>
                     ))}
                   </AnimatePresence>

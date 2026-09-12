@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import {
   PenSquare,
@@ -56,6 +57,12 @@ interface ContentItem {
   mediaAsset: { id: string; fileName: string; storageUrl: string } | null;
 }
 
+const MAX_RETRIES = 3;
+
+// Only Instagram actually calls the platform's API today — everything else flips this status
+// without publishing anywhere real, so the reviewer sees that plainly instead of assuming it went out.
+const REAL_PUBLISH_PLATFORMS = new Set(['INSTAGRAM']);
+
 interface ScheduledPost {
   id: string;
   platform: string;
@@ -63,6 +70,8 @@ interface ScheduledPost {
   status: 'PENDING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
   errorMessage: string | null;
   publishedAt: string | null;
+  externalPostId: string | null;
+  retryCount: number;
   contentItem: { id: string; type: string; body: string | null };
 }
 
@@ -273,6 +282,15 @@ function SchedulerWorkspace({
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to mark published');
+    }
+  }
+
+  async function onRetry(id: string) {
+    try {
+      await api.post(`/scheduled-posts/${id}/retry`, {});
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to retry');
     }
   }
 
@@ -654,6 +672,11 @@ function SchedulerWorkspace({
                   <div className="flex items-center gap-2">
                     <Badge tone="neutral">{post.platform}</Badge>
                     <Badge tone={POST_TONE[post.status]}>{post.status}</Badge>
+                    {!REAL_PUBLISH_PLATFORMS.has(post.platform) && (
+                      <span title="This platform isn't wired up for real publishing yet — this only updates status here, it doesn't post anywhere.">
+                        <Badge tone="neutral">Simulated</Badge>
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 truncate text-xs text-neutral-400">{post.contentItem.body || post.contentItem.type}</p>
                   <p className="mt-1 text-xs text-neutral-500">{new Date(post.scheduledTime).toLocaleString()}</p>
@@ -666,9 +689,18 @@ function SchedulerWorkspace({
                     <Button size="sm" onClick={() => onMarkPublished(post.id)}>
                       Publish Now
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => onCancel(post.id)}>
-                      Cancel
-                    </Button>
+                    <ConfirmButton onConfirm={() => onCancel(post.id)}>Cancel</ConfirmButton>
+                  </div>
+                )}
+                {post.status === 'FAILED' && (
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {post.retryCount < MAX_RETRIES ? (
+                      <Button size="sm" onClick={() => onRetry(post.id)}>
+                        Retry{post.retryCount > 0 ? ` (${post.retryCount}/${MAX_RETRIES})` : ''}
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-neutral-500">Retry limit reached — reschedule instead</span>
+                    )}
                   </div>
                 )}
               </Card>

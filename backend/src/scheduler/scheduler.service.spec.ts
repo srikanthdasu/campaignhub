@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SchedulerService } from './scheduler.service.js';
-import { ContentStatus, ScheduledPostStatus, SocialPlatform } from '../generated/prisma/client.js';
+import { ContentStatus, Role, ScheduledPostStatus, SocialPlatform } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { ConfigService } from '@nestjs/config';
 import type { InstagramPublishService } from '../social-accounts/instagram-publish.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
+import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 function buildService(overrides: { count?: number } = {}) {
   const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn() };
   const prisma = {
     scheduledPost: {
       findMany: vi.fn(() =>
@@ -23,7 +26,10 @@ function buildService(overrides: { count?: number } = {}) {
       update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, errorMessage: null })),
       count: vi.fn(() => Promise.resolve(overrides.count ?? 0)),
     },
-    contentItem: { update: vi.fn(() => Promise.resolve({})) },
+    contentItem: {
+      update: vi.fn(() => Promise.resolve({})),
+      findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+    },
   };
   const config = { getOrThrow: vi.fn() };
   const instagramPublish = { publishImage: vi.fn() };
@@ -32,8 +38,9 @@ function buildService(overrides: { count?: number } = {}) {
     audit as unknown as AuditService,
     config as unknown as ConfigService,
     instagramPublish as unknown as InstagramPublishService,
+    notifications as unknown as NotificationsService,
   );
-  return { service, prisma, audit };
+  return { service, prisma, audit, notifications };
 }
 
 describe('SchedulerService.autoPublishDuePosts', () => {
@@ -100,6 +107,7 @@ describe('SchedulerService.autoPublishDuePosts', () => {
 
   it('does nothing when no posts are due', async () => {
     const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn() };
     const prisma = {
       scheduledPost: {
         findMany: vi.fn(() => Promise.resolve([])),
@@ -108,7 +116,7 @@ describe('SchedulerService.autoPublishDuePosts', () => {
         update: vi.fn(),
         count: vi.fn(),
       },
-      contentItem: { update: vi.fn() },
+      contentItem: { update: vi.fn(), findUnique: vi.fn() },
     };
     const config = { getOrThrow: vi.fn() };
     const instagramPublish = { publishImage: vi.fn() };
@@ -117,6 +125,7 @@ describe('SchedulerService.autoPublishDuePosts', () => {
       audit as unknown as AuditService,
       config as unknown as ConfigService,
       instagramPublish as unknown as InstagramPublishService,
+      notifications as unknown as NotificationsService,
     );
 
     const count = await service.autoPublishDuePosts();
@@ -124,5 +133,115 @@ describe('SchedulerService.autoPublishDuePosts', () => {
     expect(count).toBe(0);
     expect(prisma.scheduledPost.update).not.toHaveBeenCalled();
     expect(audit.log).not.toHaveBeenCalled();
+  });
+
+  it('notifies the content creator when a post fails to publish', async () => {
+    const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn() };
+    const config = { getOrThrow: vi.fn() };
+    // No mediaAsset attached — publishToInstagram rejects immediately with InstagramPublishError,
+    // a real failure path that needs no token-crypto/social-account mocking to exercise.
+    const prisma = {
+      scheduledPost: {
+        findMany: vi.fn(() =>
+          Promise.resolve([{ id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.INSTAGRAM }]),
+        ),
+        findUniqueOrThrow: vi.fn(() => Promise.resolve({ id: 'post-1', platform: SocialPlatform.INSTAGRAM })),
+        updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+        update: vi.fn((args: any) => Promise.resolve({ id: 'post-1', ...args.data })),
+        count: vi.fn(() => Promise.resolve(1)),
+      },
+      contentItem: {
+        update: vi.fn(),
+        findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+        findUniqueOrThrow: vi.fn(() => Promise.resolve({ mediaAsset: null })),
+      },
+    };
+    const instagramPublish = { publishImage: vi.fn() };
+    const service = new SchedulerService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      config as unknown as ConfigService,
+      instagramPublish as unknown as InstagramPublishService,
+      notifications as unknown as NotificationsService,
+    );
+
+    await service.autoPublishDuePosts();
+
+    expect(notifications.create).toHaveBeenCalledWith(
+      'creator-1',
+      expect.stringContaining('Instagram requires an image or video'),
+      '/scheduler',
+    );
+  });
+});
+
+function buildRetryService(post: { status: ScheduledPostStatus; retryCount: number }) {
+  const audit = { log: vi.fn() };
+  const prisma = {
+    scheduledPost: {
+      findUnique: vi.fn(() =>
+        Promise.resolve({
+          id: 'post-1',
+          contentItemId: 'content-1',
+          platform: SocialPlatform.FACEBOOK,
+          status: post.status,
+          retryCount: post.retryCount,
+          contentItem: { client: { agencyId: 'agency-1' } },
+        }),
+      ),
+      findUniqueOrThrow: vi.fn(() => Promise.resolve({ id: 'post-1', platform: SocialPlatform.FACEBOOK })),
+      updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+      update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, errorMessage: null })),
+      count: vi.fn(() => Promise.resolve(0)),
+    },
+    contentItem: {
+      update: vi.fn(() => Promise.resolve({})),
+      findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+    },
+  };
+  const config = { getOrThrow: vi.fn() };
+  const instagramPublish = { publishImage: vi.fn() };
+  const notifications = { create: vi.fn() };
+  const service = new SchedulerService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    config as unknown as ConfigService,
+    instagramPublish as unknown as InstagramPublishService,
+    notifications as unknown as NotificationsService,
+  );
+  const user: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.OWNER, agencyId: 'agency-1' };
+  return { service, prisma, audit, user, notifications };
+}
+
+describe('SchedulerService.retry', () => {
+  it('retries a failed post that is under the retry cap', async () => {
+    const { service, prisma } = buildRetryService({ status: ScheduledPostStatus.FAILED, retryCount: 0 });
+
+    await service.retry('post-1', {
+      sub: 'user-1',
+      email: 'a@b.com',
+      role: Role.OWNER,
+      agencyId: 'agency-1',
+    });
+
+    expect(prisma.scheduledPost.updateMany).toHaveBeenCalledWith({
+      where: { id: 'post-1', status: ScheduledPostStatus.FAILED },
+      data: { status: ScheduledPostStatus.PENDING, retryCount: { increment: 1 }, errorMessage: null },
+    });
+  });
+
+  it('rejects retrying a post that is not failed', async () => {
+    const { service, prisma, user } = buildRetryService({ status: ScheduledPostStatus.PENDING, retryCount: 0 });
+
+    await expect(service.retry('post-1', user)).rejects.toThrow('Only failed posts can be retried');
+    expect(prisma.scheduledPost.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects retrying once the retry cap is reached', async () => {
+    const { service, prisma, user } = buildRetryService({ status: ScheduledPostStatus.FAILED, retryCount: 3 });
+
+    await expect(service.retry('post-1', user)).rejects.toThrow(/already been retried 3 times/);
+    expect(prisma.scheduledPost.updateMany).not.toHaveBeenCalled();
   });
 });

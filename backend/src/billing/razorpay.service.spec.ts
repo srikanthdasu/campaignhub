@@ -4,9 +4,16 @@ import { RazorpayService } from './razorpay.service.js';
 import type { ConfigService } from '@nestjs/config';
 
 const KEY_SECRET = 'test_secret';
+const WEBHOOK_SECRET = 'test_webhook_secret';
 
 function buildService() {
-  const config = { getOrThrow: vi.fn((key: string) => (key === 'RAZORPAY_KEY_SECRET' ? KEY_SECRET : 'rzp_test_id')) };
+  const config = {
+    getOrThrow: vi.fn((key: string) => {
+      if (key === 'RAZORPAY_KEY_SECRET') return KEY_SECRET;
+      if (key === 'RAZORPAY_WEBHOOK_SECRET') return WEBHOOK_SECRET;
+      return 'rzp_test_id';
+    }),
+  };
   return new RazorpayService(config as unknown as ConfigService);
 }
 
@@ -49,5 +56,45 @@ describe('RazorpayService.createOrder', () => {
     );
 
     vi.unstubAllGlobals();
+  });
+
+  it('passes notes through so a webhook can recover plan/billingCycle without the browser', async () => {
+    const service = buildService();
+    const fetchMock = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'order_1', amount: 99900, currency: 'INR' }) }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await service.createOrder(999, 'receipt-1', { agencyId: 'agency-1', plan: 'GROWTH' });
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const body = JSON.parse(requestInit.body as string);
+    expect(body.notes).toEqual({ agencyId: 'agency-1', plan: 'GROWTH' });
+
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('RazorpayService.verifyWebhookSignature', () => {
+  it('accepts a signature genuinely computed over the raw body with the webhook secret', () => {
+    const service = buildService();
+    const rawBody = Buffer.from('{"event":"payment.captured"}');
+    const signature = createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');
+    expect(service.verifyWebhookSignature(rawBody, signature)).toBe(true);
+  });
+
+  it('rejects a signature computed with the wrong secret (e.g. the payment key secret)', () => {
+    const service = buildService();
+    const rawBody = Buffer.from('{"event":"payment.captured"}');
+    const wrongSignature = createHmac('sha256', KEY_SECRET).update(rawBody).digest('hex');
+    expect(service.verifyWebhookSignature(rawBody, wrongSignature)).toBe(false);
+  });
+
+  it('rejects a signature if even one byte of the body differs', () => {
+    const service = buildService();
+    const rawBody = Buffer.from('{"event":"payment.captured"}');
+    const signature = createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');
+    const tamperedBody = Buffer.from('{"event":"payment.failed"}');
+    expect(service.verifyWebhookSignature(tamperedBody, signature)).toBe(false);
   });
 });

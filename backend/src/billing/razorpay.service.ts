@@ -23,14 +23,19 @@ export class RazorpayService {
     return 'Basic ' + Buffer.from(`${this.keyId}:${keySecret}`).toString('base64');
   }
 
-  /** amountInRupees is a whole-rupee amount (matches PLANS' priceInr fields); Razorpay bills in paise. */
-  async createOrder(amountInRupees: number, receipt: string): Promise<RazorpayOrder> {
+  /**
+   * amountInRupees is a whole-rupee amount (matches PLANS' priceInr fields); Razorpay bills in
+   * paise. `notes` are stored on the order (and copied onto its payment) by Razorpay itself —
+   * the webhook handler reads them back to know which plan/billing cycle to activate without
+   * depending on the browser ever calling back, unlike the checkout/verify confirmation path.
+   */
+  async createOrder(amountInRupees: number, receipt: string, notes?: Record<string, string>): Promise<RazorpayOrder> {
     let res: Response;
     try {
       res = await fetch('https://api.razorpay.com/v1/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: this.authHeader() },
-        body: JSON.stringify({ amount: Math.round(amountInRupees * 100), currency: 'INR', receipt }),
+        body: JSON.stringify({ amount: Math.round(amountInRupees * 100), currency: 'INR', receipt, notes }),
       });
     } catch {
       throw new BadGatewayException('Could not reach Razorpay. Please try again.');
@@ -54,6 +59,20 @@ export class RazorpayService {
   verifyPaymentSignature(orderId: string, paymentId: string, signature: string): boolean {
     const keySecret = this.config.getOrThrow<string>('RAZORPAY_KEY_SECRET');
     const expected = createHmac('sha256', keySecret).update(`${orderId}|${paymentId}`).digest('hex');
+
+    const expectedBuf = Buffer.from(expected);
+    const actualBuf = Buffer.from(signature);
+    if (expectedBuf.length !== actualBuf.length) return false;
+    return timingSafeEqual(expectedBuf, actualBuf);
+  }
+
+  // Razorpay signs webhook deliveries with a SEPARATE secret (configured alongside the webhook
+  // URL in the Razorpay dashboard, not RAZORPAY_KEY_SECRET) as HMAC-SHA256 over the exact raw
+  // request body — must be the untouched bytes Razorpay sent, not JSON.stringify(parsedBody),
+  // which can reorder keys/whitespace and silently produce a different signature.
+  verifyWebhookSignature(rawBody: Buffer, signature: string): boolean {
+    const webhookSecret = this.config.getOrThrow<string>('RAZORPAY_WEBHOOK_SECRET');
+    const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
 
     const expectedBuf = Buffer.from(expected);
     const actualBuf = Buffer.from(signature);

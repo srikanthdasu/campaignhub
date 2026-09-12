@@ -61,4 +61,11 @@ export class SchedulerController {
   publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.schedulerService.markPublished(id, user);
   }
+
+  @Post('scheduled-posts/:id/retry')
+  @UseGuards(RolesGuard)
+  @Roles(...CAN_SCHEDULE)
+  retry(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.schedulerService.retry(id, user);
+  }
 }

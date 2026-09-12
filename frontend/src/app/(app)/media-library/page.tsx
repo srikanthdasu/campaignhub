@@ -16,6 +16,7 @@ import {
   Trash2,
   Copy,
   Check,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { api, ApiError, resolveMediaUrl } from '@/lib/api';
@@ -102,6 +103,8 @@ export default function MediaLibraryPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   function loadAssets(clientId: string) {
     api.get<MediaAsset[]>(`/clients/${clientId}/media`).then(setAssets).catch(() => setAssets([]));
@@ -167,6 +170,7 @@ export default function MediaLibraryPage() {
       setAssets((prev) => prev?.filter((a) => a.id !== id) ?? null);
       setSelectedIds((prev) => prev.filter((x) => x !== id));
       if (activeId === id) setActiveId(null);
+      setConfirmDeleteId(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to delete asset');
     }
@@ -181,6 +185,7 @@ export default function MediaLibraryPage() {
       setAssets((prev) => prev?.filter((a) => !selectedIds.includes(a.id)) ?? null);
       if (activeId && selectedIds.includes(activeId)) setActiveId(null);
       setSelectedIds([]);
+      setConfirmBulkDelete(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to delete selected assets');
     } finally {
@@ -504,14 +509,32 @@ export default function MediaLibraryPage() {
                   </li>
                   {selectedIds.length > 0 && (
                     <li>
+                      {confirmBulkDelete ? (
+                        <span className="flex items-center gap-2">
+                          <button
+                            onClick={onBulkDelete}
+                            disabled={bulkDeleting}
+                            className="font-semibold text-red-400 hover:underline"
+                          >
+                            {bulkDeleting ? 'Deleting…' : `Confirm delete ${selectedIds.length}`}
+                          </button>
+                          <button
+                            onClick={() => setConfirmBulkDelete(false)}
+                            disabled={bulkDeleting}
+                            className="text-neutral-400 hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
                       <button
-                        onClick={onBulkDelete}
-                        disabled={bulkDeleting}
+                        onClick={() => setConfirmBulkDelete(true)}
                         className="flex items-center gap-1 font-medium text-red-400 hover:underline"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        {bulkDeleting ? 'Deleting…' : `Delete ${selectedIds.length} Selected`}
+                        {`Delete ${selectedIds.length} Selected`}
                       </button>
+                      )}
                     </li>
                   )}
                 </ul>
@@ -593,15 +616,41 @@ export default function MediaLibraryPage() {
                             onChange={() => toggleSelected(asset.id)}
                             className="absolute left-2 top-2 h-4 w-4 accent-accent-500"
                           />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(asset.id);
-                            }}
-                            className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />
-                          </button>
+                          {confirmDeleteId === asset.id ? (
+                            <span className="absolute right-2 top-2 flex gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDelete(asset.id);
+                                }}
+                                title="Confirm delete"
+                                className="rounded-lg bg-red-500/90 p-1.5 backdrop-blur-sm"
+                              >
+                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDeleteId(null);
+                                }}
+                                title="Cancel"
+                                className="rounded-lg bg-black/60 p-1.5 backdrop-blur-sm"
+                              >
+                                <X className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(asset.id);
+                              }}
+                              title="Delete"
+                              className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                            </button>
+                          )}
                         </div>
                         <div className="p-2.5">
                           <p className="truncate text-xs font-medium text-neutral-200">{asset.title || asset.fileName}</p>

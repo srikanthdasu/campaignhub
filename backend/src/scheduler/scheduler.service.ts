@@ -6,9 +6,15 @@ import { CreateScheduleDto } from './dto/create-schedule.dto.js';
 import { ContentStatus, Role, ScheduledPostStatus, SocialPlatform } from '../generated/prisma/client.js';
 import { decryptToken } from '../social-accounts/token-crypto.js';
 import { InstagramPublishService, InstagramPublishError } from '../social-accounts/instagram-publish.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER];
+
+// A transient failure (a momentary rate limit, a network blip) deserves a few real attempts —
+// but an endlessly-retryable post masks a genuinely broken one (bad media, revoked token) behind
+// what looks like progress. Past this, the fix is to reschedule with a corrected post.
+const MAX_RETRIES = 3;
 
 @Injectable()
 export class SchedulerService {
@@ -17,6 +23,7 @@ export class SchedulerService {
     private audit: AuditService,
     private config: ConfigService,
     private instagramPublish: InstagramPublishService,
+    private notifications: NotificationsService,
   ) {}
 
   async schedule(clientId: string, contentItemId: string, user: AuthenticatedUser, dto: CreateScheduleDto) {
@@ -136,6 +143,38 @@ export class SchedulerService {
     return updated;
   }
 
+  async retry(id: string, user: AuthenticatedUser) {
+    const post = await this.requireAccess(id, user);
+    if (post.status !== ScheduledPostStatus.FAILED) {
+      throw new BadRequestException('Only failed posts can be retried');
+    }
+    if (post.retryCount >= MAX_RETRIES) {
+      throw new BadRequestException(
+        `This post has already been retried ${MAX_RETRIES} times — reschedule it instead.`,
+      );
+    }
+
+    const claimed = await this.prisma.scheduledPost.updateMany({
+      where: { id, status: ScheduledPostStatus.FAILED },
+      data: { status: ScheduledPostStatus.PENDING, retryCount: { increment: 1 }, errorMessage: null },
+    });
+    if (claimed.count === 0) {
+      throw new BadRequestException('Only failed posts can be retried');
+    }
+
+    const updated = await this.publishPost(post.id, post.contentItemId);
+
+    await this.audit.log({
+      userId: user.sub,
+      action: updated.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
+      entityType: 'scheduled_post',
+      entityId: id,
+      metadata: { retry: true, errorMessage: updated.errorMessage ?? undefined },
+    });
+
+    return updated;
+  }
+
   /** Called by SchedulerCronService — no user in the loop, so no access check or actor on the audit entry. */
   async autoPublishDuePosts() {
     const due = await this.prisma.scheduledPost.findMany({
@@ -170,22 +209,30 @@ export class SchedulerService {
     }
 
     const post = await this.prisma.scheduledPost.findUniqueOrThrow({ where: { id } });
+    let externalPostId: string | null = null;
 
     if (post.platform === SocialPlatform.INSTAGRAM) {
       try {
-        await this.publishToInstagram(contentItemId);
+        externalPostId = await this.publishToInstagram(contentItemId);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to publish to Instagram';
-        return this.prisma.scheduledPost.update({
+        const failed = await this.prisma.scheduledPost.update({
           where: { id },
           data: { status: ScheduledPostStatus.FAILED, errorMessage: message },
         });
+        await this.notifyCreatorOfFailure(contentItemId, message);
+        return failed;
       }
     }
 
     const updated = await this.prisma.scheduledPost.update({
       where: { id },
-      data: { status: ScheduledPostStatus.PUBLISHED, publishedAt: new Date(), errorMessage: null },
+      data: {
+        status: ScheduledPostStatus.PUBLISHED,
+        publishedAt: new Date(),
+        errorMessage: null,
+        externalPostId: externalPostId ?? undefined,
+      },
     });
 
     const remaining = await this.prisma.scheduledPost.count({
@@ -201,7 +248,23 @@ export class SchedulerService {
     return updated;
   }
 
-  private async publishToInstagram(contentItemId: string) {
+  // The one truly async, unattended failure in this whole pipeline (the cron can hit it with
+  // nobody watching) — without this, a failed post was only visible if someone happened to open
+  // the Scheduler page and noticed a red badge.
+  private async notifyCreatorOfFailure(contentItemId: string, errorMessage: string) {
+    const content = await this.prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { createdById: true, client: { select: { name: true } } },
+    });
+    if (!content?.createdById) return;
+    await this.notifications.create(
+      content.createdById,
+      `A scheduled post for ${content.client.name} failed to publish: ${errorMessage}`,
+      '/scheduler',
+    );
+  }
+
+  private async publishToInstagram(contentItemId: string): Promise<string> {
     const content = await this.prisma.contentItem.findUniqueOrThrow({
       where: { id: contentItemId },
       include: { mediaAsset: true },
@@ -232,7 +295,7 @@ export class SchedulerService {
     const encryptionKey = this.config.getOrThrow<string>('TOKEN_ENCRYPTION_KEY');
     const accessToken = decryptToken(account.accessTokenEncrypted, encryptionKey);
 
-    await this.instagramPublish.publishImage(
+    return this.instagramPublish.publishImage(
       account.externalAccountId,
       accessToken,
       content.mediaAsset.storageUrl,

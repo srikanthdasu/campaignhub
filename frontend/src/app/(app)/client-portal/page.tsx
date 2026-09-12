@@ -15,7 +15,7 @@ import { ArrowRight } from 'lucide-react';
 
 interface Agency {
   name: string;
-  plan: string;
+  plan: string | null;
   subscriptionStatus: string;
 }
 
@@ -78,7 +78,7 @@ export default function ClientPortalPage() {
                 <p className="text-sm text-neutral-400">
                   Managed by <span className="text-neutral-200">{agency.name}</span>
                 </p>
-                <Badge tone="accent">{agency.plan} plan</Badge>
+                <Badge tone="accent">{agency.plan ? `${agency.plan} plan` : agency.subscriptionStatus}</Badge>
               </Card>
             </motion.div>
           )}
