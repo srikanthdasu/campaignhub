@@ -19,7 +19,9 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        # --legacy-peer-deps: @nestjs/throttler hasn't published a peer range covering
+        # @nestjs/core ^12 yet, even though it works fine at runtime against it.
+        run: npm ci --legacy-peer-deps
 
       - name: Generate Prisma client
         working-directory: backend
