@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AiVideoStudioService } from './ai-video-studio.service.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
@@ -11,6 +12,7 @@ import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Role } from '../generated/prisma/client.js';
+import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
@@ -40,6 +42,7 @@ export class AiVideoStudioController {
     return this.aiVideoStudioService.getOne(clientId, id);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post(':id/script')
   @Roles(...CAN_CREATE)
   generateScript(
@@ -80,6 +83,7 @@ export class AiVideoStudioController {
     return this.aiVideoStudioService.updateEnhancements(clientId, id, dto);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post(':id/render')
   @Roles(...CAN_CREATE)
   render(

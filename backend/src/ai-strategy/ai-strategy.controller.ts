@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AiStrategyService } from './ai-strategy.service.js';
 import { CreateStrategyDto } from './dto/create-strategy.dto.js';
 import { ReviewStrategyDto } from './dto/review-strategy.dto.js';
@@ -8,6 +9,7 @@ import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Role } from '../generated/prisma/client.js';
+import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
@@ -39,6 +41,7 @@ export class AiStrategyController {
     return this.aiStrategyService.getOne(clientId, id);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post(':id/generate')
   @Roles(...CAN_CREATE)
   generate(

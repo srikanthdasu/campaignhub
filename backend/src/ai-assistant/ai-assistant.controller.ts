@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AiAssistantService } from './ai-assistant.service.js';
 import { CreateConversationDto } from './dto/create-conversation.dto.js';
 import { AskDto } from './dto/ask.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 @Controller('clients/:clientId/ai-assistant/conversations')
@@ -30,6 +32,7 @@ export class AiAssistantController {
     return this.aiAssistantService.getConversation(clientId, id);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post(':id/messages')
   ask(
     @Param('clientId') clientId: string,

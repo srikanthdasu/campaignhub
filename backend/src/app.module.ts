@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -27,11 +28,15 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
+import { validateEnv } from './config/validate-env.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
+    // App-wide default of 60 requests/minute per IP; individual routes tighten this further
+    // with @Throttle() (see common/rate-limits.ts) for brute-forceable or billable AI endpoints.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -57,6 +62,9 @@ import { AppController } from './app.controller.js';
     DashboardModule,
   ],
   controllers: [AppController],
-  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

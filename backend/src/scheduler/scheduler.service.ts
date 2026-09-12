@@ -156,6 +156,19 @@ export class SchedulerService {
   }
 
   private async publishPost(id: string, contentItemId: string) {
+    // Atomically claim the row before doing anything external. Without this, two overlapping
+    // cron ticks (or a cron tick racing a manual "Publish Now" click) could both read the same
+    // PENDING row and both call the real Instagram API for it — an actual duplicate post, not
+    // just a duplicate DB write. The `where: { status: PENDING }` makes this a no-op for every
+    // caller except whichever one wins the race.
+    const claim = await this.prisma.scheduledPost.updateMany({
+      where: { id, status: ScheduledPostStatus.PENDING },
+      data: { status: ScheduledPostStatus.PUBLISHING },
+    });
+    if (claim.count === 0) {
+      return this.prisma.scheduledPost.findUniqueOrThrow({ where: { id } });
+    }
+
     const post = await this.prisma.scheduledPost.findUniqueOrThrow({ where: { id } });
 
     if (post.platform === SocialPlatform.INSTAGRAM) {

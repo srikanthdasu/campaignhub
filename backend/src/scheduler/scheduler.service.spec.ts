@@ -19,6 +19,7 @@ function buildService(overrides: { count?: number } = {}) {
       findUniqueOrThrow: vi.fn((args: { where: { id: string } }) =>
         Promise.resolve({ id: args.where.id, platform: SocialPlatform.FACEBOOK }),
       ),
+      updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
       update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, errorMessage: null })),
       count: vi.fn(() => Promise.resolve(overrides.count ?? 0)),
     },
@@ -75,12 +76,35 @@ describe('SchedulerService.autoPublishDuePosts', () => {
     expect(prisma.contentItem.update).not.toHaveBeenCalled();
   });
 
+  it('atomically claims a post before publishing it (PENDING -> PUBLISHING)', async () => {
+    const { service, prisma } = buildService();
+
+    await service.autoPublishDuePosts();
+
+    expect(prisma.scheduledPost.updateMany).toHaveBeenCalledWith({
+      where: { id: 'post-1', status: ScheduledPostStatus.PENDING },
+      data: { status: ScheduledPostStatus.PUBLISHING },
+    });
+  });
+
+  it('skips a post outright if another process already claimed it (lost the race)', async () => {
+    const { service, prisma } = buildService();
+    prisma.scheduledPost.updateMany = vi.fn(() => Promise.resolve({ count: 0 }));
+
+    await service.autoPublishDuePosts();
+
+    // Never re-reads the row for a decision, never calls the real Instagram API, and never
+    // writes a final PUBLISHED/FAILED status — the process that won the claim owns that.
+    expect(prisma.scheduledPost.update).not.toHaveBeenCalled();
+  });
+
   it('does nothing when no posts are due', async () => {
     const audit = { log: vi.fn() };
     const prisma = {
       scheduledPost: {
         findMany: vi.fn(() => Promise.resolve([])),
         findUniqueOrThrow: vi.fn(),
+        updateMany: vi.fn(),
         update: vi.fn(),
         count: vi.fn(),
       },

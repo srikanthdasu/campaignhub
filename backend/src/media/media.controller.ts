@@ -13,12 +13,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { MediaService } from './media.service.js';
 import { UpdateMediaDto } from './dto/update-media.dto.js';
 import { GenerateImageDto } from './dto/generate-image.dto.js';
 import { mediaMulterStorage, mediaMulterFileFilter } from './media-storage.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -47,6 +49,7 @@ export class MediaController {
     return this.mediaService.recordUpload(clientId, user.sub, file, folder, campaignId);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post('generate-image')
   generateImage(
     @Param('clientId') clientId: string,
