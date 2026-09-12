@@ -341,7 +341,7 @@ export default function AiImageStudioPage() {
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={resolveMediaUrl(asset.storageUrl)} alt="" className="aspect-square w-full object-cover" />
+                      <img src={resolveMediaUrl(asset.storageUrl)} alt={asset.prompt ?? 'AI-generated image'} className="aspect-square w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -357,7 +357,7 @@ export default function AiImageStudioPage() {
                 <div className="flex items-center gap-3">
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={resolveMediaUrl(selectedAsset.storageUrl)} alt="" className="h-full w-full object-cover" />
+                    <img src={resolveMediaUrl(selectedAsset.storageUrl)} alt={selectedAsset.prompt ?? 'Selected AI-generated image'} className="h-full w-full object-cover" />
                   </div>
                   <div className="flex flex-1 flex-wrap gap-2">
                     <a
@@ -414,7 +414,7 @@ export default function AiImageStudioPage() {
                           }`}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={resolveMediaUrl(asset.storageUrl)} alt="" className="h-full w-full object-cover" />
+                          <img src={resolveMediaUrl(asset.storageUrl)} alt={asset.prompt ?? 'AI-generated image'} className="h-full w-full object-cover" />
                           <span
                             onClick={(e) => {
                               e.stopPropagation();

@@ -30,12 +30,36 @@ export async function createApp(): Promise<NestExpressApplication> {
 
   // crossOriginResourcePolicy relaxed so the frontend (a different origin in local dev) can
   // render uploaded media via <img>/<video> src — CORS below still governs actual API calls.
-  // CSP disabled: helmet's default script-src 'self' blocks Next.js's required inline hydration
-  // scripts, which broke the combined server's frontend in production (React error #412 — found
-  // via real browser console, not curl, which doesn't execute JS or enforce CSP at all). This
-  // API never served HTML/inline scripts before the combined server existed, so CSP was doing
-  // nothing for it either way; it only ever mattered once we started serving the frontend too.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+  //
+  // CSP: helmet's *default* script-src ('self' only, no 'unsafe-inline') is what broke the
+  // combined server's frontend before (React error #412 — Next.js's own hydration bootstrap is
+  // an inline script, which a bare 'self' policy blocks). This isn't Next's documented
+  // nonce-based CSP pattern (that needs per-request middleware this app doesn't have yet) — it's
+  // a deliberately permissive script-src/style-src that only re-adds the protection CSP is
+  // actually for here: blocking a script/style tag pointed at an attacker-controlled external
+  // domain. That was the gap with CSP off entirely, and this closes it without touching how
+  // Next.js hydrates. Verified locally against the built combined server (backend/dist +
+  // frontend build-output), not just typechecked, given this exact configuration broke
+  // production once already.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          fontSrc: ["'self'", 'data:'],
+          connectSrc: ["'self'"],
+          mediaSrc: ["'self'", 'blob:'],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+    }),
+  );
   app.use(cookieParser());
   app.enableCors({
     origin: config.get<string>('CORS_ORIGIN', 'http://localhost:3000'),

@@ -30,6 +30,7 @@ export class ContentService {
         body: dto.body,
         platforms: dto.platforms ?? [],
         mediaAssetId: dto.mediaAssetId,
+        aiGenerated: dto.aiGenerated ?? false,
         createdById: user.sub,
       },
     });

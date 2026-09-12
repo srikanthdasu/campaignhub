@@ -114,18 +114,30 @@ export class ClientsService {
     const cutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000);
     const due = await this.prisma.client.findMany({
       where: { deletedAt: { lt: cutoff } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, agencyId: true },
     });
     if (due.length === 0) return 0;
 
     await this.prisma.client.deleteMany({ where: { id: { in: due.map((c) => c.id) } } });
 
-    await this.audit.log({
-      action: 'CLIENT_PURGED',
-      entityType: 'client',
-      entityId: due.map((c) => c.id).join(','),
-      metadata: { count: due.length, names: due.map((c) => c.name) },
-    });
+    // One audit entry per agency, not one entry for the whole cron batch — a single run can
+    // purge clients across many different agencies, and a shared entityId/agencyId across those
+    // would misattribute the purge to whichever agency happened to be read first.
+    const byAgency = new Map<string, { id: string; name: string }[]>();
+    for (const client of due) {
+      const list = byAgency.get(client.agencyId) ?? [];
+      list.push({ id: client.id, name: client.name });
+      byAgency.set(client.agencyId, list);
+    }
+    for (const [agencyId, clients] of byAgency) {
+      await this.audit.log({
+        agencyId,
+        action: 'CLIENT_PURGED',
+        entityType: 'client',
+        entityId: clients.map((c) => c.id).join(','),
+        metadata: { count: clients.length, names: clients.map((c) => c.name) },
+      });
+    }
 
     return due.length;
   }

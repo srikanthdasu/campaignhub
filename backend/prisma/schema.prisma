@@ -36,6 +36,7 @@ model Agency {
   users   User[]
   subscription Subscription?
   invoices     Invoice[]
+  auditLogs    AuditLog[]
 
   @@map("agencies")
 }
@@ -142,6 +143,7 @@ model UserClientAccess {
   role     ClientGroupRole @default(VIEWER)
 
   @@id([userId, clientId])
+  @@index([clientId])
   @@map("user_client_access")
 }
 
@@ -163,6 +165,12 @@ model AuditLog {
   id         String   @id @default(uuid()) @db.Uuid
   userId     String?  @map("user_id") @db.Uuid
   user       User?    @relation(fields: [userId], references: [id])
+  // Denormalized rather than derived by joining through `user` — the join misses any entry
+  // where userId is null (unattended cron/webhook actions), and every audit query needing "which
+  // agency" is now index-backed instead of walking through User. Written once at insert time by
+  // AuditService.log() (auto-derived from userId when not passed explicitly), never updated.
+  agencyId   String?  @map("agency_id") @db.Uuid
+  agency     Agency?  @relation(fields: [agencyId], references: [id])
   action     String
   entityType String?  @map("entity_type")
   entityId   String?  @map("entity_id") @db.Uuid
@@ -170,7 +178,9 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([userId])
+  @@index([agencyId])
   @@index([entityType, entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -231,6 +241,7 @@ model Campaign {
   mediaAssets  MediaAsset[]
 
   @@index([clientId])
+  @@index([status])
   @@map("campaigns")
 }
 
@@ -322,6 +333,7 @@ model ContentItem {
 
   @@index([clientId])
   @@index([campaignId])
+  @@index([status])
   @@map("content_items")
 }
 
@@ -353,6 +365,7 @@ model ApprovalFlow {
 
   steps ApprovalStep[]
 
+  @@index([status])
   @@map("approval_flows")
 }
 
@@ -375,6 +388,7 @@ model ApprovalStep {
   decidedAt      DateTime?        @map("decided_at")
 
   @@index([approvalFlowId])
+  @@index([approverId])
   @@map("approval_steps")
 }
 
@@ -416,6 +430,7 @@ model InboxMessage {
   receivedAt      DateTime       @default(now()) @map("received_at")
 
   @@index([clientId])
+  @@index([clientId, isRead])
   @@map("inbox_messages")
 }
 
@@ -446,6 +461,10 @@ model ScheduledPost {
 
   @@index([contentItemId])
   @@index([scheduledTime])
+  // Matches the publish worker's actual query shape (autoPublishDuePosts: status = PENDING AND
+  // scheduledTime <= now) — the bare [scheduledTime] index above doesn't help that query once
+  // most rows are PUBLISHED/FAILED, since Postgres still has to filter status row-by-row.
+  @@index([status, scheduledTime])
   @@map("scheduled_posts")
 }
 
@@ -577,8 +596,25 @@ model AiStrategyRequest {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
+  generations AiStrategyGeneration[]
+
   @@index([clientId])
   @@map("ai_strategy_requests")
+}
+
+// Every generate() call appends here instead of only overwriting AiStrategyRequest.output —
+// regenerating a strategy used to silently discard whatever was there before. `output`/`status`
+// on the parent request still track the latest generation for existing callers/UI that just want
+// "the current strategy text"; this is what lets a past version be recovered instead of lost.
+model AiStrategyGeneration {
+  id        String            @id @default(uuid()) @db.Uuid
+  requestId String            @map("request_id") @db.Uuid
+  request   AiStrategyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  output    String
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId])
+  @@map("ai_strategy_generations")
 }
 
 // --- Phase 5 — Campaigns & Ads ------------------------------------------
@@ -632,6 +668,7 @@ model AdCampaign {
 
   @@index([clientId])
   @@index([campaignId])
+  @@index([status])
   @@map("ad_campaigns")
 }
 
@@ -651,6 +688,7 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
+  @@index([userId, isRead])
   @@map("notifications")
 }
 
@@ -688,6 +726,7 @@ model Subscription {
 
   invoices Invoice[]
 
+  @@index([status])
   @@map("subscriptions")
 }
 
@@ -711,5 +750,6 @@ model Invoice {
   issuedAt       DateTime      @default(now()) @map("issued_at")
 
   @@index([agencyId])
+  @@index([status])
   @@map("invoices")
 }

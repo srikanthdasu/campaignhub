@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import { RequireRole } from '@/components/require-role';
+import { Role } from '@/lib/roles';
 import { Check } from 'lucide-react';
 
 declare global {
@@ -85,6 +87,14 @@ const STATUS_TONE: Record<SubStatus, 'neutral' | 'accent' | 'success' | 'warning
 const VIEW_ROLES = ['OWNER', 'ADMIN'];
 
 export default function BillingPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN']}>
+      <BillingPageContent />
+    </RequireRole>
+  );
+}
+
+function BillingPageContent() {
   const { user } = useAuth();
   const canView = !!user && VIEW_ROLES.includes(user.role);
   const canManage = user?.role === 'OWNER';

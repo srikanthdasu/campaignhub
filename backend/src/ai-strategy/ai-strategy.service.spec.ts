@@ -21,6 +21,10 @@ function buildService(overrides: { request?: any; reply?: string } = {}) {
       update: vi.fn((args: any) => Promise.resolve({ ...request, ...args.data })),
       delete: vi.fn(() => Promise.resolve({})),
     },
+    aiStrategyGeneration: {
+      create: vi.fn((args: any) => Promise.resolve({ id: 'gen-1', ...args.data })),
+    },
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
   const foundry = { chat: vi.fn(() => Promise.resolve(overrides.reply ?? 'Objective: grow reach.\n1. Do X.')) };
   const service = new AiStrategyService(
@@ -36,6 +40,17 @@ describe('AiStrategyService', () => {
     const { service } = buildService({ request: { id: 'req-1', clientId: 'other-client' } });
     await expect(service.getOne('client-1', 'req-1')).rejects.toThrow(
       'Strategy request not found for this client',
+    );
+  });
+
+  it('getOne includes the full generation history, most recent first', async () => {
+    const { service, prisma } = buildService();
+    await service.getOne('client-1', 'req-1');
+    expect(prisma.aiStrategyRequest.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'req-1' },
+        include: { generations: { orderBy: { createdAt: 'desc' } } },
+      }),
     );
   });
 
@@ -69,6 +84,17 @@ describe('AiStrategyService', () => {
       expect(prisma.aiStrategyRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: AiStrategyStatus.GENERATED }) }),
       );
+    });
+
+    it('appends a generation history row instead of only overwriting output', async () => {
+      const { service, prisma } = buildService({ reply: 'Objective: grow reach.\n1. Post daily.' });
+      await service.generate('client-1', 'req-1', 'actor-1');
+      expect(prisma.aiStrategyGeneration.create).toHaveBeenCalledWith({
+        data: { requestId: 'req-1', output: 'Objective: grow reach.\n1. Post daily.' },
+      });
+      // Both writes happen atomically in one transaction, not as two independent calls that
+      // could leave output/status and the history row inconsistent if one failed.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('passes the title, goal, and context note through to the prompt', async () => {

@@ -57,6 +57,7 @@ interface ContentItem {
   platforms: string[];
   status: keyof typeof STATUS_TONE;
   createdAt: string;
+  aiGenerated: boolean;
   mediaAsset: { id: string; fileName: string } | null;
 }
 
@@ -114,6 +115,9 @@ export default function ContentPlannerPage() {
   const [mediaAssetId, setMediaAssetId] = useState<string>('');
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [campaignId, setCampaignId] = useState<string>('');
+  // True once an AI caption or AI-generated image has been pulled into this draft — cleared after
+  // each successful create so the next draft starts un-attributed until AI is used again.
+  const [aiGenerated, setAiGenerated] = useState(false);
 
   const [aiTopic, setAiTopic] = useState('');
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
@@ -196,6 +200,7 @@ export default function ContentPlannerPage() {
     setBody(variant.text);
     setHashtags(variant.hashtags.join(' '));
     setCaptionVariants(null);
+    setAiGenerated(true);
   }
 
   async function onGenerateImage() {
@@ -208,6 +213,7 @@ export default function ContentPlannerPage() {
       });
       setMediaAssets((prev) => [asset, ...prev]);
       setMediaAssetId(asset.id);
+      setAiGenerated(true);
       setAiImagePrompt('');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to generate image');
@@ -229,6 +235,7 @@ export default function ContentPlannerPage() {
         platforms,
         mediaAssetId: mediaAssetId || undefined,
         campaignId: campaignId || undefined,
+        aiGenerated,
       });
       setBody('');
       setHashtags('');
@@ -236,6 +243,7 @@ export default function ContentPlannerPage() {
       setPlatforms([]);
       setMediaAssetId('');
       setCampaignId('');
+      setAiGenerated(false);
       loadItems(selectedClientId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create content');
@@ -514,7 +522,17 @@ export default function ContentPlannerPage() {
                 <div className="max-h-52 space-y-2 overflow-y-auto">
                   {approved.map((item) => (
                     <div key={item.id} className="rounded-lg border border-white/10 px-2.5 py-2 text-[11px]">
-                      <p className="truncate text-neutral-300">{item.body || item.type}</p>
+                      <p className="truncate text-neutral-300">
+                        {item.aiGenerated && (
+                          <span
+                            className="mr-1.5 rounded border border-accent-400/30 bg-accent-500/10 px-1 py-0.5 text-[9px] font-medium text-accent-300"
+                            title="Created from an AI caption or image"
+                          >
+                            AI
+                          </span>
+                        )}
+                        {item.body || item.type}
+                      </p>
                       {schedulingId === item.id ? (
                         <div className="mt-1.5 flex items-end gap-1.5">
                           <input
@@ -562,7 +580,17 @@ export default function ContentPlannerPage() {
                 <div className="mt-3 max-h-40 space-y-2 overflow-y-auto border-t border-white/10 pt-3">
                   {drafts.map((item) => (
                     <div key={item.id} className="rounded-lg border border-white/10 px-2.5 py-2 text-[11px]">
-                      <p className="truncate text-neutral-300">{item.body || item.type}</p>
+                      <p className="truncate text-neutral-300">
+                        {item.aiGenerated && (
+                          <span
+                            className="mr-1.5 rounded border border-accent-400/30 bg-accent-500/10 px-1 py-0.5 text-[9px] font-medium text-accent-300"
+                            title="Created from an AI caption or image"
+                          >
+                            AI
+                          </span>
+                        )}
+                        {item.body || item.type}
+                      </p>
                       {submittingId === item.id ? (
                         <div className="mt-1.5 space-y-1.5">
                           <div className="flex flex-wrap gap-1">

@@ -183,7 +183,12 @@ export class SchedulerService {
 
     for (const post of due) {
       const result = await this.publishPost(post.id, post.contentItemId);
+      const content = await this.prisma.contentItem.findUnique({
+        where: { id: post.contentItemId },
+        select: { client: { select: { agencyId: true } } },
+      });
       await this.audit.log({
+        agencyId: content?.client.agencyId,
         action: result.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
         entityType: 'scheduled_post',
         entityId: post.id,

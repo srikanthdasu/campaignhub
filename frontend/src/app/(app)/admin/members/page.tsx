@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import { RequireRole } from '@/components/require-role';
 import { Users, UserPlus, Building2, UserX, BarChart3, type LucideIcon } from 'lucide-react';
 
 const CLIENT_GROUP_ROLES = ['MANAGER', 'APPROVER', 'VIEWER'] as const;
@@ -65,6 +66,14 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 }
 
 export default function MembersAdminPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN']}>
+      <MembersAdminPageContent />
+    </RequireRole>
+  );
+}
+
+function MembersAdminPageContent() {
   const { user: currentUser } = useAuth();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [overview, setOverview] = useState<AccessOverview | null>(null);

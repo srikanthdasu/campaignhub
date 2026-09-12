@@ -40,7 +40,11 @@ export class AiStrategyService {
   }
 
   async getOne(clientId: string, id: string) {
-    return this.requireInClient(id, clientId);
+    await this.requireInClient(id, clientId);
+    return this.prisma.aiStrategyRequest.findUnique({
+      where: { id },
+      include: { generations: { orderBy: { createdAt: 'desc' } } },
+    });
   }
 
   async generate(clientId: string, id: string, actorId: string) {
@@ -71,10 +75,13 @@ export class AiStrategyService {
       { maxTokens: 500, temperature: 0.6 },
     );
 
-    const updated = await this.prisma.aiStrategyRequest.update({
-      where: { id },
-      data: { output, status: AiStrategyStatus.GENERATED },
-    });
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.aiStrategyRequest.update({
+        where: { id },
+        data: { output, status: AiStrategyStatus.GENERATED },
+      }),
+      this.prisma.aiStrategyGeneration.create({ data: { requestId: id, output } }),
+    ]);
 
     await this.audit.log({
       userId: actorId,

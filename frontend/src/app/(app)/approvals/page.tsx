@@ -320,7 +320,7 @@ export default function ApprovalsPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={resolveMediaUrl(active.contentItem.mediaAsset.storageUrl)}
-                      alt=""
+                      alt={active.contentItem.mediaAsset.fileName}
                       className="h-full w-full object-cover"
                     />
                   </div>

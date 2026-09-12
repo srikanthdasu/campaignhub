@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import { RequireRole } from '@/components/require-role';
 
 interface Agency {
   id: string;
@@ -21,6 +22,14 @@ interface Agency {
 }
 
 export default function SettingsPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN']}>
+      <SettingsPageContent />
+    </RequireRole>
+  );
+}
+
+function SettingsPageContent() {
   const { user } = useAuth();
   const admin = isAgencyAdmin(user?.role as Role | undefined);
 

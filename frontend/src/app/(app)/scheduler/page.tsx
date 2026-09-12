@@ -491,7 +491,7 @@ function SchedulerWorkspace({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={selectedItem.mediaAsset.storageUrl}
-                        alt=""
+                        alt={selectedItem.mediaAsset.fileName}
                         className="mb-1.5 h-20 w-full rounded object-cover"
                       />
                     )}

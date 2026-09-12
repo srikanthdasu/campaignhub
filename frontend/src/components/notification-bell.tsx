@@ -70,6 +70,7 @@ export function NotificationBell() {
     <div ref={containerRef} className="relative">
       <button
         onClick={toggleOpen}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         className="relative flex h-9 w-9 items-center justify-center rounded-xl text-neutral-300 hover:bg-white/[0.06]"
       >
         <Bell className="h-4.5 w-4.5" strokeWidth={2} />

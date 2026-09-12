@@ -354,7 +354,7 @@ export default function MediaLibraryPage() {
                     <div className="h-20 overflow-hidden rounded-lg bg-white/[0.03]">
                       {active.type === 'IMAGE' || active.type === 'GIF' ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={resolveMediaUrl(active.storageUrl)} alt="" className="h-full w-full object-cover" />
+                        <img src={resolveMediaUrl(active.storageUrl)} alt={active.title || active.fileName} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-neutral-500">{active.type}</div>
                       )}
@@ -551,7 +551,7 @@ export default function MediaLibraryPage() {
                         <div className="h-8 w-8 shrink-0 overflow-hidden rounded bg-white/[0.03]">
                           {a.type === 'IMAGE' || a.type === 'GIF' ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={resolveMediaUrl(a.storageUrl)} alt="" className="h-full w-full object-cover" />
+                            <img src={resolveMediaUrl(a.storageUrl)} alt={a.title || a.fileName} className="h-full w-full object-cover" />
                           ) : null}
                         </div>
                         <span className="truncate text-neutral-300">{a.title || a.fileName}</span>
@@ -624,6 +624,7 @@ export default function MediaLibraryPage() {
                                   onDelete(asset.id);
                                 }}
                                 title="Confirm delete"
+                                aria-label={`Confirm delete ${asset.title || asset.fileName}`}
                                 className="rounded-lg bg-red-500/90 p-1.5 backdrop-blur-sm"
                               >
                                 <Check className="h-3.5 w-3.5 text-white" strokeWidth={2} />
@@ -634,6 +635,7 @@ export default function MediaLibraryPage() {
                                   setConfirmDeleteId(null);
                                 }}
                                 title="Cancel"
+                                aria-label="Cancel delete"
                                 className="rounded-lg bg-black/60 p-1.5 backdrop-blur-sm"
                               >
                                 <X className="h-3.5 w-3.5 text-white" strokeWidth={2} />
@@ -646,6 +648,7 @@ export default function MediaLibraryPage() {
                                 setConfirmDeleteId(asset.id);
                               }}
                               title="Delete"
+                              aria-label={`Delete ${asset.title || asset.fileName}`}
                               className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />

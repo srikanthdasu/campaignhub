@@ -323,7 +323,7 @@ function CampaignsWorkspace({ clientId }: { clientId: string }) {
                       </button>
                     </span>
                   ) : (
-                    <button onClick={() => setConfirmDeleteId(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100" title="Delete campaign">
+                    <button onClick={() => setConfirmDeleteId(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100" title="Delete campaign" aria-label={`Delete ${c.name}`}>
                       <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
                     </button>
                   )}

@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import { RequireRole } from '@/components/require-role';
+import { Role } from '@/lib/roles';
 
 interface AuditEntry {
   id: string;
@@ -26,6 +28,14 @@ const ACTION_TONE: Record<string, 'accent' | 'success' | 'warning' | 'danger' | 
 };
 
 export default function AuditLogPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN']}>
+      <AuditLogPageContent />
+    </RequireRole>
+  );
+}
+
+function AuditLogPageContent() {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 

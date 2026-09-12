@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
+import { RequireRole } from '@/components/require-role';
 import {
   LayoutList,
   UserPlus,
@@ -161,6 +162,14 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 }
 
 export default function AgencyAdminPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN']}>
+      <AgencyAdminPageContent />
+    </RequireRole>
+  );
+}
+
+function AgencyAdminPageContent() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [search, setSearch] = useState('');
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
@@ -569,6 +578,7 @@ export default function AgencyAdminPage() {
                       onClick={() => setConfirmDeleteId(c.id)}
                       className="shrink-0 opacity-0 group-hover:opacity-100"
                       title="Delete client"
+                      aria-label={`Delete ${c.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
                     </button>

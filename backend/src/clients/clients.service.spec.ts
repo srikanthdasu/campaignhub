@@ -104,14 +104,34 @@ describe('ClientsService', () => {
 
     it('purges only clients past the grace period and audits the batch', async () => {
       const { service, prisma, audit } = buildService();
-      prisma.client.findMany.mockResolvedValueOnce([{ id: 'client-1', name: 'Old Co' }] as never);
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-1', name: 'Old Co', agencyId: 'agency-1' },
+      ] as never);
       const count = await service.purgeExpired(15);
       expect(prisma.client.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { deletedAt: { lt: expect.any(Date) } } }),
       );
       expect(prisma.client.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['client-1'] } } });
-      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLIENT_PURGED' }));
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'CLIENT_PURGED', agencyId: 'agency-1' }),
+      );
       expect(count).toBe(1);
+    });
+
+    it('writes one audit entry per agency when a batch spans multiple agencies', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-1', name: 'Old Co', agencyId: 'agency-1' },
+        { id: 'client-2', name: 'Older Co', agencyId: 'agency-2' },
+      ] as never);
+      await service.purgeExpired(15);
+      expect(audit.log).toHaveBeenCalledTimes(2);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ agencyId: 'agency-1', entityId: 'client-1' }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ agencyId: 'agency-2', entityId: 'client-2' }),
+      );
     });
 
     it('skips the delete and audit call when nothing is due for purge', async () => {
