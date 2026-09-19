@@ -19,6 +19,7 @@ import { UpdateMediaDto } from './dto/update-media.dto.js';
 import { GenerateImageDto } from './dto/generate-image.dto.js';
 import { mediaMulterStorage, mediaMulterFileFilter } from './media-storage.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
+import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
@@ -31,6 +32,7 @@ export class MediaController {
   constructor(private mediaService: MediaService) {}
 
   @Post()
+  @UseGuards(ClientContentCreationGuard)
   @UseInterceptors(
     FileInterceptor('file', { storage: mediaMulterStorage, fileFilter: mediaMulterFileFilter }),
   )
@@ -50,6 +52,7 @@ export class MediaController {
   }
 
   @Throttle(AI_GENERATION_THROTTLE)
+  @UseGuards(ClientContentCreationGuard)
   @Post('generate-image')
   generateImage(
     @Param('clientId') clientId: string,

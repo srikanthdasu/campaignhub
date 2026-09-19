@@ -72,6 +72,11 @@ model Client {
   currency     String?
   defaultLanguage String?   @map("default_language")
   allowClientPortalAccess Boolean @default(true) @map("allow_client_portal_access")
+  // Off by default — a client can only create/submit content (Content Planner, AI Captions/
+  // Image/Assistant/Video Studio) once an agency admin explicitly opts them in. Agency-created
+  // content still flows through the client for approval either way; this only controls whether
+  // the client can also be the one drafting it (2026-09-19 decision, see plan doc).
+  allowClientContentCreation Boolean @default(false) @map("allow_client_content_creation")
   notes        String?
   plan         ClientPlan   @default(BASIC)
   status       ClientStatus @default(ACTIVE)
@@ -556,6 +561,7 @@ model AiVideoProject {
   enhancements Json?
   step         AiVideoStep @default(IDEA)
   previewUrl   String?     @map("preview_url")
+  videoUrl     String?     @map("video_url")
   exportFormat String?     @map("export_format")
   publishedAt  DateTime?   @map("published_at")
   createdById  String?     @map("created_by") @db.Uuid

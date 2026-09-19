@@ -118,7 +118,28 @@ export class ContentService {
       throw new BadRequestException('Only draft or changes-requested content can be submitted');
     }
 
+    if (user.role === Role.CLIENT) {
+      await this.assertApproversAreAgencyStaff(dto.approverIds, user);
+    }
+
     return this.approvals.createFlowForContent(id, user.sub, dto.approverIds, dto.mode, dto.dueDate);
+  }
+
+  // A client can never name themselves — or another client — as the approver of their own
+  // content: the agency is the point of contact if something wrong goes out, so the approver
+  // has to be agency staff. Server-side, not just a UI convention (mirrors the equally-real rule
+  // in ApprovalsService.decide() that nobody can approve content they created).
+  private async assertApproversAreAgencyStaff(approverIds: string[], user: AuthenticatedUser) {
+    if (approverIds.includes(user.sub)) {
+      throw new ForbiddenException('You cannot name yourself as the approver of your own content');
+    }
+    const approvers = await this.prisma.user.findMany({
+      where: { id: { in: approverIds }, agencyId: user.agencyId! },
+      select: { id: true, role: true },
+    });
+    if (approvers.length !== approverIds.length || approvers.some((a) => a.role === Role.CLIENT)) {
+      throw new ForbiddenException('Approvers must be agency staff, not client-portal users');
+    }
   }
 
   private assertCanEdit(item: { createdById: string | null }, user: AuthenticatedUser) {

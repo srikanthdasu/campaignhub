@@ -4,16 +4,17 @@ import { CreateContentDto } from './dto/create-content.dto.js';
 import { UpdateContentDto } from './dto/update-content.dto.js';
 import { SubmitContentDto } from './dto/submit-content.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
+import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { ContentStatus, Role } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
-const CAN_CREATE_CONTENT = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
+const CAN_CREATE_CONTENT = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER, Role.CLIENT];
 
 @Controller('clients/:clientId/content')
-@UseGuards(ClientAccessGuard, RolesGuard)
+@UseGuards(ClientAccessGuard, RolesGuard, ClientContentCreationGuard)
 export class ContentController {
   constructor(private contentService: ContentService) {}
 

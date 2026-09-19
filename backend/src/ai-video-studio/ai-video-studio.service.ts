@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { VideoGenerationService } from '../ai-common/video-generation.service.js';
 import { parseModelJson } from '../ai-common/parse-model-json.js';
 import { BlobStorageService } from '../media/blob-storage.service.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
@@ -13,11 +14,11 @@ import { ExportVideoDto } from './dto/export-video.dto.js';
 import { AiVideoStep } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
-// No Google Cloud / Vertex AI credentials are configured (spec itself notes the Veo provider
-// choice is undecided pending GCP credit confirmation), so "export" produces a placeholder
-// instead of a real video file. Script generation and the render preview image both call real
-// models (Azure AI Foundry); storyboard/asset selection/enhancements are user-driven, not
-// AI-generated, so there's nothing to simulate there either way.
+// Script generation and the render preview image call Azure AI Foundry (chat, MAI-Image); the
+// export video calls Kling 3.0 via Magic Hour instead of Azure Sora — Azure's sora-2 deployment
+// shuts down 2026-09-24 with no successor, and Kling independently tests ahead on facial
+// realism, which was the deciding requirement. No simulated output remains anywhere in this
+// flow. Storyboard/asset selection/enhancements stay user-driven, not AI-generated, by design.
 
 interface ScriptScene {
   title: string;
@@ -49,6 +50,7 @@ export class AiVideoStudioService {
     private prisma: PrismaService,
     private audit: AuditService,
     private foundry: AzureAiFoundryService,
+    private videoGen: VideoGenerationService,
     private blobStorage: BlobStorageService,
   ) {}
 
@@ -172,17 +174,35 @@ export class AiVideoStudioService {
   }
 
   async export(clientId: string, id: string, actorId: string, dto: ExportVideoDto) {
-    await this.requireInClient(id, clientId);
+    const existing = await this.requireInClient(id, clientId);
+    const scenes = (existing.scenes as unknown as ScriptScene[] | null) ?? [];
+    const subject = existing.idea || existing.title;
+    const prompt = [
+      `A short-form social media video for: ${subject}.`,
+      existing.script ? `Script: ${existing.script}` : null,
+      scenes.length
+        ? `Scenes in order: ${scenes.map((s, i) => `(${i + 1}) ${s.title} — ${s.description}`).join('; ')}.`
+        : null,
+      'Eye-catching, professional cinematography, vertical framing, no on-screen text or logos.',
+    ]
+      .filter((line): line is string => !!line)
+      .join(' ');
+    const totalSec = scenes.reduce((sum, s) => sum + (s.durationSec || 0), 0);
+    const durationSec = Math.min(20, Math.max(4, totalSec || 8));
+
+    const videoBuffer = await this.videoGen.generateVideo(prompt, durationSec);
+    const videoUrl = await this.blobStorage.upload(videoBuffer, '.mp4', 'video/mp4');
+
     const project = await this.prisma.aiVideoProject.update({
       where: { id },
-      data: { exportFormat: dto.format, step: AiVideoStep.EXPORT },
+      data: { videoUrl, exportFormat: dto.format, step: AiVideoStep.EXPORT },
     });
     await this.audit.log({
       userId: actorId,
       action: 'AI_VIDEO_EXPORTED',
       entityType: 'ai_video_project',
       entityId: id,
-      metadata: { format: dto.format, simulated: true },
+      metadata: { format: dto.format },
     });
     return project;
   }

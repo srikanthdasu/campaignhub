@@ -146,6 +146,12 @@ export class ApprovalsService {
       throw new NotFoundException('Approval flow not found');
     }
 
+    // Nobody decides their own content, regardless of role — this is what actually makes
+    // "client creates, agency approves" (or the reverse) a real rule rather than a UI convention.
+    if (flow.contentItem.createdById === user.sub) {
+      throw new ForbiddenException('You cannot approve content you created yourself');
+    }
+
     const step = flow.steps.find((s) => s.id === stepId);
     if (!step) throw new NotFoundException('Approval step not found on this flow');
 

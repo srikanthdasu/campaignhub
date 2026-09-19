@@ -66,6 +66,10 @@ export class UpdateClientDto {
   allowClientPortalAccess?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  allowClientContentCreation?: boolean;
+
+  @IsOptional()
   @IsString()
   @MaxLength(2000)
   notes?: string;

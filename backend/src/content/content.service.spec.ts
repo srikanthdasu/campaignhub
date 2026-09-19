@@ -11,7 +11,7 @@ function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser
   return { sub: 'creator-1', email: 'a@b.com', role: Role.CREATOR, agencyId: 'agency-1', ...overrides };
 }
 
-function buildService(overrides: { item?: any } = {}) {
+function buildService(overrides: { item?: any; agencyUsers?: any[] } = {}) {
   const item = overrides.item ?? {
     id: 'content-1',
     clientId: 'client-1',
@@ -19,6 +19,7 @@ function buildService(overrides: { item?: any } = {}) {
     status: ContentStatus.DRAFT,
     mediaAssetId: null,
   };
+  const agencyUsers = overrides.agencyUsers ?? [{ id: 'a1', role: Role.MANAGER }];
   const audit = { log: vi.fn() };
   const prisma = {
     contentItem: {
@@ -26,6 +27,11 @@ function buildService(overrides: { item?: any } = {}) {
       findUnique: vi.fn(() => Promise.resolve(item)),
       update: vi.fn((args: any) => Promise.resolve({ ...item, ...args.data })),
       delete: vi.fn(() => Promise.resolve({})),
+    },
+    user: {
+      findMany: vi.fn((args: any) =>
+        Promise.resolve(agencyUsers.filter((u) => args.where.id.in.includes(u.id))),
+      ),
     },
   };
   const media = { incrementUsage: vi.fn(() => Promise.resolve()) };
@@ -129,6 +135,56 @@ describe('ContentService', () => {
       await expect(
         service.submit('client-1', 'content-1', makeUser(), { approverIds: ['a1'] } as any),
       ).rejects.toThrow('Only draft or changes-requested content can be submitted');
+    });
+  });
+
+  describe('submit — CLIENT-role approver restrictions', () => {
+    it('rejects a CLIENT submitter naming themselves as the approver', async () => {
+      const { service } = buildService({
+        item: { id: 'content-1', clientId: 'client-1', createdById: 'client-user-1', status: ContentStatus.DRAFT },
+      });
+      const clientUser = makeUser({ sub: 'client-user-1', role: Role.CLIENT });
+      await expect(
+        service.submit('client-1', 'content-1', clientUser, { approverIds: ['client-user-1'] } as any),
+      ).rejects.toThrow('cannot name yourself');
+    });
+
+    it('rejects a CLIENT submitter naming another client-portal user as approver', async () => {
+      const { service } = buildService({
+        item: { id: 'content-1', clientId: 'client-1', createdById: 'client-user-1', status: ContentStatus.DRAFT },
+        agencyUsers: [{ id: 'other-client', role: Role.CLIENT }],
+      });
+      const clientUser = makeUser({ sub: 'client-user-1', role: Role.CLIENT });
+      await expect(
+        service.submit('client-1', 'content-1', clientUser, { approverIds: ['other-client'] } as any),
+      ).rejects.toThrow('must be agency staff');
+    });
+
+    it('rejects an approverId that does not resolve to a real agency user', async () => {
+      const { service } = buildService({
+        item: { id: 'content-1', clientId: 'client-1', createdById: 'client-user-1', status: ContentStatus.DRAFT },
+        agencyUsers: [],
+      });
+      const clientUser = makeUser({ sub: 'client-user-1', role: Role.CLIENT });
+      await expect(
+        service.submit('client-1', 'content-1', clientUser, { approverIds: ['ghost'] } as any),
+      ).rejects.toThrow('must be agency staff');
+    });
+
+    it('allows a CLIENT submitter to name real agency staff as approver', async () => {
+      const { service, approvals } = buildService({
+        item: { id: 'content-1', clientId: 'client-1', createdById: 'client-user-1', status: ContentStatus.DRAFT },
+        agencyUsers: [{ id: 'mgr-1', role: Role.MANAGER }],
+      });
+      const clientUser = makeUser({ sub: 'client-user-1', role: Role.CLIENT });
+      await service.submit('client-1', 'content-1', clientUser, { approverIds: ['mgr-1'] } as any);
+      expect(approvals.createFlowForContent).toHaveBeenCalledWith(
+        'content-1',
+        'client-user-1',
+        ['mgr-1'],
+        undefined,
+        undefined,
+      );
     });
   });
 });

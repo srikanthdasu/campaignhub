@@ -140,6 +140,22 @@ describe('ApprovalsService.decide', () => {
     );
   });
 
+  it('blocks the content creator from deciding their own content, even as an OWNER override', async () => {
+    const user = makeUser({ sub: 'creator-1', role: Role.OWNER });
+    await expect(service.decide('flow-1', 'step-1', user, ApprovalDecision.APPROVED)).rejects.toThrow(
+      'cannot approve content you created',
+    );
+    expect(flowState.steps[0].decision).toBe(ApprovalDecision.PENDING);
+  });
+
+  it('blocks the content creator even when they are the step\'s assigned approver', async () => {
+    flowState.steps[0].approverId = 'creator-1';
+    const user = makeUser({ sub: 'creator-1' });
+    await expect(service.decide('flow-1', 'step-1', user, ApprovalDecision.APPROVED)).rejects.toThrow(
+      'cannot approve content you created',
+    );
+  });
+
   it('blocks an OWNER/ADMIN from another agency from deciding this flow (cross-tenant IDOR)', async () => {
     const user = makeUser({ sub: 'foreign-owner', role: Role.OWNER, agencyId: 'agency-2' });
     await expect(service.decide('flow-1', 'step-1', user, ApprovalDecision.APPROVED)).rejects.toThrow(

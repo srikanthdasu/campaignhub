@@ -4,6 +4,7 @@ import { AiCaptionsService } from './ai-captions.service.js';
 import { GenerateCaptionsDto } from './dto/generate-captions.dto.js';
 import { SaveCaptionDto } from './dto/save-caption.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
+import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -11,10 +12,10 @@ import { Role } from '../generated/prisma/client.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
-const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
+const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER, Role.CLIENT];
 
 @Controller('clients/:clientId/ai-captions')
-@UseGuards(ClientAccessGuard, RolesGuard)
+@UseGuards(ClientAccessGuard, RolesGuard, ClientContentCreationGuard)
 export class AiCaptionsController {
   constructor(private aiCaptionsService: AiCaptionsService) {}
 

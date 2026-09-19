@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { api, ApiError, resolveMediaUrl } from '@/lib/api';
-import { ROLE_LABELS, ROLES, Role } from '@/lib/roles';
+import { ROLE_LABELS, Role } from '@/lib/roles';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +64,7 @@ interface Client {
   currency: string | null;
   defaultLanguage: string | null;
   allowClientPortalAccess: boolean;
+  allowClientContentCreation: boolean;
   notes: string | null;
   plan: ClientPlan;
   status: ClientStatus;
@@ -110,6 +111,7 @@ interface DetailsForm {
   currency: string;
   defaultLanguage: string;
   allowClientPortalAccess: boolean;
+  allowClientContentCreation: boolean;
   notes: string;
   plan: ClientPlan;
   status: ClientStatus;
@@ -124,6 +126,7 @@ function toDetailsForm(client: Client): DetailsForm {
     currency: client.currency ?? '',
     defaultLanguage: client.defaultLanguage ?? '',
     allowClientPortalAccess: client.allowClientPortalAccess,
+    allowClientContentCreation: client.allowClientContentCreation,
     notes: client.notes ?? '',
     plan: client.plan,
     status: client.status,
@@ -201,7 +204,11 @@ function AgencyAdminPageContent() {
 
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<Role>('CLIENT');
+  // Not a Select anymore — this panel only ever creates Client-role accounts (a client account
+  // with Owner/Admin/Manager access was exactly the 2026-09-19 incident: the old dropdown here
+  // let any role be picked for what's meant to be a client-only invite). Staff accounts belong
+  // on the Members page instead, which keeps its own full role picker.
+  const inviteRole: Role = 'CLIENT';
   const [inviting, setInviting] = useState(false);
   const [credentials, setCredentials] = useState<CreatedCredential[]>([]);
 
@@ -757,6 +764,18 @@ function AgencyAdminPageContent() {
                 />
                 Allow Client Portal Access
               </label>
+              <label className="flex items-center gap-2 text-xs text-neutral-300">
+                <input
+                  type="checkbox"
+                  checked={details.allowClientContentCreation}
+                  onChange={(e) =>
+                    setDetails((p) => (p ? { ...p, allowClientContentCreation: e.target.checked } : p))
+                  }
+                  className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 text-accent-500 focus:ring-accent-400"
+                />
+                Allow client to create content (Content Planner, AI tools) — your team still approves before it
+                publishes
+              </label>
               <Textarea
                 placeholder="Notes"
                 value={details.notes}
@@ -816,13 +835,14 @@ function AgencyAdminPageContent() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
               />
-              <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)}>
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </option>
-                ))}
-              </Select>
+              <p className="text-[11px] text-neutral-500">
+                Creates a <span className="text-neutral-300">Client</span> account, scoped to this
+                client only. For staff accounts (Manager, Creator, etc.), use{' '}
+                <a href="/admin/members" className="text-accent-300 hover:underline">
+                  Members
+                </a>{' '}
+                instead.
+              </p>
               <Button
                 size="sm"
                 className="w-full"

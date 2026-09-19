@@ -52,6 +52,7 @@ interface VideoProject {
   enhancements: Enhancements | null;
   step: StepKey;
   previewUrl: string | null;
+  videoUrl: string | null;
   exportFormat: string | null;
   publishedAt: string | null;
   updatedAt: string;
@@ -74,9 +75,9 @@ export default function AiVideoStudioPage() {
         <h1 className="text-2xl font-semibold text-neutral-50">AI Video Studio</h1>
         <p className="text-sm text-neutral-400">From idea to ready-to-publish video.</p>
         <p className="mt-2 text-xs text-amber-300/80">
-          No Google Cloud / Vertex AI (Veo) credentials are configured yet, so the stock library
-          is a small fixed catalog and Preview/Export produce a placeholder clip instead of a
-          real render. Script generation uses real AI.
+          The stock library is a small fixed catalog. Preview renders a still concept image.
+          Export (real video generation) is temporarily disabled while we're between clients —
+          it&apos;ll return once there&apos;s revenue to fund the paid rendering tier.
         </p>
       </motion.div>
 
@@ -499,12 +500,12 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={resolveMediaUrl(active.previewUrl)}
-                          alt="Simulated render preview"
+                          alt="Render preview"
                           width={64}
                           height={64}
                           className="rounded-xl border border-white/10 object-cover"
                         />
-                        <Badge tone="warning">Simulated render — not a real video file</Badge>
+                        <Badge tone="warning">Concept still — export to generate the real video</Badge>
                       </div>
                     ) : (
                       <p className="text-sm text-neutral-400">Not rendered yet.</p>
@@ -527,11 +528,22 @@ function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                       <option value="MOV">MOV — 1080p</option>
                       <option value="WEBM">WEBM — 720p</option>
                     </select>
-                    {active.exportFormat && (
-                      <p className="text-xs text-neutral-400">Last exported as {active.exportFormat}.</p>
+                    {active.videoUrl ? (
+                      <div className="space-y-2">
+                        <video
+                          src={resolveMediaUrl(active.videoUrl)}
+                          controls
+                          className="w-full max-w-sm rounded-xl border border-white/10"
+                        />
+                        {active.exportFormat && (
+                          <p className="text-xs text-neutral-400">Last exported as {active.exportFormat}.</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-neutral-400">Not exported yet.</p>
                     )}
                     <Button size="sm" onClick={onExport} loading={busy}>
-                      Export Video
+                      {busy ? 'Generating video…' : 'Export Video'}
                     </Button>
                   </div>
                 )}

@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 export interface ClientSummary {
   id: string;
   name: string;
+  allowClientContentCreation?: boolean;
 }
 
 export function useClientPicker() {

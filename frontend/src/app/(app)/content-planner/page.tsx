@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -100,6 +101,7 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 }
 
 export default function ContentPlannerPage() {
+  const { user } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<ContentItem[] | null>(null);
@@ -166,7 +168,12 @@ export default function ContentPlannerPage() {
     loadItems(selectedClientId);
     api
       .get<Member[]>(`/clients/${selectedClientId}/access`)
-      .then(setMembers)
+      .then((list) =>
+        // A client can never approve their own content — the agency is the point of contact if
+        // something wrong goes out — so client-portal users never show up as pickable approvers
+        // here at all (backend enforces this independently in ContentService.submit()).
+        setMembers(user?.role === 'CLIENT' ? list.filter((m) => m.role !== 'CLIENT') : list),
+      )
       .catch(() => setMembers([]));
     loadMedia(selectedClientId);
     api

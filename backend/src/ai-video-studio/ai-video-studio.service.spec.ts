@@ -4,6 +4,7 @@ import { AiVideoStep } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import type { VideoGenerationService } from '../ai-common/video-generation.service.js';
 import type { BlobStorageService } from '../media/blob-storage.service.js';
 
 const VALID_SCRIPT_REPLY = JSON.stringify({
@@ -35,17 +36,23 @@ function buildService(overrides: { project?: any; scriptReply?: string } = {}) {
     chat: vi.fn(() => Promise.resolve(overrides.scriptReply ?? VALID_SCRIPT_REPLY)),
     generateImage: vi.fn(() => Promise.resolve(Buffer.from('fake-png-bytes'))),
   };
+  const videoGen = {
+    generateVideo: vi.fn(() => Promise.resolve(Buffer.from('fake-mp4-bytes'))),
+  };
   const blobStorage = {
-    upload: vi.fn(() => Promise.resolve('/uploads/fake-generated.png')),
+    upload: vi.fn((buffer: Buffer, extension: string) =>
+      Promise.resolve(extension === '.mp4' ? '/uploads/fake-generated.mp4' : '/uploads/fake-generated.png'),
+    ),
     remove: vi.fn(() => Promise.resolve()),
   };
   const service = new AiVideoStudioService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     foundry as unknown as AzureAiFoundryService,
+    videoGen as unknown as VideoGenerationService,
     blobStorage as unknown as BlobStorageService,
   );
-  return { service, prisma, audit, foundry, blobStorage, project };
+  return { service, prisma, audit, foundry, videoGen, blobStorage, project };
 }
 
 describe('AiVideoStudioService — tenant scoping', () => {
@@ -154,5 +161,88 @@ describe('AiVideoStudioService.render', () => {
     const { service, audit } = buildService();
     await service.render('client-1', 'proj-1', 'actor-1');
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: { simulated: true } }));
+  });
+});
+
+describe('AiVideoStudioService.export', () => {
+  it('generates a real video, uploads it, and stores the returned URL and format', async () => {
+    const { service, prisma, blobStorage, videoGen } = buildService({
+      project: {
+        id: 'proj-1',
+        clientId: 'client-1',
+        title: 'Launch Teaser',
+        idea: 'eco water bottle launch',
+        script: 'Scene 1: intro. Scene 2: product.',
+        scenes: [
+          { title: 'Intro', description: 'Opening shot', durationSec: 4 },
+          { title: 'Product', description: 'Close-up', durationSec: 6 },
+        ],
+        step: AiVideoStep.PREVIEW,
+      },
+    });
+    const project = await service.export('client-1', 'proj-1', 'actor-1', { format: 'MP4' } as any);
+
+    expect(videoGen.generateVideo).toHaveBeenCalledWith(expect.any(String), 10);
+    expect(blobStorage.upload).toHaveBeenCalledWith(Buffer.from('fake-mp4-bytes'), '.mp4', 'video/mp4');
+    expect(prisma.aiVideoProject.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          videoUrl: '/uploads/fake-generated.mp4',
+          exportFormat: 'MP4',
+          step: AiVideoStep.EXPORT,
+        }),
+      }),
+    );
+    expect(project.step).toBe(AiVideoStep.EXPORT);
+  });
+
+  it('builds the video prompt from the idea, script, and scene descriptions', async () => {
+    const { service, videoGen } = buildService({
+      project: {
+        id: 'proj-1',
+        clientId: 'client-1',
+        title: 'Launch Teaser',
+        idea: 'eco water bottle launch',
+        script: 'Full narration script',
+        scenes: [{ title: 'Intro', description: 'a bottle on a mountain trail', durationSec: 4 }],
+        step: AiVideoStep.PREVIEW,
+      },
+    });
+    await service.export('client-1', 'proj-1', 'actor-1', { format: 'MOV' } as any);
+
+    const [prompt] = videoGen.generateVideo.mock.calls[0];
+    expect(prompt).toContain('eco water bottle launch');
+    expect(prompt).toContain('Full narration script');
+    expect(prompt).toContain('a bottle on a mountain trail');
+  });
+
+  it('clamps the requested duration between 4 and 20 seconds', async () => {
+    const { service, videoGen } = buildService({
+      project: {
+        id: 'proj-1',
+        clientId: 'client-1',
+        title: 'Launch Teaser',
+        idea: 'eco water bottle launch',
+        scenes: [{ title: 'Long', description: 'a very long scene', durationSec: 45 }],
+        step: AiVideoStep.PREVIEW,
+      },
+    });
+    await service.export('client-1', 'proj-1', 'actor-1', { format: 'MP4' } as any);
+    expect(videoGen.generateVideo).toHaveBeenCalledWith(expect.any(String), 20);
+  });
+
+  it('falls back to an 8 second default when there are no scenes yet', async () => {
+    const { service, videoGen } = buildService({
+      project: { id: 'proj-1', clientId: 'client-1', title: 'Launch Teaser', idea: null, scenes: null, step: AiVideoStep.PREVIEW },
+    });
+    await service.export('client-1', 'proj-1', 'actor-1', { format: 'MP4' } as any);
+    expect(videoGen.generateVideo).toHaveBeenCalledWith(expect.any(String), 8);
+  });
+
+  it('rejects exporting a project from a different client', async () => {
+    const { service } = buildService({ project: { id: 'proj-1', clientId: 'other-client', step: AiVideoStep.PREVIEW } });
+    await expect(
+      service.export('client-1', 'proj-1', 'actor-1', { format: 'MP4' } as any),
+    ).rejects.toThrow('Video project not found for this client');
   });
 });

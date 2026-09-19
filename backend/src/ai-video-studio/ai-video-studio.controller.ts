@@ -8,6 +8,7 @@ import { UpdateAssetsDto } from './dto/update-assets.dto.js';
 import { UpdateEnhancementsDto } from './dto/update-enhancements.dto.js';
 import { ExportVideoDto } from './dto/export-video.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
+import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -15,10 +16,10 @@ import { Role } from '../generated/prisma/client.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
-const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
+const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER, Role.CLIENT];
 
 @Controller('clients/:clientId/ai-video-studio/projects')
-@UseGuards(ClientAccessGuard, RolesGuard)
+@UseGuards(ClientAccessGuard, RolesGuard, ClientContentCreationGuard)
 export class AiVideoStudioController {
   constructor(private aiVideoStudioService: AiVideoStudioService) {}
 
@@ -94,6 +95,7 @@ export class AiVideoStudioController {
     return this.aiVideoStudioService.render(clientId, id, user.sub);
   }
 
+  @Throttle(AI_GENERATION_THROTTLE)
   @Post(':id/export')
   @Roles(...CAN_CREATE)
   export(

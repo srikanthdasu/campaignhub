@@ -34,6 +34,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { isAgencyAdmin, ROLE_LABELS, Role } from '@/lib/roles';
 import { DURATION, EASE_SOFT, tapScale } from '@/lib/motion';
+import { useClientPicker } from '@/hooks/use-client-picker';
 
 interface NavLink {
   href: string;
@@ -104,21 +105,33 @@ const sections: { label: string; links: NavLink[] }[] = [
 
 // A Client-role user gets their own portal only — not the agency's full workspace, per the
 // book's Client Portal result: "A client sees only their own campaigns, approvals, analytics,
-// social status and subscription."
-const clientSections: { label: string; links: NavLink[] }[] = [
-  {
-    label: 'Client Portal',
-    links: [
-      { href: '/client-portal', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-      { href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false },
-      { href: '/analytics', label: 'Analytics', icon: BarChart3, adminOnly: false },
-    ],
-  },
-  {
-    label: 'System',
-    links: [{ href: '/profile', label: 'Profile', icon: UserIcon, adminOnly: false }],
-  },
-];
+// social status and subscription." Content-creation tools (Content Planner, AI Studio, Media
+// Library) only appear once the agency has opted this specific client in via
+// Client.allowClientContentCreation — off by default, so most clients stay approval-only.
+function buildClientSections(canCreate: boolean): { label: string; links: NavLink[] }[] {
+  const portalLinks: NavLink[] = [
+    { href: '/client-portal', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  ];
+  if (canCreate) {
+    portalLinks.push(
+      { href: '/content-planner', label: 'Content Planner', icon: ClipboardCheck, adminOnly: false },
+      { href: '/media-library', label: 'Media Library', icon: ImageIcon, adminOnly: false },
+      { href: '/ai-assistant', label: 'AI Assistant', icon: Bot, adminOnly: false },
+      { href: '/ai-captions', label: 'AI Captions', icon: Sparkles, adminOnly: false },
+      { href: '/ai-image-studio', label: 'AI Image', icon: ImagePlus, adminOnly: false },
+      { href: '/ai-video-studio', label: 'AI Video Studio', icon: Video, adminOnly: false },
+    );
+  }
+  portalLinks.push(
+    { href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false },
+    { href: '/analytics', label: 'Analytics', icon: BarChart3, adminOnly: false },
+  );
+
+  return [
+    { label: 'Client Portal', links: portalLinks },
+    { label: 'System', links: [{ href: '/profile', label: 'Profile', icon: UserIcon, adminOnly: false }] },
+  ];
+}
 
 export function AppNav() {
   const { user, logout } = useAuth();
@@ -126,7 +139,9 @@ export function AppNav() {
   const router = useRouter();
   const admin = isAgencyAdmin(user?.role as Role | undefined);
   const isClient = user?.role === 'CLIENT';
-  const navSections = isClient ? clientSections : sections;
+  const { clients } = useClientPicker();
+  const canCreate = isClient && clients?.[0]?.allowClientContentCreation === true;
+  const navSections = isClient ? buildClientSections(canCreate) : sections;
   const activeLinkRef = useRef<HTMLLIElement>(null);
 
   // The sidebar scrolls independently of the page and can be taller than the viewport (System

@@ -42,6 +42,52 @@ describe('parseModelJson', () => {
     expect(() => parseModelJson('not json at all', isThing)).toThrow('could not parse');
   });
 
+  it('recovers JSON prefaced with prose commentary', () => {
+    const result = parseModelJson('Sure, here you go:\n{"name":"widget"}', isThing);
+    expect(result).toEqual({ name: 'widget' });
+  });
+
+  it('recovers JSON followed by trailing prose commentary', () => {
+    const result = parseModelJson('{"name":"widget"}\n\nLet me know if you need changes!', isThing);
+    expect(result).toEqual({ name: 'widget' });
+  });
+
+  it('recovers a string value containing a literal, unescaped newline', () => {
+    const raw = '{"name":"line one\nline two"}';
+    const result = parseModelJson(raw, isThing);
+    expect(result).toEqual({ name: 'line one\nline two' });
+  });
+
+  it('recovers literal newlines across multiple string fields without corrupting structure', () => {
+    interface Scripty {
+      script: string;
+      scenes: { title: string }[];
+    }
+    const isScripty = (v: unknown): v is Scripty =>
+      typeof v === 'object' &&
+      v !== null &&
+      typeof (v as Scripty).script === 'string' &&
+      Array.isArray((v as Scripty).scenes);
+    const raw =
+      '{"script": "Scene 1: Intro.\nScene 2: Dance.\nScene 3: Outro.", "scenes": [{"title": "Intro"}, {"title": "Dance"}]}';
+    const result = parseModelJson(raw, isScripty);
+    expect(result.script).toBe('Scene 1: Intro.\nScene 2: Dance.\nScene 3: Outro.');
+    expect(result.scenes).toEqual([{ title: 'Intro' }, { title: 'Dance' }]);
+  });
+
+  it('leaves structural whitespace between JSON tokens untouched', () => {
+    const raw = '{\n  "name": "widget"\n}';
+    const result = parseModelJson(raw, isThing);
+    expect(result).toEqual({ name: 'widget' });
+  });
+
+  it('recovers a JSON array wrapped in prose on both sides', () => {
+    const result = parseModelJson('Here are the items: [{"name":"a"},{"name":"b"}] hope that helps', (
+      v,
+    ): v is Thing[] => Array.isArray(v) && v.every(isThing));
+    expect(result).toEqual([{ name: 'a' }, { name: 'b' }]);
+  });
+
   it('throws an "unexpected response" error when parsed JSON fails the validator', () => {
     expect(() => parseModelJson('{"wrong":"shape"}', isThing)).toThrow('unexpected response');
   });
