@@ -5,6 +5,8 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService, TokenPair } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { AUTH_THROTTLE } from '../common/rate-limits.js';
 
@@ -39,11 +41,27 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, refreshTokenExpiresAt, ...rest } =
-      await this.authService.register(dto);
+      await this.authService.verifyEmail(dto.token);
     this.setRefreshCookie(res, { accessToken, refreshToken, refreshTokenExpiresAt });
     return { ...rest, accessToken };
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto.email);
   }
 
   @Public()

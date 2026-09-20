@@ -9,7 +9,9 @@ interface AuthContextValue {
   user: AuthUser | null;
   status: Status;
   login: (email: string, password: string) => Promise<void>;
-  register: (agencyName: string, name: string, email: string, password: string) => Promise<void>;
+  register: (agencyName: string, name: string, email: string, password: string) => Promise<{ message: string }>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
 }
 
@@ -54,18 +56,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (agencyName: string, name: string, email: string, password: string) => {
-      const res = await api.post<{ user: AuthUser; accessToken: string }>('/auth/register', {
+      return api.post<{ message: string }>('/auth/register', {
         agencyName,
         name,
         email,
         password,
       });
-      setAccessToken(res.accessToken);
-      setUser(res.user);
-      setStatus('authenticated');
     },
     [],
   );
+
+  const verifyEmail = useCallback(async (token: string) => {
+    const res = await api.post<{ user: AuthUser; accessToken: string }>('/auth/verify-email', {
+      token,
+    });
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+    setStatus('authenticated');
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    return api.post<{ message: string }>('/auth/resend-verification', { email });
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -79,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, status, login, register, logout }}>
+    <AuthContext.Provider value={{ user, status, login, register, verifyEmail, resendVerification, logout }}>
       {children}
     </AuthContext.Provider>
   );

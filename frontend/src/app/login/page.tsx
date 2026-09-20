@@ -12,25 +12,42 @@ import { AuthBrandPanel } from '@/components/auth-brand-panel';
 import { AuthPromoFooter } from '@/components/auth-promo-footer';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
+const UNVERIFIED_MESSAGE = 'Please verify your email before logging in.';
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, resendVerification } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setShowResend(false);
+    setResendState('idle');
     setSubmitting(true);
     try {
       await login(email, password);
       router.replace('/dashboard');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      const message = err instanceof ApiError ? err.message : 'Something went wrong';
+      setError(message);
+      setShowResend(message === UNVERIFIED_MESSAGE);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onResend() {
+    setResendState('sending');
+    try {
+      await resendVerification(email);
+    } finally {
+      setResendState('sent');
     }
   }
 
@@ -84,6 +101,23 @@ export default function LoginPage() {
                 </motion.p>
               )}
             </AnimatePresence>
+
+            {showResend && (
+              <p className="-mt-2 text-sm text-neutral-400">
+                {resendState === 'sent' ? (
+                  'Verification email sent — check your inbox.'
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onResend}
+                    disabled={resendState === 'sending'}
+                    className="font-medium text-accent-300 hover:underline disabled:opacity-60"
+                  >
+                    {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
+                  </button>
+                )}
+              </p>
+            )}
 
             <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
               <Input

@@ -6,15 +6,20 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { EmailService } from '../notifications/email.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { Role } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const BCRYPT_ROUNDS = 12;
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const RESEND_VERIFICATION_GENERIC_RESULT = {
+  message: 'If an account with that email exists and is not yet verified, a new verification link has been sent.',
+};
 
 export interface TokenPair {
   accessToken: string;
@@ -29,10 +34,30 @@ export class AuthService {
     private jwt: JwtService,
     private config: ConfigService,
     private audit: AuditService,
+    private email: EmailService,
   ) {}
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private generateVerificationToken(): { rawToken: string; tokenHash: string; expiresAt: Date } {
+    const rawToken = randomBytes(32).toString('hex');
+    return {
+      rawToken,
+      tokenHash: this.hashToken(rawToken),
+      expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
+    };
+  }
+
+  private async sendVerificationEmail(email: string, name: string, rawToken: string): Promise<void> {
+    const appUrl = this.config.getOrThrow<string>('PUBLIC_APP_URL');
+    const link = `${appUrl}/verify-email?token=${rawToken}`;
+    await this.email.send(
+      email,
+      'Verify your CampaignHub AI account',
+      `Hi ${name},\n\nPlease verify your email address to activate your CampaignHub AI account:\n\n${link}\n\nThis link expires in 24 hours. If you didn't create this account, you can ignore this email.`,
+    );
   }
 
   private async issueTokenPair(user: {
@@ -85,6 +110,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const { rawToken, tokenHash, expiresAt } = this.generateVerificationToken();
 
     const { user, agency } = await this.prisma.$transaction(async (tx) => {
       const agency = await tx.agency.create({ data: { name: dto.agencyName } });
@@ -95,6 +121,8 @@ export class AuthService {
           passwordHash,
           name: dto.name,
           role: Role.OWNER,
+          verificationTokenHash: tokenHash,
+          verificationTokenExpiresAt: expiresAt,
         },
       });
       return { user, agency };
@@ -107,8 +135,9 @@ export class AuthService {
       entityId: agency.id,
     });
 
-    const tokens = await this.issueTokenPair(user);
-    return { user: this.toSafeUser(user), ...tokens };
+    await this.sendVerificationEmail(user.email, user.name, rawToken);
+
+    return { message: 'Check your email to verify your account.' };
   }
 
   async login(dto: LoginDto) {
@@ -137,6 +166,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.emailVerifiedAt) {
+      await this.audit.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED_UNVERIFIED',
+        entityType: 'user',
+        entityId: user.id,
+      });
+      throw new UnauthorizedException('Please verify your email before logging in.');
+    }
+
     await this.audit.log({
       userId: user.id,
       action: 'LOGIN_SUCCESS',
@@ -146,6 +185,51 @@ export class AuthService {
 
     const tokens = await this.issueTokenPair(user);
     return { user: this.toSafeUser(user), ...tokens };
+  }
+
+  async verifyEmail(token: string) {
+    const tokenHash = this.hashToken(token);
+    const user = await this.prisma.user.findUnique({ where: { verificationTokenHash: tokenHash } });
+
+    if (!user || !user.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
+      throw new UnauthorizedException('This verification link is invalid or has expired.');
+    }
+
+    const verifiedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        verificationTokenHash: null,
+        verificationTokenExpiresAt: null,
+      },
+    });
+
+    await this.audit.log({
+      userId: verifiedUser.id,
+      action: 'EMAIL_VERIFIED',
+      entityType: 'user',
+      entityId: verifiedUser.id,
+    });
+
+    const tokens = await this.issueTokenPair(verifiedUser);
+    return { user: this.toSafeUser(verifiedUser), ...tokens };
+  }
+
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.emailVerifiedAt) {
+      return RESEND_VERIFICATION_GENERIC_RESULT;
+    }
+
+    const { rawToken, tokenHash, expiresAt } = this.generateVerificationToken();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { verificationTokenHash: tokenHash, verificationTokenExpiresAt: expiresAt },
+    });
+
+    await this.sendVerificationEmail(user.email, user.name, rawToken);
+
+    return RESEND_VERIFICATION_GENERIC_RESULT;
   }
 
   async refresh(refreshToken: string) {

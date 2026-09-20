@@ -99,6 +99,10 @@ export class UsersService {
         name: dto.name,
         role: dto.role,
         passwordHash,
+        // Created by a trusted agency admin who already vouches for this email — unlike public
+        // self-registration (AuthService.register()), there's no untrusted party to verify against,
+        // so this account is pre-verified rather than blocked on an email link nobody would send.
+        emailVerifiedAt: new Date(),
         clientAccess: dto.clientIds?.length
           ? { create: dto.clientIds.map((clientId) => ({ clientId })) }
           : undefined,

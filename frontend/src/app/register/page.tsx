@@ -2,7 +2,6 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth, ApiError } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -13,14 +12,15 @@ import { AuthPromoFooter } from '@/components/auth-promo-footer';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
-  const router = useRouter();
+  const { register, resendVerification } = useAuth();
   const [agencyName, setAgencyName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,11 +28,20 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(agencyName, name, email, password);
-      router.replace('/dashboard');
+      setSubmitted(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onResend() {
+    setResendState('sending');
+    try {
+      await resendVerification(email);
+    } finally {
+      setResendState('sent');
     }
   }
 
@@ -61,6 +70,39 @@ export default function RegisterPage() {
         </motion.div>
 
         <Card padding="lg" className="w-full max-w-sm">
+          {submitted ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION.base, ease: EASE_SOFT }}
+              className="space-y-4 text-center"
+            >
+              <h2 className="text-2xl font-semibold text-neutral-50">Check your email</h2>
+              <p className="text-sm leading-relaxed text-neutral-400">
+                We sent a verification link to <span className="text-neutral-200">{email}</span>.
+                Click it to activate your account — the link expires in 24 hours.
+              </p>
+              <div className="pt-2">
+                {resendState === 'sent' ? (
+                  <p className="text-sm text-neutral-500">Verification email sent — check your inbox.</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onResend}
+                    disabled={resendState === 'sending'}
+                    className="text-sm font-medium text-accent-300 hover:underline disabled:opacity-60"
+                  >
+                    {resendState === 'sending' ? 'Sending…' : "Didn't get it? Resend"}
+                  </button>
+                )}
+              </div>
+              <p className="pt-4 text-sm text-neutral-400">
+                <Link href="/login" className="font-medium text-accent-300 hover:underline">
+                  Back to sign in
+                </Link>
+              </p>
+            </motion.div>
+          ) : (
           <motion.form
             onSubmit={onSubmit}
             variants={staggerContainer(0.06)}
@@ -150,6 +192,7 @@ export default function RegisterPage() {
               </Link>
             </motion.p>
           </motion.form>
+          )}
         </Card>
 
         <AuthPromoFooter />

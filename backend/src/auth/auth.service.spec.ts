@@ -14,6 +14,7 @@ const FUTURE_EXP = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
 
 function buildService(overrides: { existingUser?: any } = {}) {
   const audit = { log: vi.fn() };
+  const email = { send: vi.fn(() => Promise.resolve()) };
   const jwt = {
     sign: vi.fn(() => 'signed-token'),
     verify: vi.fn(() => ({ sub: 'user-1', jti: 'jti-1' })),
@@ -23,9 +24,12 @@ function buildService(overrides: { existingUser?: any } = {}) {
     get: vi.fn((key: string, fallback?: unknown) => fallback),
     getOrThrow: vi.fn((key: string) => `secret-${key}`),
   };
+  const txUserCreate = vi.fn((args: any) => Promise.resolve({ id: 'user-1', ...args.data }));
+  const txAgencyCreate = vi.fn((args: any) => Promise.resolve({ id: 'agency-1', ...args.data }));
   const prisma = {
     user: {
       findUnique: vi.fn(() => Promise.resolve(overrides.existingUser ?? null)),
+      update: vi.fn((args: any) => Promise.resolve({ ...overrides.existingUser, ...args.data })),
     },
     refreshToken: {
       create: vi.fn(() => Promise.resolve({})),
@@ -35,8 +39,8 @@ function buildService(overrides: { existingUser?: any } = {}) {
     },
     $transaction: vi.fn((fn: any) =>
       fn({
-        agency: { create: vi.fn((args: any) => Promise.resolve({ id: 'agency-1', ...args.data })) },
-        user: { create: vi.fn((args: any) => Promise.resolve({ id: 'user-1', ...args.data })) },
+        agency: { create: txAgencyCreate },
+        user: { create: txUserCreate },
       }),
     ),
   };
@@ -45,8 +49,9 @@ function buildService(overrides: { existingUser?: any } = {}) {
     jwt as any,
     config as any,
     audit as unknown as AuditService,
+    email as any,
   );
-  return { service, prisma, audit, jwt, config };
+  return { service, prisma, audit, jwt, config, email, txUserCreate };
 }
 
 describe('AuthService.register', () => {
@@ -57,8 +62,8 @@ describe('AuthService.register', () => {
     ).rejects.toThrow('An account with this email already exists');
   });
 
-  it('creates a new agency with the registering user as OWNER, and never leaks the password hash', async () => {
-    const { service, prisma } = buildService();
+  it('creates a new agency with the registering user as OWNER, sends a verification email, and does not auto-login', async () => {
+    const { service, prisma, email } = buildService();
     const result = await service.register({
       agencyName: 'Acme',
       name: 'Founder',
@@ -67,9 +72,27 @@ describe('AuthService.register', () => {
     });
 
     expect(prisma.$transaction).toHaveBeenCalled();
-    expect(result.user.role).toBe(Role.OWNER);
-    expect(result.user).not.toHaveProperty('passwordHash');
-    expect(result.accessToken).toBe('signed-token');
+    expect(result).toEqual({ message: 'Check your email to verify your account.' });
+    expect(email.send).toHaveBeenCalledWith(
+      'founder@acme.com',
+      expect.stringContaining('Verify your CampaignHub AI account'),
+      expect.stringContaining('verify-email?token='),
+    );
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('stores a hashed verification token with an expiry on the new user', async () => {
+    const { service, txUserCreate } = buildService();
+    await service.register({
+      agencyName: 'Acme',
+      name: 'Founder',
+      email: 'founder@acme.com',
+      password: 'password123',
+    });
+
+    const createArgs = txUserCreate.mock.calls[0][0];
+    expect(createArgs.data.verificationTokenHash).toEqual(expect.any(String));
+    expect(createArgs.data.verificationTokenExpiresAt).toBeInstanceOf(Date);
   });
 });
 
@@ -77,7 +100,7 @@ describe('AuthService.login', () => {
   it('gives an identical error for a nonexistent email as for a wrong password (no user enumeration)', async () => {
     const noUser = buildService({ existingUser: null });
     const wrongPassword = buildService({
-      existingUser: { id: 'u1', email: 'a@b.com', passwordHash: 'x', isActive: true },
+      existingUser: { id: 'u1', email: 'a@b.com', passwordHash: 'x', isActive: true, emailVerifiedAt: new Date() },
     });
 
     let noUserError: unknown;
@@ -109,11 +132,119 @@ describe('AuthService.login', () => {
 
   it('logs in successfully with the correct password and issues a token pair', async () => {
     const { service, prisma } = buildService({
-      existingUser: { id: 'u1', email: 'a@b.com', passwordHash: 'x', isActive: true, role: Role.CREATOR, agencyId: 'agency-1' },
+      existingUser: {
+        id: 'u1',
+        email: 'a@b.com',
+        passwordHash: 'x',
+        isActive: true,
+        role: Role.CREATOR,
+        agencyId: 'agency-1',
+        emailVerifiedAt: new Date(),
+      },
     });
     const result = await service.login({ email: 'a@b.com', password: 'correct-password' });
     expect(result.accessToken).toBe('signed-token');
     expect(prisma.refreshToken.create).toHaveBeenCalled();
+  });
+
+  it('rejects an unverified account with a distinguishable message and logs LOGIN_FAILED_UNVERIFIED', async () => {
+    const { service, audit } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', passwordHash: 'x', isActive: true, emailVerifiedAt: null },
+    });
+    await expect(service.login({ email: 'a@b.com', password: 'correct-password' })).rejects.toThrow(
+      'Please verify your email before logging in.',
+    );
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'LOGIN_FAILED_UNVERIFIED' }));
+  });
+
+  it('still gives the generic no-enumeration message for a wrong password against an unverified account', async () => {
+    const { service, audit } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', passwordHash: 'x', isActive: true, emailVerifiedAt: null },
+    });
+    await expect(service.login({ email: 'a@b.com', password: 'wrong-password' })).rejects.toThrow(
+      'Invalid credentials',
+    );
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'LOGIN_FAILED' }));
+    expect(audit.log).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'LOGIN_FAILED_UNVERIFIED' }));
+  });
+});
+
+describe('AuthService.verifyEmail', () => {
+  it('verifies a user with a valid, unexpired token and issues a token pair', async () => {
+    const { service, prisma, audit } = buildService();
+    const hash = (service as any).hashToken('raw-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        email: 'a@b.com',
+        role: Role.OWNER,
+        agencyId: 'agency-1',
+        verificationTokenHash: hash,
+        verificationTokenExpiresAt: new Date(Date.now() + 100_000),
+      }),
+    ) as any;
+
+    const result = await service.verifyEmail('raw-token');
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { emailVerifiedAt: expect.any(Date), verificationTokenHash: null, verificationTokenExpiresAt: null },
+    });
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'EMAIL_VERIFIED' }));
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  it('rejects an unknown token', async () => {
+    const { service, prisma } = buildService();
+    prisma.user.findUnique = vi.fn(() => Promise.resolve(null)) as any;
+    await expect(service.verifyEmail('bogus-token')).rejects.toThrow(
+      'This verification link is invalid or has expired.',
+    );
+  });
+
+  it('rejects an expired token', async () => {
+    const { service, prisma } = buildService();
+    const hash = (service as any).hashToken('raw-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        verificationTokenHash: hash,
+        verificationTokenExpiresAt: new Date(Date.now() - 1000),
+      }),
+    ) as any;
+    await expect(service.verifyEmail('raw-token')).rejects.toThrow(
+      'This verification link is invalid or has expired.',
+    );
+  });
+});
+
+describe('AuthService.resendVerification', () => {
+  it('returns the generic message and sends nothing for a nonexistent email', async () => {
+    const { service, email } = buildService({ existingUser: null });
+    const result = await service.resendVerification('nobody@nowhere.com');
+    expect(email.send).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/if an account with that email exists/i);
+  });
+
+  it('returns the same generic message and sends nothing for an already-verified email (no enumeration)', async () => {
+    const { service, email } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', emailVerifiedAt: new Date() },
+    });
+    const result = await service.resendVerification('a@b.com');
+    expect(email.send).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/if an account with that email exists/i);
+  });
+
+  it('generates a new token and sends the email for a real unverified user', async () => {
+    const { service, prisma, email } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', name: 'A', emailVerifiedAt: null },
+    });
+    await service.resendVerification('a@b.com');
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { verificationTokenHash: expect.any(String), verificationTokenExpiresAt: expect.any(Date) },
+    });
+    expect(email.send).toHaveBeenCalledTimes(1);
   });
 });
 

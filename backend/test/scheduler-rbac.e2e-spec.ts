@@ -25,17 +25,24 @@ describe('Scheduler RBAC (e2e)', () => {
   const clientEmail = `client-${suffix}@e2e.test`;
   const password = 'password12345';
 
-  async function register(agencyName: string, name: string, email: string) {
-    const res = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ agencyName, name, email, password })
-      .expect(201);
-    return res.body as { accessToken: string; user: { agencyId: string } };
-  }
-
   async function login(email: string) {
     const res = await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(200);
     return res.body.accessToken as string;
+  }
+
+  // Registration now requires clicking an emailed verification link (see AuthService.register/
+  // verifyEmail) — for this RBAC-focused e2e test, bypass that by verifying directly through the
+  // test DB connection, same as how the "skip the full approval workflow" line below bypasses an
+  // unrelated flow this test isn't exercising.
+  async function registerAndVerify(agencyName: string, name: string, email: string) {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ agencyName, name, email, password })
+      .expect(201);
+    await prisma.user.update({ where: { email }, data: { emailVerifiedAt: new Date() } });
+    const accessToken = await login(email);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    return { accessToken, user: { agencyId: user.agencyId as string } };
   }
 
   beforeAll(async () => {
@@ -48,7 +55,7 @@ describe('Scheduler RBAC (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
-    const owner = await register(`E2E Scheduler Agency ${suffix}`, 'Owner', ownerEmail);
+    const owner = await registerAndVerify(`E2E Scheduler Agency ${suffix}`, 'Owner', ownerEmail);
     ownerToken = owner.accessToken;
     agencyId = owner.user.agencyId;
 
