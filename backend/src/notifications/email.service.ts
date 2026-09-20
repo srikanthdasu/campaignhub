@@ -37,15 +37,23 @@ export class EmailService {
     }
   }
 
-  async send(to: string, subject: string, text: string): Promise<void> {
+  /**
+   * Returns whether the message actually went out over SMTP — existing callers that only need
+   * "best effort, never throws" can keep awaiting this and ignoring the result unchanged. Added
+   * for bulk email campaigns, which need a real sent/failed signal per recipient to report back
+   * to the agency, rather than silently treating every attempt as successful.
+   */
+  async send(to: string, subject: string, text: string): Promise<boolean> {
     if (!this.transporter) {
       this.logger.log(`[email not configured] would send to ${to}: "${subject}"`);
-      return;
+      return false;
     }
     try {
       await this.transporter.sendMail({ from: this.from, to, subject, text });
+      return true;
     } catch (err) {
       this.logger.error(`Failed to send email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
     }
   }
 }

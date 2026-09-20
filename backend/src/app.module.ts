@@ -21,6 +21,7 @@ import { AiCaptionsModule } from './ai-captions/ai-captions.module.js';
 import { AiVideoStudioModule } from './ai-video-studio/ai-video-studio.module.js';
 import { AiStrategyModule } from './ai-strategy/ai-strategy.module.js';
 import { CampaignsModule } from './campaigns/campaigns.module.js';
+import { EmailCampaignsModule } from './email-campaigns/email-campaigns.module.js';
 import { AdsModule } from './ads/ads.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { BillingModule } from './billing/billing.module.js';
@@ -55,6 +56,7 @@ import { validateEnv } from './config/validate-env.js';
     AiVideoStudioModule,
     AiStrategyModule,
     CampaignsModule,
+    EmailCampaignsModule,
     AdsModule,
     NotificationsModule,
     BillingModule,

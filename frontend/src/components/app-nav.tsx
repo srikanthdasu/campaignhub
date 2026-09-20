@@ -30,6 +30,7 @@ import {
   FileText,
   CreditCard,
   Crown,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -53,6 +54,7 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: '/admin/agency', label: 'Agency & Clients', icon: Building2, adminOnly: true },
       { href: '/content-planner', label: 'Content Planner', icon: ClipboardCheck, adminOnly: false },
       { href: '/campaigns', label: 'Campaigns', icon: Megaphone, adminOnly: false },
+      { href: '/email-campaigns', label: 'Email Campaigns', icon: Mail, adminOnly: false },
       { href: '/ads', label: 'Ads & Paid Campaigns', icon: Rocket, adminOnly: false },
       { href: '/media-library', label: 'Media Library', icon: ImageIcon, adminOnly: false },
       { href: '/scheduler', label: 'Scheduler', icon: CalendarClock, adminOnly: false },

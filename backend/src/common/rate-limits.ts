@@ -9,3 +9,8 @@ export const AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 // Every AI-calling route is a real, billable Azure AI Foundry request. This caps the cost-abuse
 // surface without getting in the way of a person actually using the feature.
 export const AI_GENERATION_THROTTLE = { default: { limit: 20, ttl: 60_000 } };
+
+// Composing/sending bulk email carries real reputational risk against the agency's own sending
+// identity (spam complaints, provider blocks) — tighter than AI generation, since the cost of
+// abuse here isn't just money, it's deliverability for every client sharing that SMTP account.
+export const EMAIL_CAMPAIGN_THROTTLE = { default: { limit: 10, ttl: 60_000 } };

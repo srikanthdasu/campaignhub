@@ -100,6 +100,8 @@ model Client {
   aiVideoProjects   AiVideoProject[]
   aiStrategyRequests AiStrategyRequest[]
   adCampaigns       AdCampaign[]
+  emailCampaigns    EmailCampaign[]
+  emailUnsubscribes EmailUnsubscribe[]
 
   @@index([agencyId])
   @@map("clients")
@@ -137,6 +139,7 @@ model User {
   adCampaignsCreated     AdCampaign[]        @relation("AdCampaignCreatedBy")
   adCampaignsApproved    AdCampaign[]        @relation("AdCampaignApprovedBy")
   notifications          Notification[]
+  emailCampaignsCreated  EmailCampaign[]
 
   @@index([agencyId])
   @@map("users")
@@ -766,4 +769,70 @@ model Invoice {
   @@index([agencyId])
   @@index([status])
   @@map("invoices")
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  QUEUED
+  SENDING
+  SENT
+}
+
+enum EmailRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  UNSUBSCRIBED
+}
+
+model EmailCampaign {
+  id           String              @id @default(uuid()) @db.Uuid
+  clientId     String              @map("client_id") @db.Uuid
+  client       Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String
+  subject      String
+  // Supports a {{name}} merge field, filled in per-recipient at send time.
+  bodyTemplate String              @map("body_template")
+  status       EmailCampaignStatus @default(DRAFT)
+  createdById  String?             @map("created_by_id") @db.Uuid
+  createdBy    User?               @relation(fields: [createdById], references: [id])
+  queuedAt     DateTime?           @map("queued_at")
+  sentAt       DateTime?           @map("sent_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  recipients EmailRecipient[]
+
+  @@index([clientId])
+  @@map("email_campaigns")
+}
+
+model EmailRecipient {
+  id         String                @id @default(uuid()) @db.Uuid
+  campaignId String                @map("campaign_id") @db.Uuid
+  campaign   EmailCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name       String
+  email      String                @db.VarChar(255)
+  status     EmailRecipientStatus  @default(PENDING)
+  // Generated at import time (same randomBytes(32) + sha256 pattern as email verification
+  // tokens) — the raw token goes out in the unsubscribe link, only this hash is stored.
+  unsubscribeTokenHash String?     @unique @map("unsubscribe_token_hash")
+  sentAt        DateTime?          @map("sent_at")
+  errorMessage  String?            @map("error_message")
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@map("email_recipients")
+}
+
+// A persistent per-client suppression list — once someone unsubscribes, every future campaign
+// to that client must skip them too, not just the one they clicked from.
+model EmailUnsubscribe {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  email     String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([clientId, email])
+  @@map("email_unsubscribes")
 }

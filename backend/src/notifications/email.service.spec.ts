@@ -7,13 +7,13 @@ function buildConfig(values: Record<string, string | undefined>) {
 }
 
 describe('EmailService', () => {
-  it('never throws when SMTP is not configured — it just logs instead of sending', async () => {
+  it('never throws when SMTP is not configured — it just logs instead of sending, and reports false', async () => {
     const service = new EmailService(buildConfig({}));
-    await expect(service.send('user@example.com', 'Subject', 'Body')).resolves.toBeUndefined();
+    await expect(service.send('user@example.com', 'Subject', 'Body')).resolves.toBe(false);
   });
 
-  it('does not require all four SMTP vars to avoid crashing — partial config also no-ops', async () => {
+  it('does not require all four SMTP vars to avoid crashing — partial config also no-ops, reports false', async () => {
     const service = new EmailService(buildConfig({ SMTP_HOST: 'smtp.example.com' }));
-    await expect(service.send('user@example.com', 'Subject', 'Body')).resolves.toBeUndefined();
+    await expect(service.send('user@example.com', 'Subject', 'Body')).resolves.toBe(false);
   });
 });
