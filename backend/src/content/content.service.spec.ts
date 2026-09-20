@@ -5,6 +5,7 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { MediaService } from '../media/media.service.js';
 import type { ApprovalsService } from '../approvals/approvals.service.js';
+import type { CampaignsService } from '../campaigns/campaigns.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
@@ -34,7 +35,11 @@ function buildService(overrides: { item?: any; agencyUsers?: any[] } = {}) {
       ),
     },
   };
-  const media = { incrementUsage: vi.fn(() => Promise.resolve()) };
+  const media = {
+    incrementUsage: vi.fn(() => Promise.resolve()),
+    requireInClient: vi.fn(() => Promise.resolve({})),
+  };
+  const campaigns = { requireInClient: vi.fn(() => Promise.resolve({})) };
   const approvals = {
     resubmit: vi.fn(() => Promise.resolve({ resubmitted: true })),
     createFlowForContent: vi.fn(() => Promise.resolve({ created: true })),
@@ -44,11 +49,38 @@ function buildService(overrides: { item?: any; agencyUsers?: any[] } = {}) {
     audit as unknown as AuditService,
     media as unknown as MediaService,
     approvals as unknown as ApprovalsService,
+    campaigns as unknown as CampaignsService,
   );
-  return { service, prisma, audit, media, approvals, item };
+  return { service, prisma, audit, media, approvals, campaigns, item };
 }
 
 describe('ContentService', () => {
+  describe('create — media/campaign ownership', () => {
+    it('rejects creating content with a media asset that belongs to a different client', async () => {
+      const { service, media } = buildService();
+      media.requireInClient = vi.fn(() => Promise.reject(new Error('Media asset not found for this client')));
+      await expect(
+        service.create('client-1', makeUser(), { mediaAssetId: 'other-clients-asset' } as any),
+      ).rejects.toThrow('Media asset not found for this client');
+    });
+
+    it('rejects creating content with a campaign that belongs to a different client', async () => {
+      const { service, campaigns } = buildService();
+      campaigns.requireInClient = vi.fn(() => Promise.reject(new Error('Campaign not found for this client')));
+      await expect(
+        service.create('client-1', makeUser(), { campaignId: 'other-clients-campaign' } as any),
+      ).rejects.toThrow('Campaign not found for this client');
+    });
+
+    it('creates content when media/campaign genuinely belong to this client', async () => {
+      const { service, prisma, media, campaigns } = buildService();
+      await service.create('client-1', makeUser(), { mediaAssetId: 'm1', campaignId: 'c1' } as any);
+      expect(media.requireInClient).toHaveBeenCalledWith('m1', 'client-1');
+      expect(campaigns.requireInClient).toHaveBeenCalledWith('c1', 'client-1');
+      expect(prisma.contentItem.create).toHaveBeenCalled();
+    });
+  });
+
   describe('update/remove/submit — client scoping', () => {
     it('rejects an item that belongs to a different client', async () => {
       const { service } = buildService({
@@ -168,7 +200,7 @@ describe('ContentService', () => {
       const clientUser = makeUser({ sub: 'client-user-1', role: Role.CLIENT });
       await expect(
         service.submit('client-1', 'content-1', clientUser, { approverIds: ['ghost'] } as any),
-      ).rejects.toThrow('must be agency staff');
+      ).rejects.toThrow('must belong to your agency');
     });
 
     it('allows a CLIENT submitter to name real agency staff as approver', async () => {
@@ -185,6 +217,34 @@ describe('ContentService', () => {
         undefined,
         undefined,
       );
+    });
+  });
+
+  describe('submit — staff approver validation (was previously unchecked)', () => {
+    it('rejects a staff submitter naming an approver from another agency', async () => {
+      const { service } = buildService({ agencyUsers: [] }); // approverId won't resolve within this agency
+      await expect(
+        service.submit('client-1', 'content-1', makeUser({ role: Role.CREATOR }), {
+          approverIds: ['cross-agency-user'],
+        } as any),
+      ).rejects.toThrow('must belong to your agency');
+    });
+
+    it('rejects a staff submitter naming themselves as the approver', async () => {
+      const { service } = buildService();
+      await expect(
+        service.submit('client-1', 'content-1', makeUser({ sub: 'creator-1', role: Role.CREATOR }), {
+          approverIds: ['creator-1'],
+        } as any),
+      ).rejects.toThrow('cannot name yourself');
+    });
+
+    it('allows a staff submitter to name a client-role approver (the normal workflow)', async () => {
+      const { service, approvals } = buildService({ agencyUsers: [{ id: 'client-user-1', role: Role.CLIENT }] });
+      await service.submit('client-1', 'content-1', makeUser({ role: Role.CREATOR }), {
+        approverIds: ['client-user-1'],
+      } as any);
+      expect(approvals.createFlowForContent).toHaveBeenCalled();
     });
   });
 });

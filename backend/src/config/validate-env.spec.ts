@@ -27,4 +27,23 @@ describe('validateEnv', () => {
   it('does not throw on an empty-string secret (treated as absent, not "weak")', () => {
     expect(() => validateEnv({ JWT_REFRESH_SECRET: '' })).not.toThrow();
   });
+
+  it('rejects a production config missing SMTP settings', () => {
+    expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/SMTP_HOST/);
+  });
+
+  it('passes a production config with all SMTP settings present', () => {
+    const config = {
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'user@gmail.com',
+      SMTP_PASSWORD: 'app-password',
+    };
+    expect(validateEnv(config)).toEqual(config);
+  });
+
+  it('does not require SMTP settings outside production', () => {
+    expect(() => validateEnv({ NODE_ENV: 'development' })).not.toThrow();
+  });
 });

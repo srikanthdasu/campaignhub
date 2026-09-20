@@ -98,7 +98,10 @@ export class ApprovalsService {
     }
 
     return this.prisma.approvalFlow.findMany({
-      where: { steps: { some: { approverId: user.sub } } },
+      where: {
+        steps: { some: { approverId: user.sub } },
+        contentItem: { client: { agencyId: user.agencyId! } },
+      },
       include: APPROVAL_STEP_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });

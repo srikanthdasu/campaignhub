@@ -134,6 +134,26 @@ describe('ClientsService', () => {
       );
     });
 
+    it('writes one audit entry per client — not a joined id string — when one agency has 2+ clients expire together', async () => {
+      // Regression test: entityId is a strict UUID column. The previous implementation joined
+      // multiple client ids into one comma-separated entityId per agency, which would have
+      // thrown here (after the delete already committed) the moment an agency had 2+ expired
+      // clients in the same run.
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-1', name: 'Old Co', agencyId: 'agency-1' },
+        { id: 'client-2', name: 'Older Co', agencyId: 'agency-1' },
+      ] as never);
+      await service.purgeExpired(15);
+      expect(audit.log).toHaveBeenCalledTimes(2);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ agencyId: 'agency-1', entityId: 'client-1' }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ agencyId: 'agency-1', entityId: 'client-2' }),
+      );
+    });
+
     it('skips the delete and audit call when nothing is due for purge', async () => {
       const { service, prisma, audit } = buildService();
       const count = await service.purgeExpired(15);

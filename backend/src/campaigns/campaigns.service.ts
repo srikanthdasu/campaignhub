@@ -119,7 +119,7 @@ export class CampaignsService {
     });
   }
 
-  private async requireInClient(id: string, clientId: string) {
+  async requireInClient(id: string, clientId: string) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
     if (!campaign || campaign.clientId !== clientId) {
       throw new NotFoundException('Campaign not found for this client');

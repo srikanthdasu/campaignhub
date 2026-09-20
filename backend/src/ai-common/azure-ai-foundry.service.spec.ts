@@ -12,7 +12,10 @@ const CONFIG_VALUES: Record<string, string> = {
 };
 
 function buildService() {
-  const config = { getOrThrow: vi.fn((key: string) => CONFIG_VALUES[key]) };
+  const config = {
+    getOrThrow: vi.fn((key: string) => CONFIG_VALUES[key]),
+    get: vi.fn((key: string) => CONFIG_VALUES[key]),
+  };
   const service = new AzureAiFoundryService(config as unknown as ConfigService);
   return { service, config };
 }
@@ -123,6 +126,25 @@ describe('AzureAiFoundryService.chat', () => {
 
     await expect(service.chat([{ role: 'user', content: 'hi' }])).rejects.toThrow('empty response');
   });
+
+  it('works normally when AI_TEXT_GENERATION_ENABLED is unset (defaults on)', async () => {
+    const { service } = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(200, { choices: [{ message: { content: 'hi' } }] }))),
+    );
+    await expect(service.chat([{ role: 'user', content: 'hi' }])).resolves.toBe('hi');
+  });
+
+  it('throws ServiceUnavailableException when AI_TEXT_GENERATION_ENABLED is explicitly "false"', async () => {
+    const { service, config } = buildService();
+    config.get = vi.fn((key: string) => (key === 'AI_TEXT_GENERATION_ENABLED' ? 'false' : CONFIG_VALUES[key]));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(service.chat([{ role: 'user', content: 'hi' }])).rejects.toThrow('temporarily disabled');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('AzureAiFoundryService.generateImage', () => {
@@ -188,5 +210,15 @@ describe('AzureAiFoundryService.generateImage', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, { data: [] }))));
 
     await expect(service.generateImage('a red circle')).rejects.toThrow('returned no image');
+  });
+
+  it('throws ServiceUnavailableException when AI_IMAGE_GENERATION_ENABLED is explicitly "false"', async () => {
+    const { service, config } = buildService();
+    config.get = vi.fn((key: string) => (key === 'AI_IMAGE_GENERATION_ENABLED' ? 'false' : CONFIG_VALUES[key]));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(service.generateImage('a red circle')).rejects.toThrow('temporarily disabled');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

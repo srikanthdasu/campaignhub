@@ -52,7 +52,10 @@ describe('SchedulerService.autoPublishDuePosts', () => {
     expect(count).toBe(2);
     expect(prisma.scheduledPost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: ScheduledPostStatus.PENDING }),
+        where: expect.objectContaining({
+          status: ScheduledPostStatus.PENDING,
+          contentItem: { client: { deletedAt: null } },
+        }),
       }),
     );
     expect(prisma.scheduledPost.update).toHaveBeenCalledTimes(2);

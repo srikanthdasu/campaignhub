@@ -178,7 +178,11 @@ export class SchedulerService {
   /** Called by SchedulerCronService — no user in the loop, so no access check or actor on the audit entry. */
   async autoPublishDuePosts() {
     const due = await this.prisma.scheduledPost.findMany({
-      where: { status: ScheduledPostStatus.PENDING, scheduledTime: { lte: new Date() } },
+      where: {
+        status: ScheduledPostStatus.PENDING,
+        scheduledTime: { lte: new Date() },
+        contentItem: { client: { deletedAt: null } },
+      },
     });
 
     for (const post of due) {

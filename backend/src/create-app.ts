@@ -28,6 +28,11 @@ export async function createApp(): Promise<NestExpressApplication> {
   const config = app.get(ConfigService);
   const apiPrefix = config.get<string>('API_PREFIX', '');
 
+  // Azure App Service terminates TLS at a front-end proxy and forwards over a local connection —
+  // without this, req.ip resolves to the proxy for every request, collapsing the rate limiter's
+  // per-IP buckets (login, register, AI generation) into one shared bucket for all real visitors.
+  app.set('trust proxy', 1);
+
   // crossOriginResourcePolicy relaxed so the frontend (a different origin in local dev) can
   // render uploaded media via <img>/<video> src — CORS below still governs actual API calls.
   //

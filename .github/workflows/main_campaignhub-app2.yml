@@ -27,11 +27,9 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Apply database migrations
+      - name: Run backend tests
         working-directory: backend
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate deploy
+        run: npm run test
 
       - name: Build backend
         working-directory: backend
@@ -41,6 +39,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test
+
       - name: Build frontend
         working-directory: frontend
         env:
@@ -49,6 +51,18 @@ jobs:
           # is a same-origin relative path, not the separate-port URL local dev uses.
           NEXT_PUBLIC_API_URL: /api
         run: npm run build
+
+      # Runs only after both builds have already succeeded — applying a migration ahead of an
+      # unbuildable release is exactly the failure mode that caused the "No clients yet" incident
+      # this step originally fixed. Stays in this job (rather than the deploy job) because that's
+      # the only job with the schema/migrations source checked out and the Prisma CLI installed;
+      # moving it there would mean re-checking-out and re-installing for no real benefit, since
+      # `needs: build` already blocks deploy on this job's success either way.
+      - name: Apply database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
 
       - name: Stage deployment package
         run: |

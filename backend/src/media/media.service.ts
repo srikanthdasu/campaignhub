@@ -147,7 +147,7 @@ export class MediaService {
     });
   }
 
-  private async requireInClient(id: string, clientId: string) {
+  async requireInClient(id: string, clientId: string) {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
     if (!asset || asset.clientId !== clientId) {
       throw new NotFoundException('Media asset not found for this client');

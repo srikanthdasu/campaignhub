@@ -164,3 +164,42 @@ describe('ApprovalsService.decide', () => {
     expect(flowState.steps[0].decision).toBe(ApprovalDecision.PENDING);
   });
 });
+
+describe('ApprovalsService.listForUser', () => {
+  it('scopes a non-admin approver\'s list to their own agency (cross-tenant leak fix)', async () => {
+    const prisma = { approvalFlow: { findMany: vi.fn(() => Promise.resolve([])) } };
+    const service = new ApprovalsService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await service.listForUser(makeUser({ sub: 'approver-1', role: Role.CREATOR, agencyId: 'agency-1' }));
+
+    expect(prisma.approvalFlow.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          steps: { some: { approverId: 'approver-1' } },
+          contentItem: { client: { agencyId: 'agency-1' } },
+        }),
+      }),
+    );
+  });
+
+  it('scopes an OWNER/ADMIN\'s agency-wide list to their own agency', async () => {
+    const prisma = { approvalFlow: { findMany: vi.fn(() => Promise.resolve([])) } };
+    const service = new ApprovalsService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await service.listForUser(makeUser({ sub: 'owner-1', role: Role.OWNER, agencyId: 'agency-1' }));
+
+    expect(prisma.approvalFlow.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { contentItem: { client: { agencyId: 'agency-1' } } },
+      }),
+    );
+  });
+});

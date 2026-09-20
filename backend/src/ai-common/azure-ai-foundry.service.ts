@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export interface ChatMessage {
@@ -24,6 +24,13 @@ export class AzureAiFoundryService {
   constructor(private config: ConfigService) {}
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+    // Unlike VideoGenerationService's kill switch (default OFF, no budget yet), text/image
+    // generation are live, actively-used product features — this is an emergency spend lever,
+    // not a launch gate, so it defaults ON and only blocks when explicitly disabled.
+    if (this.config.get<string>('AI_TEXT_GENERATION_ENABLED') === 'false') {
+      throw new ServiceUnavailableException('AI text generation is temporarily disabled.');
+    }
+
     const endpoint = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_ENDPOINT');
     const key = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_KEY');
     const model = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_TEXT_MODEL');
@@ -58,6 +65,11 @@ export class AzureAiFoundryService {
 
   /** Returns raw PNG bytes for the given prompt. */
   async generateImage(prompt: string, size = '1024x1024'): Promise<Buffer> {
+    // Same emergency-lever pattern as chat() above — defaults ON.
+    if (this.config.get<string>('AI_IMAGE_GENERATION_ENABLED') === 'false') {
+      throw new ServiceUnavailableException('AI image generation is temporarily disabled.');
+    }
+
     const endpoint = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_IMAGE_ENDPOINT');
     const key = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_IMAGE_KEY');
     const model = this.config.getOrThrow<string>('AZURE_AI_FOUNDRY_IMAGE_MODEL');

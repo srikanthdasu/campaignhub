@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MediaService } from '../media/media.service.js';
 import { ApprovalsService } from '../approvals/approvals.service.js';
+import { CampaignsService } from '../campaigns/campaigns.service.js';
 import { CreateContentDto } from './dto/create-content.dto.js';
 import { UpdateContentDto } from './dto/update-content.dto.js';
 import { SubmitContentDto } from './dto/submit-content.dto.js';
@@ -19,9 +20,13 @@ export class ContentService {
     private audit: AuditService,
     private media: MediaService,
     private approvals: ApprovalsService,
+    private campaigns: CampaignsService,
   ) {}
 
   async create(clientId: string, user: AuthenticatedUser, dto: CreateContentDto) {
+    if (dto.mediaAssetId) await this.media.requireInClient(dto.mediaAssetId, clientId);
+    if (dto.campaignId) await this.campaigns.requireInClient(dto.campaignId, clientId);
+
     const item = await this.prisma.contentItem.create({
       data: {
         clientId,
@@ -73,6 +78,7 @@ export class ContentService {
     }
 
     if (dto.mediaAssetId && dto.mediaAssetId !== item.mediaAssetId) {
+      await this.media.requireInClient(dto.mediaAssetId, clientId);
       await this.media.incrementUsage(dto.mediaAssetId);
     }
 
@@ -118,18 +124,21 @@ export class ContentService {
       throw new BadRequestException('Only draft or changes-requested content can be submitted');
     }
 
-    if (user.role === Role.CLIENT) {
-      await this.assertApproversAreAgencyStaff(dto.approverIds, user);
-    }
+    await this.assertApproversValid(dto.approverIds, user);
 
     return this.approvals.createFlowForContent(id, user.sub, dto.approverIds, dto.mode, dto.dueDate);
   }
 
+  // Runs for every submitter, not just clients — approverIds used to go straight into the
+  // approval flow unvalidated for agency staff, meaning a cross-agency user id would silently
+  // succeed and then show up (with full client details) in that other agency's approvals list.
   // A client can never name themselves — or another client — as the approver of their own
-  // content: the agency is the point of contact if something wrong goes out, so the approver
-  // has to be agency staff. Server-side, not just a UI convention (mirrors the equally-real rule
-  // in ApprovalsService.decide() that nobody can approve content they created).
-  private async assertApproversAreAgencyStaff(approverIds: string[], user: AuthenticatedUser) {
+  // content: the agency is the point of contact if something wrong goes out. Staff submitters,
+  // however, legitimately need to name a client-role approver (the normal "we submit, client
+  // approves" workflow), so that restriction only applies when the submitter is themselves a
+  // client. Mirrors the equally-real rule in ApprovalsService.decide() that nobody can approve
+  // content they created.
+  private async assertApproversValid(approverIds: string[], user: AuthenticatedUser) {
     if (approverIds.includes(user.sub)) {
       throw new ForbiddenException('You cannot name yourself as the approver of your own content');
     }
@@ -137,7 +146,10 @@ export class ContentService {
       where: { id: { in: approverIds }, agencyId: user.agencyId! },
       select: { id: true, role: true },
     });
-    if (approvers.length !== approverIds.length || approvers.some((a) => a.role === Role.CLIENT)) {
+    if (approvers.length !== approverIds.length) {
+      throw new ForbiddenException('Approvers must belong to your agency');
+    }
+    if (user.role === Role.CLIENT && approvers.some((a) => a.role === Role.CLIENT)) {
       throw new ForbiddenException('Approvers must be agency staff, not client-portal users');
     }
   }

@@ -121,22 +121,17 @@ export class ClientsService {
 
     await this.prisma.client.deleteMany({ where: { id: { in: due.map((c) => c.id) } } });
 
-    // One audit entry per agency, not one entry for the whole cron batch — a single run can
-    // purge clients across many different agencies, and a shared entityId/agencyId across those
-    // would misattribute the purge to whichever agency happened to be read first.
-    const byAgency = new Map<string, { id: string; name: string }[]>();
+    // One audit entry per purged client, not per agency batch — entityId is a strict UUID
+    // column, so joining multiple client ids into one string (the previous approach) would throw
+    // the moment a single agency had 2+ clients expire in the same run, after the delete had
+    // already committed.
     for (const client of due) {
-      const list = byAgency.get(client.agencyId) ?? [];
-      list.push({ id: client.id, name: client.name });
-      byAgency.set(client.agencyId, list);
-    }
-    for (const [agencyId, clients] of byAgency) {
       await this.audit.log({
-        agencyId,
+        agencyId: client.agencyId,
         action: 'CLIENT_PURGED',
         entityType: 'client',
-        entityId: clients.map((c) => c.id).join(','),
-        metadata: { count: clients.length, names: clients.map((c) => c.name) },
+        entityId: client.id,
+        metadata: { name: client.name },
       });
     }
 

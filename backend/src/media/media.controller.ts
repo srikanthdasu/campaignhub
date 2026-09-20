@@ -34,7 +34,11 @@ export class MediaController {
   @Post()
   @UseGuards(ClientContentCreationGuard)
   @UseInterceptors(
-    FileInterceptor('file', { storage: mediaMulterStorage, fileFilter: mediaMulterFileFilter }),
+    FileInterceptor('file', {
+      storage: mediaMulterStorage,
+      fileFilter: mediaMulterFileFilter,
+      limits: { fileSize: MAX_FILE_SIZE_BYTES },
+    }),
   )
   upload(
     @Param('clientId') clientId: string,
