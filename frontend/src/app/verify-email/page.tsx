@@ -42,14 +42,14 @@ function VerifyEmailContent() {
   }, []);
 
   return (
-    <div className="grid lg:grid-cols-2 lg:items-start">
+    <div className="grid min-h-dvh lg:grid-cols-2">
       <AuthBrandPanel
         eyebrow="Agency Command Center"
         headline="One more step to activate your workspace."
         subtext="Confirming your email keeps every agency account on CampaignHub AI real and secure."
       />
 
-      <div className="flex flex-col items-center gap-4 px-6 py-8">
+      <div className="flex flex-col items-center justify-center gap-4 px-6 py-8">
         <Card padding="lg" className="w-full max-w-sm">
           <motion.div
             initial={{ opacity: 0, y: 8 }}

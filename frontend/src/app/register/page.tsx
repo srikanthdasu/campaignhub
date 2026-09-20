@@ -46,14 +46,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="grid lg:grid-cols-2 lg:items-start">
+    <div className="grid min-h-dvh lg:grid-cols-2">
       <AuthBrandPanel
         eyebrow="Agency Command Center"
         headline="Bring your whole agency into one workspace, in minutes."
         subtext="You'll be the Owner — invite your team and clients once you're in."
       />
 
-      <div className="flex flex-col items-center gap-4 px-6 py-8">
+      <div className="flex flex-col items-center justify-center gap-4 px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
