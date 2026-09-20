@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -11,6 +11,14 @@ import { AuthPromoFooter } from '@/components/auth-promo-footer';
 import { DURATION, EASE_SOFT } from '@/lib/motion';
 
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
+}
+
+function VerifyEmailContent() {
   const { verifyEmail } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
