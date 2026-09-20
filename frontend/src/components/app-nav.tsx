@@ -29,6 +29,7 @@ import {
   BarChart3,
   FileText,
   CreditCard,
+  Crown,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -41,6 +42,7 @@ interface NavLink {
   label: string;
   icon: LucideIcon;
   adminOnly: boolean;
+  superAdminOnly?: boolean;
 }
 
 const sections: { label: string; links: NavLink[] }[] = [
@@ -92,6 +94,13 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: '/ai-strategy', label: 'AI Strategy & Governance', icon: Brain, adminOnly: false },
       { href: '/billing', label: 'Billing & Subscriptions', icon: CreditCard, adminOnly: true },
       { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
+      {
+        href: '/admin/super-admin',
+        label: 'Super Admin',
+        icon: Crown,
+        adminOnly: true,
+        superAdminOnly: true,
+      },
     ],
   },
   {
@@ -138,6 +147,7 @@ export function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
   const admin = isAgencyAdmin(user?.role as Role | undefined);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const isClient = user?.role === 'CLIENT';
   const { clients } = useClientPicker();
   const canCreate = isClient && clients?.[0]?.allowClientContentCreation === true;
@@ -172,7 +182,9 @@ export function AppNav() {
 
       <div className="flex-1 space-y-5">
         {navSections.map((section) => {
-          const visibleLinks = section.links.filter((link) => !link.adminOnly || admin);
+          const visibleLinks = section.links.filter(
+            (link) => (!link.adminOnly || admin) && (!link.superAdminOnly || isSuperAdmin),
+          );
           if (visibleLinks.length === 0) return null;
           return (
             <div key={section.label}>

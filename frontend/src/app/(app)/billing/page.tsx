@@ -89,7 +89,7 @@ const VIEW_ROLES = ['OWNER', 'ADMIN'];
 
 export default function BillingPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'SUPER_ADMIN']}>
       <BillingPageContent />
     </RequireRole>
   );

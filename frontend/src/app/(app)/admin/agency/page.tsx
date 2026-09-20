@@ -167,7 +167,7 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 
 export default function AgencyAdminPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'SUPER_ADMIN']}>
       <AgencyAdminPageContent />
     </RequireRole>
   );

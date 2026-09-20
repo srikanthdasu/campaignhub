@@ -11,7 +11,7 @@ import { ContentStatus, Role } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const EDITABLE_STATUSES: ContentStatus[] = [ContentStatus.DRAFT, ContentStatus.CHANGES_REQUESTED];
-const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER];
+const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SUPER_ADMIN];
 
 @Injectable()
 export class ContentService {

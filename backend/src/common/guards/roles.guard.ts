@@ -18,7 +18,15 @@ export class RolesGuard implements CanActivate {
     }
 
     const user: AuthenticatedUser | undefined = context.switchToHttp().getRequest().user;
-    if (!user || !requiredRoles.includes(user.role)) {
+    if (!user) {
+      throw new ForbiddenException('Insufficient role for this action');
+    }
+    // Platform-operator role — passes every @Roles() check unconditionally, everywhere, rather
+    // than being added to each of the ~15 controllers' own local role arrays individually.
+    if (user.role === Role.SUPER_ADMIN) {
+      return true;
+    }
+    if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Insufficient role for this action');
     }
     return true;

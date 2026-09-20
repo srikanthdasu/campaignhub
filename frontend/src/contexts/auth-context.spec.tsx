@@ -11,19 +11,22 @@ vi.mock('@/lib/api.js', async () => {
     api: {
       ...actual.api,
       post: vi.fn(),
+      patch: vi.fn(),
       refreshSession: vi.fn(),
     },
   };
 });
 
 function Probe() {
-  const { user, status, login, logout } = useAuth();
+  const { user, status, login, logout, switchAgency } = useAuth();
   return (
     <div>
       <span data-testid="status">{status}</span>
       <span data-testid="user">{user?.email ?? 'none'}</span>
+      <span data-testid="agency">{user?.agencyId ?? 'none'}</span>
       <button onClick={() => login('a@b.com', 'password123')}>login</button>
       <button onClick={() => logout()}>logout</button>
+      <button onClick={() => switchAgency('agency-2')}>switch</button>
     </div>
   );
 }
@@ -123,5 +126,31 @@ describe('AuthProvider', () => {
     });
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+  });
+
+  it('switchAgency calls the act-as-agency endpoint then refreshes the session', async () => {
+    vi.mocked(api.refreshSession)
+      .mockResolvedValueOnce({
+        user: { id: 'sa1', email: 'sa@b.com', name: 'SA', role: 'SUPER_ADMIN', agencyId: 'agency-1' },
+        accessToken: 'tok',
+      })
+      .mockResolvedValueOnce({
+        user: { id: 'sa1', email: 'sa@b.com', name: 'SA', role: 'SUPER_ADMIN', agencyId: 'agency-2' },
+        accessToken: 'tok2',
+      });
+    vi.mocked(api.patch).mockResolvedValue({});
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('agency')).toHaveTextContent('agency-1'));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('switch'));
+
+    expect(api.patch).toHaveBeenCalledWith('/users/me/act-as-agency', { agencyId: 'agency-2' });
+    await waitFor(() => expect(screen.getByTestId('agency')).toHaveTextContent('agency-2'));
   });
 });

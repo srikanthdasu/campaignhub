@@ -5,15 +5,13 @@ import { Role } from '../../generated/prisma/client.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { ExecutionContext } from '@nestjs/common';
 
-function buildContext(user: unknown, clientId: string): ExecutionContext {
+function buildContext(user: unknown, clientId: string | undefined): ExecutionContext {
   return {
-    switchToHttp: () => ({
-      getRequest: () => ({ user, params: { clientId } }),
-    }),
+    switchToHttp: () => ({ getRequest: () => ({ user, params: { clientId } }) }),
   } as unknown as ExecutionContext;
 }
 
-function buildGuard(client: Record<string, unknown> | null, access: unknown) {
+function buildGuard(client: Record<string, unknown> | null, access: Record<string, unknown> | null = null) {
   const prisma = {
     client: { findUnique: vi.fn(() => Promise.resolve(client)) },
     userClientAccess: { findUnique: vi.fn(() => Promise.resolve(access)) },
@@ -22,42 +20,47 @@ function buildGuard(client: Record<string, unknown> | null, access: unknown) {
 }
 
 describe('ClientAccessGuard', () => {
-  it('lets OWNER/ADMIN through regardless of a per-user access grant', async () => {
+  it('rejects a client belonging to a different agency', async () => {
+    const { guard } = buildGuard({ id: 'client-1', agencyId: 'agency-2' });
+    const user = { sub: 'u1', agencyId: 'agency-1', role: Role.OWNER };
+    await expect(guard.canActivate(buildContext(user, 'client-1'))).rejects.toThrow(
+      'Client belongs to a different agency',
+    );
+  });
+
+  it('grants OWNER full access once the agency matches', async () => {
+    const { guard } = buildGuard({ id: 'client-1', agencyId: 'agency-1' });
+    const user = { sub: 'u1', agencyId: 'agency-1', role: Role.OWNER };
+    await expect(guard.canActivate(buildContext(user, 'client-1'))).resolves.toBe(true);
+  });
+
+  it('grants SUPER_ADMIN full access once its agencyId matches (post-switch)', async () => {
+    const { guard, prisma } = buildGuard({ id: 'client-1', agencyId: 'agency-2' });
+    const user = { sub: 'super-admin-1', agencyId: 'agency-2', role: Role.SUPER_ADMIN };
+    await expect(guard.canActivate(buildContext(user, 'client-1'))).resolves.toBe(true);
+    // No UserClientAccess grant required — same short-circuit as OWNER/ADMIN.
+    expect(prisma.userClientAccess.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('still rejects SUPER_ADMIN for an agency it has not switched into', async () => {
+    const { guard } = buildGuard({ id: 'client-1', agencyId: 'agency-2' });
+    const user = { sub: 'super-admin-1', agencyId: 'agency-1', role: Role.SUPER_ADMIN };
+    await expect(guard.canActivate(buildContext(user, 'client-1'))).rejects.toThrow(
+      'Client belongs to a different agency',
+    );
+  });
+
+  it('requires an explicit UserClientAccess grant for a non-elevated role', async () => {
     const { guard } = buildGuard({ id: 'client-1', agencyId: 'agency-1' }, null);
-    const user = { sub: 'user-1', agencyId: 'agency-1', role: Role.OWNER };
-    await expect(guard.canActivate(buildContext(user, 'client-1'))).resolves.toBe(true);
-  });
-
-  it('rejects a CLIENT-role user when portal access is disabled, even with a grant', async () => {
-    const { guard } = buildGuard(
-      { id: 'client-1', agencyId: 'agency-1', allowClientPortalAccess: false },
-      { userId: 'user-1', clientId: 'client-1' },
+    const user = { sub: 'u1', agencyId: 'agency-1', role: Role.CREATOR };
+    await expect(guard.canActivate(buildContext(user, 'client-1'))).rejects.toThrow(
+      'You do not have access to this client',
     );
-    const user = { sub: 'user-1', agencyId: 'agency-1', role: Role.CLIENT };
-    await expect(guard.canActivate(buildContext(user, 'client-1'))).rejects.toThrow(ForbiddenException);
-  });
-
-  it('allows a CLIENT-role user through when portal access is enabled and they have a grant', async () => {
-    const { guard } = buildGuard(
-      { id: 'client-1', agencyId: 'agency-1', allowClientPortalAccess: true },
-      { userId: 'user-1', clientId: 'client-1' },
-    );
-    const user = { sub: 'user-1', agencyId: 'agency-1', role: Role.CLIENT };
-    await expect(guard.canActivate(buildContext(user, 'client-1'))).resolves.toBe(true);
-  });
-
-  it('does not gate non-CLIENT roles on the portal access toggle', async () => {
-    const { guard } = buildGuard(
-      { id: 'client-1', agencyId: 'agency-1', allowClientPortalAccess: false },
-      { userId: 'user-1', clientId: 'client-1' },
-    );
-    const user = { sub: 'user-1', agencyId: 'agency-1', role: Role.MANAGER };
-    await expect(guard.canActivate(buildContext(user, 'client-1'))).resolves.toBe(true);
   });
 
   it('404s when the client does not exist', async () => {
-    const { guard } = buildGuard(null, null);
-    const user = { sub: 'user-1', agencyId: 'agency-1', role: Role.MANAGER };
+    const { guard } = buildGuard(null);
+    const user = { sub: 'u1', agencyId: 'agency-1', role: Role.OWNER };
     await expect(guard.canActivate(buildContext(user, 'missing'))).rejects.toThrow(NotFoundException);
   });
 });

@@ -23,7 +23,7 @@ interface Agency {
 
 export default function SettingsPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'SUPER_ADMIN']}>
       <SettingsPageContent />
     </RequireRole>
   );

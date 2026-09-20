@@ -47,7 +47,7 @@ export class ClientsService {
   }
 
   async listForUser(user: AuthenticatedUser) {
-    if (user.role === Role.OWNER || user.role === Role.ADMIN) {
+    if (user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
       return this.prisma.client.findMany({
         where: { agencyId: user.agencyId!, deletedAt: null },
         orderBy: { createdAt: 'asc' },

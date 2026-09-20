@@ -89,7 +89,7 @@ export class ApprovalsService {
   }
 
   async listForUser(user: AuthenticatedUser) {
-    if (user.role === Role.OWNER || user.role === Role.ADMIN) {
+    if (user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
       return this.prisma.approvalFlow.findMany({
         where: { contentItem: { client: { agencyId: user.agencyId! } } },
         include: APPROVAL_STEP_INCLUDE,
@@ -114,7 +114,11 @@ export class ApprovalsService {
     if (flow.contentItem.client.agencyId !== user.agencyId) {
       throw new NotFoundException('Approval flow not found');
     }
-    const isAgencyWide = user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.MANAGER;
+    const isAgencyWide =
+      user.role === Role.OWNER ||
+      user.role === Role.ADMIN ||
+      user.role === Role.MANAGER ||
+      user.role === Role.SUPER_ADMIN;
     const isAssignedApprover = flow.steps.some((s) => s.approverId === user.sub);
     if (!isAgencyWide && !isAssignedApprover) {
       throw new ForbiddenException('You do not have access to this approval flow');
@@ -158,7 +162,7 @@ export class ApprovalsService {
     const step = flow.steps.find((s) => s.id === stepId);
     if (!step) throw new NotFoundException('Approval step not found on this flow');
 
-    const isOverride = user.role === Role.OWNER || user.role === Role.ADMIN;
+    const isOverride = user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN;
     if (!isOverride && step.approverId !== user.sub) {
       throw new ForbiddenException('You are not the assigned approver for this step');
     }

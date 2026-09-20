@@ -29,7 +29,7 @@ const ACTION_TONE: Record<string, 'accent' | 'success' | 'warning' | 'danger' | 
 
 export default function AuditLogPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'SUPER_ADMIN']}>
       <AuditLogPageContent />
     </RequireRole>
   );

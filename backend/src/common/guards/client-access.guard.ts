@@ -35,7 +35,7 @@ export class ClientAccessGuard implements CanActivate {
       throw new ForbiddenException('Client belongs to a different agency');
     }
 
-    if (user.role === Role.OWNER || user.role === Role.ADMIN) {
+    if (user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
       return true;
     }
 

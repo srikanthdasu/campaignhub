@@ -67,7 +67,7 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 
 export default function MembersAdminPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'SUPER_ADMIN']}>
       <MembersAdminPageContent />
     </RequireRole>
   );

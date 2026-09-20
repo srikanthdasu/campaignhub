@@ -12,6 +12,7 @@ interface AuthContextValue {
   register: (agencyName: string, name: string, email: string, password: string) => Promise<{ message: string }>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: (email: string) => Promise<{ message: string }>;
+  switchAgency: (agencyId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -79,6 +80,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return api.post<{ message: string }>('/auth/resend-verification', { email });
   }, []);
 
+  const switchAgency = useCallback(async (agencyId: string) => {
+    // The backend endpoint only updates the account's own agencyId + logs it — it deliberately
+    // doesn't reissue tokens itself (that logic already exists correctly in /auth/refresh, which
+    // re-reads this account's current DB row including the field we just changed).
+    await api.patch('/users/me/act-as-agency', { agencyId });
+    const session = await api.refreshSession();
+    if (session) {
+      setUser(session.user);
+      setStatus('authenticated');
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -91,7 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, status, login, register, verifyEmail, resendVerification, logout }}>
+    <AuthContext.Provider
+      value={{ user, status, login, register, verifyEmail, resendVerification, switchAgency, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

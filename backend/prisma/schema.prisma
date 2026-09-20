@@ -21,6 +21,11 @@ enum Role {
   DESIGNER
   ANALYST
   CLIENT
+  // Platform-operator account, not assignable through any UI or API — provisioned once, by
+  // hand, outside the app. Behaves exactly like Owner, but only for whichever single agency its
+  // own agencyId currently points to; switching agency is a dedicated endpoint that updates that
+  // one field, so every existing agency-scoped query in the codebase works unmodified.
+  SUPER_ADMIN
 }
 
 model Agency {

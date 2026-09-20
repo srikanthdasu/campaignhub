@@ -72,7 +72,12 @@ export class UsersService {
   }
 
   async createMember(agencyId: string, actorId: string, actorRole: Role, dto: CreateMemberDto) {
-    if (dto.role === Role.OWNER && actorRole !== Role.OWNER) {
+    // Not a display omission from ROLES on the frontend — the only way this role can ever exist
+    // on an account is a one-off script run directly against the database, never through the app.
+    if (dto.role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException('This role cannot be assigned through the app');
+    }
+    if (dto.role === Role.OWNER && actorRole !== Role.OWNER && actorRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Only an Owner can create another Owner');
     }
 
@@ -128,7 +133,10 @@ export class UsersService {
     targetUserId: string,
     role: Role,
   ) {
-    if (role === Role.OWNER && actorRole !== Role.OWNER) {
+    if (role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException('This role cannot be assigned through the app');
+    }
+    if (role === Role.OWNER && actorRole !== Role.OWNER && actorRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Only an Owner can promote a member to Owner');
     }
 
@@ -217,6 +225,48 @@ export class UsersService {
       action: 'PASSWORD_RESET_BY_ADMIN',
       entityType: 'user',
       entityId: targetUserId,
+    });
+  }
+
+  /**
+   * Super Admin only — the entire mechanism behind "switch into any agency, act as its Owner."
+   * Updates the caller's OWN agencyId, so every existing agency-scoped query in the codebase
+   * keeps working unmodified: the account genuinely, temporarily belongs to the target agency.
+   * Logged to that agency's own audit trail — every action taken afterward is attributable, not
+   * a hidden backdoor.
+   */
+  async actAsAgency(actorId: string, previousAgencyId: string | null, targetAgencyId: string) {
+    const agency = await this.prisma.agency.findUnique({ where: { id: targetAgencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+
+    const user = await this.prisma.user.update({
+      where: { id: actorId },
+      data: { agencyId: targetAgencyId },
+      select: SAFE_USER_SELECT,
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      agencyId: targetAgencyId,
+      action: 'SUPER_ADMIN_SWITCHED_AGENCY',
+      entityType: 'agency',
+      entityId: targetAgencyId,
+      metadata: { from: previousAgencyId, to: targetAgencyId, agencyName: agency.name },
+    });
+
+    return user;
+  }
+
+  /** Super Admin only — the agency picker for actAsAgency(). */
+  async listAllAgencies() {
+    return this.prisma.agency.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        _count: { select: { users: true, clients: true } },
+      },
     });
   }
 

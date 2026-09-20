@@ -6,6 +6,7 @@ import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { UpdateActiveDto } from './dto/update-active.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { ActAsAgencyDto } from './dto/act-as-agency.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -72,5 +73,17 @@ export class UsersController {
     @Body() dto: UpdateActiveDto,
   ) {
     return this.usersService.setActive(user.agencyId!, user.sub, targetUserId, dto.isActive);
+  }
+
+  @Get('agencies')
+  @Roles(Role.SUPER_ADMIN)
+  listAllAgencies() {
+    return this.usersService.listAllAgencies();
+  }
+
+  @Patch('me/act-as-agency')
+  @Roles(Role.SUPER_ADMIN)
+  actAsAgency(@CurrentUser() user: AuthenticatedUser, @Body() dto: ActAsAgencyDto) {
+    return this.usersService.actAsAgency(user.sub, user.agencyId, dto.agencyId);
   }
 }
