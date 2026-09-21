@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ThreeBackground } from "@/components/three-background";
+import { SITE_URL, SITE_NAME } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CampaignHub AI",
-  description: "Agency campaign management platform",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Plan, Approve, and Publish Every Client Campaign`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description:
+    "AI-powered social media management for agencies — content planning, approvals, scheduling, and AI-generated captions and images, all in one workspace.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
