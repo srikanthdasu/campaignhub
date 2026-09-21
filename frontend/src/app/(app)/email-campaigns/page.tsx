@@ -164,7 +164,7 @@ export default function EmailCampaignsPage() {
       loadSelected(selected.id);
       loadCampaigns();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to import CSV');
+      setError(err instanceof Error ? err.message : 'Failed to import CSV');
     } finally {
       setImporting(false);
     }
