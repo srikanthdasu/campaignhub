@@ -5,6 +5,16 @@ vi.mock('bcrypt', () => ({
   compare: vi.fn(async (plain: string) => plain === 'correct-password'),
 }));
 
+const mockVerifyIdToken = vi.hoisted(() => vi.fn());
+vi.mock('google-auth-library', () => {
+  class MockOAuth2Client {
+    verifyIdToken(...args: unknown[]) {
+      return mockVerifyIdToken(...args);
+    }
+  }
+  return { OAuth2Client: MockOAuth2Client };
+});
+
 import { AuthService } from './auth.service.js';
 import { Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -21,7 +31,7 @@ function buildService(overrides: { existingUser?: any } = {}) {
     decode: vi.fn(() => ({ exp: FUTURE_EXP })),
   };
   const config = {
-    get: vi.fn((key: string, fallback?: unknown) => fallback),
+    get: vi.fn((key: string, fallback?: unknown) => (key === 'GOOGLE_CLIENT_ID' ? 'test-google-client-id' : fallback)),
     getOrThrow: vi.fn((key: string) => `secret-${key}`),
   };
   const txUserCreate = vi.fn((args: any) => Promise.resolve({ id: 'user-1', ...args.data }));
@@ -324,6 +334,129 @@ describe('AuthService.refresh', () => {
       }),
     ) as any;
     await expect(service.refresh('some-token')).rejects.toThrow('Account is no longer active');
+  });
+});
+
+describe('AuthService.googleAuth', () => {
+  function mockGooglePayload(overrides: Partial<{
+    email: string;
+    name: string;
+    sub: string;
+    email_verified: boolean;
+  }> = {}) {
+    mockVerifyIdToken.mockResolvedValueOnce({
+      getPayload: () => ({
+        email: 'person@gmail.com',
+        name: 'Person',
+        sub: 'google-sub-123',
+        email_verified: true,
+        ...overrides,
+      }),
+    });
+  }
+
+  it('fails closed when GOOGLE_CLIENT_ID is not configured', async () => {
+    const { service, config } = buildService();
+    config.get.mockImplementation((key: string, fallback?: unknown) => fallback);
+    await expect(service.googleAuth('some-id-token')).rejects.toThrow('Google sign-in is not configured');
+  });
+
+  it('rejects an ID token that fails verification', async () => {
+    const { service } = buildService();
+    mockVerifyIdToken.mockRejectedValueOnce(new Error('bad signature'));
+    await expect(service.googleAuth('tampered')).rejects.toThrow('Invalid Google sign-in token');
+  });
+
+  it('rejects a token whose payload reports an unverified email', async () => {
+    const { service } = buildService();
+    mockGooglePayload({ email_verified: false });
+    await expect(service.googleAuth('some-id-token')).rejects.toThrow(
+      'Google account email is not verified',
+    );
+  });
+
+  it('logs in directly when a user is already matched by googleId — no account-link or new-agency writes', async () => {
+    const { service, prisma, audit } = buildService({
+      existingUser: {
+        id: 'u1',
+        email: 'person@gmail.com',
+        name: 'Person',
+        role: Role.OWNER,
+        agencyId: 'agency-1',
+        googleId: 'google-sub-123',
+        isActive: true,
+      },
+    });
+    mockGooglePayload();
+
+    const result = await service.googleAuth('some-id-token');
+
+    expect(result.accessToken).toBe('signed-token');
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'LOGIN_SUCCESS' }));
+  });
+
+  it('rejects an inactive account matched by googleId', async () => {
+    const { service, audit } = buildService({
+      existingUser: {
+        id: 'u1',
+        email: 'person@gmail.com',
+        googleId: 'google-sub-123',
+        isActive: false,
+      },
+    });
+    mockGooglePayload();
+    await expect(service.googleAuth('some-id-token')).rejects.toThrow('Invalid credentials');
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'LOGIN_FAILED_INACTIVE' }));
+  });
+
+  it('links an existing password-registered account matched by email, then logs in', async () => {
+    const existingUser = {
+      id: 'u1',
+      email: 'person@gmail.com',
+      name: 'Person',
+      role: Role.OWNER,
+      agencyId: 'agency-1',
+      googleId: null,
+      isActive: true,
+    };
+    const { service, prisma, audit } = buildService({ existingUser });
+    // First lookup (by googleId) finds nothing; second lookup (by email) finds the account.
+    prisma.user.findUnique = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingUser) as any;
+    mockGooglePayload();
+
+    const result = await service.googleAuth('some-id-token');
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { googleId: 'google-sub-123' },
+    });
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'GOOGLE_ACCOUNT_LINKED' }));
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  it('creates a brand-new agency and OWNER user when no account matches at all, with no verification email and immediate login', async () => {
+    const { service, prisma, audit, email, txUserCreate } = buildService();
+    prisma.user.findUnique = vi.fn().mockResolvedValue(null) as any;
+    mockGooglePayload({ name: 'Brand New Person', email: 'new@gmail.com', sub: 'google-sub-new' });
+
+    const result = await service.googleAuth('some-id-token');
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    const createArgs = txUserCreate.mock.calls[0][0];
+    expect(createArgs.data.role).toBe(Role.OWNER);
+    expect(createArgs.data.googleId).toBe('google-sub-new');
+    expect(createArgs.data.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(createArgs.data.passwordHash).toEqual(expect.any(String));
+    expect(email.send).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'AGENCY_REGISTERED', metadata: { via: 'google' } }),
+    );
+    expect(result.accessToken).toBe('signed-token');
   });
 });
 

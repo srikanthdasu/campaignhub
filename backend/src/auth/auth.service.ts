@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { EmailService } from '../notifications/email.service.js';
@@ -181,6 +182,131 @@ export class AuthService {
       action: 'LOGIN_SUCCESS',
       entityType: 'user',
       entityId: user.id,
+    });
+
+    const tokens = await this.issueTokenPair(user);
+    return { user: this.toSafeUser(user), ...tokens };
+  }
+
+  // Verifies the ID token's signature/audience/expiry against Google's own published keys — no
+  // client secret involved, since that's only needed for the server-side redirect flow this app
+  // doesn't use. Fails closed (never constructs a verifier with no audience to check against) if
+  // GOOGLE_CLIENT_ID isn't configured, matching EmailService's optional-feature pattern.
+  private async verifyGoogleIdToken(
+    idToken: string,
+  ): Promise<{ email: string; name: string; googleId: string; emailVerified: boolean }> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new UnauthorizedException('Google sign-in is not configured');
+    }
+
+    const client = new OAuth2Client(clientId);
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Invalid Google sign-in token');
+    }
+
+    if (!payload?.email || !payload.sub) {
+      throw new UnauthorizedException('Invalid Google sign-in token');
+    }
+
+    return {
+      email: payload.email,
+      name: payload.name ?? payload.email,
+      googleId: payload.sub,
+      emailVerified: payload.email_verified ?? false,
+    };
+  }
+
+  async googleAuth(idToken: string) {
+    const { email, name, googleId, emailVerified } = await this.verifyGoogleIdToken(idToken);
+    if (!emailVerified) {
+      throw new UnauthorizedException('Google account email is not verified');
+    }
+
+    const byGoogleId = await this.prisma.user.findUnique({ where: { googleId } });
+    if (byGoogleId) {
+      return this.completeGoogleSignIn(byGoogleId);
+    }
+
+    const byEmail = await this.prisma.user.findUnique({ where: { email } });
+    if (byEmail) {
+      // Safe to link without any further proof — emailVerified above already confirms Google
+      // itself vouches for this exact address, the same bar `verifyEmail()` clears via a clicked
+      // link. The account's original password (if any) keeps working after this.
+      const linked = await this.prisma.user.update({
+        where: { id: byEmail.id },
+        data: { googleId },
+      });
+      await this.audit.log({
+        userId: linked.id,
+        action: 'GOOGLE_ACCOUNT_LINKED',
+        entityType: 'user',
+        entityId: linked.id,
+      });
+      return this.completeGoogleSignIn(linked);
+    }
+
+    // No match at all — first time this person has ever touched CampaignHub AI. Mirrors
+    // register()'s transaction shape exactly, except emailVerifiedAt is set immediately (Google
+    // already proved it) and a random, never-usable passwordHash fills the required column
+    // without needing a schema migration to make it nullable.
+    const randomPasswordHash = await bcrypt.hash(randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
+    const { user, agency } = await this.prisma.$transaction(async (tx) => {
+      const agency = await tx.agency.create({ data: { name: `${name}'s Agency` } });
+      const user = await tx.user.create({
+        data: {
+          agencyId: agency.id,
+          email,
+          passwordHash: randomPasswordHash,
+          name,
+          role: Role.OWNER,
+          googleId,
+          emailVerifiedAt: new Date(),
+          isActive: true,
+        },
+      });
+      return { user, agency };
+    });
+
+    await this.audit.log({
+      userId: user.id,
+      action: 'AGENCY_REGISTERED',
+      entityType: 'agency',
+      entityId: agency.id,
+      metadata: { via: 'google' },
+    });
+
+    return this.completeGoogleSignIn(user);
+  }
+
+  private async completeGoogleSignIn(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    agencyId: string | null;
+    isActive: boolean;
+  }) {
+    if (!user.isActive) {
+      await this.audit.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED_INACTIVE',
+        entityType: 'user',
+        entityId: user.id,
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    await this.audit.log({
+      userId: user.id,
+      action: 'LOGIN_SUCCESS',
+      entityType: 'user',
+      entityId: user.id,
+      metadata: { via: 'google' },
     });
 
     const tokens = await this.issueTokenPair(user);

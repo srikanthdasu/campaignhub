@@ -5,6 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService, TokenPair } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { GoogleAuthDto } from './dto/google-auth.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 import { Public } from '../common/decorators/public.decorator.js';
@@ -71,6 +72,17 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, refreshTokenExpiresAt, ...rest } =
       await this.authService.login(dto);
+    this.setRefreshCookie(res, { accessToken, refreshToken, refreshTokenExpiresAt });
+    return { ...rest, accessToken };
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async googleAuth(@Body() dto: GoogleAuthDto, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refreshToken, refreshTokenExpiresAt, ...rest } =
+      await this.authService.googleAuth(dto.idToken);
     this.setRefreshCookie(res, { accessToken, refreshToken, refreshTokenExpiresAt });
     return { ...rest, accessToken };
   }

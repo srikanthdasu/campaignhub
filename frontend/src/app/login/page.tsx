@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { AuthBrandPanel } from '@/components/auth-brand-panel';
 import { AuthPromoFooter } from '@/components/auth-promo-footer';
+import { GoogleSignInButton } from '@/components/google-signin-button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 const UNVERIFIED_MESSAGE = 'Please verify your email before logging in.';
 
 export default function LoginPage() {
-  const { login, resendVerification } = useAuth();
+  const { login, loginWithGoogle, resendVerification } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +24,16 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  async function onGoogleCredential(idToken: string) {
+    setError(null);
+    try {
+      await loginWithGoogle(idToken);
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong signing in with Google');
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -118,6 +129,15 @@ export default function LoginPage() {
                 )}
               </p>
             )}
+
+            <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+              <GoogleSignInButton onCredential={onGoogleCredential} />
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs text-neutral-500">or continue with email</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+            </motion.div>
 
             <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
               <Input

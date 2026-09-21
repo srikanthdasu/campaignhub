@@ -3,16 +3,19 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useAuth, ApiError } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { AuthBrandPanel } from '@/components/auth-brand-panel';
 import { AuthPromoFooter } from '@/components/auth-promo-footer';
+import { GoogleSignInButton } from '@/components/google-signin-button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
 export default function RegisterPage() {
-  const { register, resendVerification } = useAuth();
+  const { register, loginWithGoogle, resendVerification } = useAuth();
+  const router = useRouter();
   const [agencyName, setAgencyName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,6 +24,16 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  async function onGoogleCredential(idToken: string) {
+    setError(null);
+    try {
+      await loginWithGoogle(idToken);
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong signing in with Google');
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -130,6 +143,15 @@ export default function RegisterPage() {
                 </motion.p>
               )}
             </AnimatePresence>
+
+            <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
+              <GoogleSignInButton onCredential={onGoogleCredential} />
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs text-neutral-500">or create with email</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+            </motion.div>
 
             <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
               <Input
