@@ -50,6 +50,12 @@ jobs:
           # the API under /api on the same origin/port as the frontend in production, so this
           # is a same-origin relative path, not the separate-port URL local dev uses.
           NEXT_PUBLIC_API_URL: /api
+          # Same OAuth Client ID as the backend's GOOGLE_CLIENT_ID App Service setting — a public
+          # identifier by design (not a secret), so it's fine directly in the workflow rather
+          # than needing its own GitHub secret. Without this at build time, GoogleSignInButton
+          # silently renders nothing (no error) since NEXT_PUBLIC_* vars are inlined at build,
+          # not read at request time — that's exactly what happened on the first deploy attempt.
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: 447671100716-bgejntbph1ki9pud5l1b25sqpdign9fv.apps.googleusercontent.com
         run: npm run build
 
       # Runs only after both builds have already succeeded — applying a migration ahead of an
