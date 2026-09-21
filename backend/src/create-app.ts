@@ -56,7 +56,7 @@ export async function createApp(): Promise<NestExpressApplication> {
           // Identity Services load its script, render its iframe-based Sign-In button, and make
           // its own network calls — needed for Google Sign-In (auth.service.ts googleAuth()).
           scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://accounts.google.com/gsi/client'],
-          styleSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
           imgSrc: ["'self'", 'data:', 'blob:'],
           fontSrc: ["'self'", 'data:'],
           connectSrc: ["'self'", 'https://accounts.google.com'],
