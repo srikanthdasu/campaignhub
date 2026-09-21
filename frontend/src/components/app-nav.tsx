@@ -37,6 +37,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { isAgencyAdmin, ROLE_LABELS, Role } from '@/lib/roles';
 import { DURATION, EASE_SOFT, tapScale } from '@/lib/motion';
 import { useClientPicker } from '@/hooks/use-client-picker';
+import { cn } from '@/lib/cn';
 
 interface NavLink {
   href: string;
@@ -144,7 +145,7 @@ function buildClientSections(canCreate: boolean): { label: string; links: NavLin
   ];
 }
 
-export function AppNav() {
+export function AppNav({ isOpen = false, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -170,7 +171,13 @@ export function AppNav() {
   }
 
   return (
-    <nav className="card-surface flex h-full min-h-0 w-64 shrink-0 flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-5">
+    <nav
+      className={cn(
+        'card-surface flex h-full min-h-0 w-64 max-w-[85vw] shrink-0 flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-5 transition-transform duration-300 ease-out',
+        'fixed inset-y-0 left-0 z-50 lg:static',
+        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      )}
+    >
       <div className="mb-8">
         <Image
           src="/brand/logo-wide.png"
@@ -208,6 +215,7 @@ export function AppNav() {
                       )}
                       <Link
                         href={link.href}
+                        onClick={() => onClose?.()}
                         className={`relative z-10 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
                           active
                             ? 'text-white'
