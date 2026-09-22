@@ -42,6 +42,7 @@ model Agency {
   subscription Subscription?
   invoices     Invoice[]
   auditLogs    AuditLog[]
+  aiUsageLogs  AiUsageLog[]
 
   @@map("agencies")
 }
@@ -903,4 +904,20 @@ model EmailUnsubscribe {
 
   @@unique([clientId, email])
   @@map("email_unsubscribes")
+}
+
+// AI-1: one row per AI generation call (chat or image), the source of truth for
+// AiSpendCapGuard's per-agency daily cap — a coarse request-count cap, not exact token/dollar
+// tracking, chosen to close the "fully open-ended spend" gap without a larger per-call
+// token-usage/billing redesign. See ai-spend-cap.guard.ts.
+model AiUsageLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  agencyId  String   @map("agency_id") @db.Uuid
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // AiSpendCapGuard's only query is "how many rows for this agency since midnight" — this
+  // composite serves it as a direct index scan.
+  @@index([agencyId, createdAt])
+  @@map("ai_usage_logs")
 }

@@ -5,6 +5,7 @@ import { CreateStrategyDto } from './dto/create-strategy.dto.js';
 import { ReviewStrategyDto } from './dto/review-strategy.dto.js';
 import { FeedbackStrategyDto } from './dto/feedback-strategy.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
+import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -42,6 +43,7 @@ export class AiStrategyController {
   }
 
   @Throttle(AI_GENERATION_THROTTLE)
+  @UseGuards(AiSpendCapGuard)
   @Post(':id/generate')
   @Roles(...CAN_CREATE)
   generate(

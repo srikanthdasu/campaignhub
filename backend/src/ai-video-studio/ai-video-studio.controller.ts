@@ -9,6 +9,7 @@ import { UpdateEnhancementsDto } from './dto/update-enhancements.dto.js';
 import { ExportVideoDto } from './dto/export-video.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
+import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -44,6 +45,7 @@ export class AiVideoStudioController {
   }
 
   @Throttle(AI_GENERATION_THROTTLE)
+  @UseGuards(AiSpendCapGuard)
   @Post(':id/script')
   @Roles(...CAN_CREATE)
   generateScript(
@@ -85,6 +87,7 @@ export class AiVideoStudioController {
   }
 
   @Throttle(AI_GENERATION_THROTTLE)
+  @UseGuards(AiSpendCapGuard)
   @Post(':id/render')
   @Roles(...CAN_CREATE)
   render(

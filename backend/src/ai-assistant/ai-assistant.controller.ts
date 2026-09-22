@@ -5,6 +5,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto.js';
 import { AskDto } from './dto/ask.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
+import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
@@ -35,7 +36,7 @@ export class AiAssistantController {
   }
 
   @Throttle(AI_GENERATION_THROTTLE)
-  @UseGuards(ClientContentCreationGuard)
+  @UseGuards(ClientContentCreationGuard, AiSpendCapGuard)
   @Post(':id/messages')
   ask(
     @Param('clientId') clientId: string,

@@ -5,6 +5,7 @@ import { GenerateCaptionsDto } from './dto/generate-captions.dto.js';
 import { SaveCaptionDto } from './dto/save-caption.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
+import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -20,6 +21,7 @@ export class AiCaptionsController {
   constructor(private aiCaptionsService: AiCaptionsService) {}
 
   @Throttle(AI_GENERATION_THROTTLE)
+  @UseGuards(AiSpendCapGuard)
   @Post('generate')
   @Roles(...CAN_CREATE)
   generate(@Body() dto: GenerateCaptionsDto) {
