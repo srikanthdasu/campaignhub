@@ -8,6 +8,7 @@ import type { InstagramPublishService } from '../social-accounts/instagram-publi
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
+import { encryptToken } from '../social-accounts/token-crypto.js';
 
 function makeBlobStorage() {
   return { getReadUrl: vi.fn((url: string) => Promise.resolve(url)) } as unknown as BlobStorageService;
@@ -70,6 +71,73 @@ describe('SchedulerService.autoPublishDuePosts', () => {
         action: 'SCHEDULED_POST_PUBLISHED',
         metadata: expect.objectContaining({ auto: true }),
       }),
+    );
+  });
+
+  it('flags a non-Instagram publish as simulated — no real platform call was made (BROKE-1)', async () => {
+    const { service, prisma } = buildService();
+
+    await service.autoPublishDuePosts();
+
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ simulated: true }) }),
+    );
+  });
+
+  it('does not flag a real Instagram publish as simulated', async () => {
+    const ENCRYPTION_KEY = 'a-real-32-character-encryption-key';
+    const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn() };
+    const prisma = {
+      scheduledPost: {
+        findMany: vi.fn(() =>
+          Promise.resolve([{ id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.INSTAGRAM }]),
+        ),
+        findUniqueOrThrow: vi.fn(() =>
+          Promise.resolve({ id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.INSTAGRAM }),
+        ),
+        updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+        update: vi.fn((args: any) => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, ...args.data })),
+        count: vi.fn(() => Promise.resolve(0)),
+      },
+      contentItem: {
+        update: vi.fn(() => Promise.resolve({})),
+        findUnique: vi.fn(() => Promise.resolve({ client: { agencyId: 'agency-1' } })),
+        findUniqueOrThrow: vi.fn(() =>
+          Promise.resolve({
+            clientId: 'client-1',
+            mediaAsset: { storageUrl: '/uploads/x.png' },
+            body: 'caption',
+          }),
+        ),
+      },
+      // decryptToken needs a real ciphertext shape (iv.authTag.data, base64) — encrypt one with
+      // the same key/helper the service itself uses, rather than hand-rolling a fake token.
+      socialAccount: {
+        findFirst: vi.fn(() =>
+          Promise.resolve({
+            accessTokenEncrypted: encryptToken('real-ig-token', ENCRYPTION_KEY),
+            externalAccountId: 'ig-123',
+          }),
+        ),
+      },
+    };
+    const config = { getOrThrow: vi.fn(() => ENCRYPTION_KEY) };
+    const instagramPublish = { publishImage: vi.fn(() => Promise.resolve('ig-post-1')) };
+    const service = new SchedulerService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      config as unknown as ConfigService,
+      instagramPublish as unknown as InstagramPublishService,
+      notifications as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    await service.autoPublishDuePosts();
+
+    expect(instagramPublish.publishImage).toHaveBeenCalled();
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ simulated: false }) }),
     );
   });
 

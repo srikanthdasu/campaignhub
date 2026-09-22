@@ -146,7 +146,7 @@ export class SchedulerService {
       action: updated.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
       entityType: 'scheduled_post',
       entityId: id,
-      metadata: updated.errorMessage ? { errorMessage: updated.errorMessage } : undefined,
+      metadata: { simulated: updated.simulated, errorMessage: updated.errorMessage ?? undefined },
     });
 
     return updated;
@@ -178,7 +178,7 @@ export class SchedulerService {
       action: updated.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
       entityType: 'scheduled_post',
       entityId: id,
-      metadata: { retry: true, errorMessage: updated.errorMessage ?? undefined },
+      metadata: { retry: true, simulated: updated.simulated, errorMessage: updated.errorMessage ?? undefined },
     });
 
     return updated;
@@ -210,7 +210,7 @@ export class SchedulerService {
         action: result.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
         entityType: 'scheduled_post',
         entityId: post.id,
-        metadata: { auto: true, errorMessage: result.errorMessage ?? undefined },
+        metadata: { auto: true, simulated: result.simulated, errorMessage: result.errorMessage ?? undefined },
       });
     }
 
@@ -255,6 +255,10 @@ export class SchedulerService {
         publishedAt: new Date(),
         errorMessage: null,
         externalPostId: externalPostId ?? undefined,
+        // Only Instagram calls a real platform API above — every other platform reaches
+        // PUBLISHED with no external call at all, so it must be flagged as such rather than
+        // looking identical to a real publish everywhere this status is read.
+        simulated: post.platform !== SocialPlatform.INSTAGRAM,
       },
     });
 

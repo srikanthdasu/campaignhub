@@ -505,6 +505,11 @@ model ScheduledPost {
   // Set only on a real publish (Instagram today) — the platform's own ID for this post, so a
   // later analytics pull or delete-on-platform action has something to reference back to.
   externalPostId  String?             @map("external_post_id")
+  // True when this post reached PUBLISHED with zero real platform API call (every platform
+  // except Instagram today — see SchedulerService.publishPost). The frontend already showed an
+  // honest "Simulated" badge derived from a hardcoded platform list; this is the same fact made
+  // backend-authoritative, so the API response, audit log, and any future export carry it too.
+  simulated       Boolean             @default(false)
   // Bounded manual retries for a FAILED post — see SchedulerService.MAX_RETRIES.
   retryCount      Int                 @default(0) @map("retry_count")
   createdAt       DateTime            @default(now()) @map("created_at")

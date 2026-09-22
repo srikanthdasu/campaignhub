@@ -60,8 +60,10 @@ interface ContentItem {
 
 const MAX_RETRIES = 3;
 
-// Only Instagram actually calls the platform's API today — everything else flips this status
-// without publishing anywhere real, so the reviewer sees that plainly instead of assuming it went out.
+// Only Instagram actually calls the platform's API today. For a post that hasn't published yet,
+// this is just a forward-looking heads-up (nothing dishonest has happened); once a post reaches
+// PUBLISHED, `post.simulated` below — set by the backend, not guessed here — is what actually
+// distinguishes a real publish from a simulated one.
 const REAL_PUBLISH_PLATFORMS = new Set(['INSTAGRAM']);
 
 interface ScheduledPost {
@@ -72,6 +74,9 @@ interface ScheduledPost {
   errorMessage: string | null;
   publishedAt: string | null;
   externalPostId: string | null;
+  // True when this reached PUBLISHED with no real platform API call (every platform except
+  // Instagram today) — backend-authoritative (SchedulerService.publishPost), not guessed here.
+  simulated: boolean;
   retryCount: number;
   contentItem: { id: string; type: string; body: string | null };
 }
@@ -672,7 +677,7 @@ function SchedulerWorkspace({
                   <div className="flex items-center gap-2">
                     <Badge tone="neutral">{post.platform}</Badge>
                     <Badge tone={POST_TONE[post.status]}>{post.status}</Badge>
-                    {!REAL_PUBLISH_PLATFORMS.has(post.platform) && (
+                    {(post.status === 'PUBLISHED' ? post.simulated : !REAL_PUBLISH_PLATFORMS.has(post.platform)) && (
                       <span title="This platform isn't wired up for real publishing yet — this only updates status here, it doesn't post anywhere.">
                         <Badge tone="neutral">Simulated</Badge>
                       </span>
