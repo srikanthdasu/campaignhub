@@ -32,7 +32,23 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/SMTP_HOST/);
   });
 
-  it('passes a production config with all SMTP settings present', () => {
+  it('passes a production config with all SMTP and storage settings present', () => {
+    const config = {
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'user@gmail.com',
+      SMTP_PASSWORD: 'app-password',
+      AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
+    };
+    expect(validateEnv(config)).toEqual(config);
+  });
+
+  it('does not require SMTP or storage settings outside production', () => {
+    expect(() => validateEnv({ NODE_ENV: 'development' })).not.toThrow();
+  });
+
+  it('rejects a production config missing AZURE_STORAGE_CONNECTION_STRING even with SMTP present', () => {
     const config = {
       NODE_ENV: 'production',
       SMTP_HOST: 'smtp.gmail.com',
@@ -40,10 +56,6 @@ describe('validateEnv', () => {
       SMTP_USER: 'user@gmail.com',
       SMTP_PASSWORD: 'app-password',
     };
-    expect(validateEnv(config)).toEqual(config);
-  });
-
-  it('does not require SMTP settings outside production', () => {
-    expect(() => validateEnv({ NODE_ENV: 'development' })).not.toThrow();
+    expect(() => validateEnv(config)).toThrow(/AZURE_STORAGE_CONNECTION_STRING/);
   });
 });

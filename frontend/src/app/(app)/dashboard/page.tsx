@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FetchError } from '@/components/ui/fetch-error';
 import { AnimatedNumber } from '@/components/ui/animated-number';
 import { SocialConstellation } from '@/components/social-constellation';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
@@ -117,28 +118,53 @@ export default function DashboardPage() {
   const isClient = user?.role === 'CLIENT';
 
   const [agency, setAgency] = useState<Agency | null>(null);
+  const [agencyError, setAgencyError] = useState(false);
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [membersError, setMembersError] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewError, setOverviewError] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null | undefined>(undefined);
+  const [subscriptionError, setSubscriptionError] = useState(false);
 
   useEffect(() => {
     if (isClient) router.replace('/client-portal');
   }, [isClient, router]);
 
+  function loadAgency() {
+    setAgencyError(false);
+    api.get<Agency>('/agencies/me').then(setAgency).catch(() => setAgencyError(true));
+  }
+
+  function loadOverview() {
+    setOverviewError(false);
+    api.get<Overview>('/dashboard/overview').then(setOverview).catch(() => setOverviewError(true));
+  }
+
+  function loadMembers() {
+    setMembersError(false);
+    api
+      .get<unknown[]>('/users')
+      .then((u) => setMemberCount(u.length))
+      .catch(() => setMembersError(true));
+  }
+
+  function loadSubscription() {
+    setSubscriptionError(false);
+    api
+      .get<Subscription | null>('/billing/subscription')
+      .then(setSubscription)
+      .catch(() => setSubscriptionError(true));
+  }
+
   useEffect(() => {
     if (isClient) return;
-    api.get<Agency>('/agencies/me').then(setAgency).catch(() => {});
-    api.get<Overview>('/dashboard/overview').then(setOverview).catch(() => {});
+    loadAgency();
+    loadOverview();
     if (admin) {
-      api
-        .get<unknown[]>('/users')
-        .then((u) => setMemberCount(u.length))
-        .catch(() => {});
-      api
-        .get<Subscription | null>('/billing/subscription')
-        .then(setSubscription)
-        .catch(() => setSubscription(null));
+      loadMembers();
+      loadSubscription();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admin, isClient]);
 
   if (isClient) return null;
@@ -169,6 +195,15 @@ export default function DashboardPage() {
             Here&apos;s what&apos;s happening across {agency?.name ?? 'your agency'} right now. You&apos;re signed in
             as {user ? ROLE_LABELS[user.role as Role] ?? user.role : '—'}.
           </p>
+          {agencyError && (
+            <p className="mt-1 text-xs text-amber-300/80">
+              Couldn&apos;t load your agency&apos;s details —{' '}
+              <button onClick={loadAgency} className="underline hover:text-amber-200">
+                retry
+              </button>
+              .
+            </p>
+          )}
           <Link
             href="/content-planner"
             className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-accent-500 to-fuchsia-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:opacity-90"
@@ -183,13 +218,13 @@ export default function DashboardPage() {
         transition={{ duration: DURATION.base, ease: EASE_SOFT }}
         className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6"
       >
-        <StatCard label="Total Clients" value={overview?.totalClients ?? null} />
-        <StatCard label="Connected Accounts" value={overview?.connectedAccounts ?? null} />
-        <StatCard label="Scheduled Posts" value={overview?.posts.scheduled ?? null} />
-        <StatCard label="Published Posts" value={overview?.posts.published ?? null} />
-        <StatCard label="Pending Approvals" value={overview?.posts.pendingApproval ?? null} />
+        <StatCard label="Total Clients" value={overview?.totalClients ?? null} error={overviewError} />
+        <StatCard label="Connected Accounts" value={overview?.connectedAccounts ?? null} error={overviewError} />
+        <StatCard label="Scheduled Posts" value={overview?.posts.scheduled ?? null} error={overviewError} />
+        <StatCard label="Published Posts" value={overview?.posts.published ?? null} error={overviewError} />
+        <StatCard label="Pending Approvals" value={overview?.posts.pendingApproval ?? null} error={overviewError} />
         {admin ? (
-          <StatCard label="Team Members" value={memberCount} />
+          <StatCard label="Team Members" value={memberCount} error={membersError} />
         ) : (
           <Card padding="lg">
             <p className="text-sm text-neutral-400">Your role</p>
@@ -211,7 +246,9 @@ export default function DashboardPage() {
             <ClipboardList className="h-4 w-4 text-accent-300" />
             <h2 className="text-sm font-semibold text-neutral-50">Posts Overview</h2>
           </div>
-          {!overview ? (
+          {overviewError ? (
+            <FetchError onRetry={loadOverview} />
+          ) : !overview ? (
             <Skeleton className="h-32 w-full" />
           ) : (
             <ul className="space-y-2 text-xs">
@@ -238,7 +275,9 @@ export default function DashboardPage() {
             <BarChart3 className="h-4 w-4 text-accent-300" />
             <h2 className="text-sm font-semibold text-neutral-50">Posts by Platform</h2>
           </div>
-          {!overview ? (
+          {overviewError ? (
+            <FetchError onRetry={loadOverview} />
+          ) : !overview ? (
             <Skeleton className="h-32 w-full" />
           ) : Object.keys(overview.postsByPlatform).length === 0 ? (
             <p className="text-xs text-neutral-500">Nothing scheduled or published yet.</p>
@@ -268,7 +307,9 @@ export default function DashboardPage() {
             <ClipboardCheck className="h-4 w-4 text-accent-300" />
             <h2 className="text-sm font-semibold text-neutral-50">Recent Activity</h2>
           </div>
-          {!overview ? (
+          {overviewError ? (
+            <FetchError onRetry={loadOverview} />
+          ) : !overview ? (
             <Skeleton className="h-32 w-full" />
           ) : overview.recentActivity.length === 0 ? (
             <p className="text-xs text-neutral-500">Nothing yet.</p>
@@ -304,7 +345,9 @@ export default function DashboardPage() {
               View Calendar →
             </Link>
           </div>
-          {!overview ? (
+          {overviewError ? (
+            <FetchError onRetry={loadOverview} />
+          ) : !overview ? (
             <Skeleton className="h-32 w-full" />
           ) : overview.upcomingScheduledPosts.length === 0 ? (
             <p className="text-xs text-neutral-500">Nothing scheduled yet.</p>
@@ -333,6 +376,8 @@ export default function DashboardPage() {
           </div>
           {!admin ? (
             <p className="text-xs text-neutral-500">Only Owners and Admins can view billing.</p>
+          ) : subscriptionError ? (
+            <FetchError onRetry={loadSubscription} />
           ) : subscription === undefined ? (
             <Skeleton className="h-24 w-full" />
           ) : subscription === null ? (
@@ -422,12 +467,20 @@ export default function DashboardPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number | null }) {
+function StatCard({ label, value, error = false }: { label: string; value: number | null; error?: boolean }) {
   return (
     <Card padding="lg" hoverable>
       <p className="text-xs text-neutral-400">{label}</p>
       <div className="mt-2 text-2xl font-semibold text-neutral-50 sm:text-3xl">
-        {value === null ? <Skeleton className="h-9 w-16" /> : <AnimatedNumber value={value} />}
+        {error ? (
+          <span className="text-base font-normal text-neutral-500" title="Couldn't load — try refreshing">
+            —
+          </span>
+        ) : value === null ? (
+          <Skeleton className="h-9 w-16" />
+        ) : (
+          <AnimatedNumber value={value} />
+        )}
       </div>
     </Card>
   );

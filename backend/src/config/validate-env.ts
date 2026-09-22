@@ -12,6 +12,12 @@ const SECRETS_TO_VALIDATE = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'TOKEN_E
 // accept every registration and let nobody ever log in, silently.
 const REQUIRED_SMTP_VARS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD'] as const;
 
+// BlobStorageService silently falls back to Azure App Service's local disk when this is unset —
+// fine for local dev, a real Critical-tier data-loss risk in production, since that disk is
+// wiped on every restart/scale event/deploy. Failing to start is far better than every client
+// upload quietly vanishing on the next deploy with the database still pointing at dead links.
+const REQUIRED_PRODUCTION_VARS = ['AZURE_STORAGE_CONNECTION_STRING'] as const;
+
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   for (const key of SECRETS_TO_VALIDATE) {
     const value = config[key];
@@ -24,11 +30,20 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   }
 
   if (config.NODE_ENV === 'production') {
-    const missing = REQUIRED_SMTP_VARS.filter((key) => !config[key]);
-    if (missing.length > 0) {
+    const missingSmtp = REQUIRED_SMTP_VARS.filter((key) => !config[key]);
+    if (missingSmtp.length > 0) {
       throw new Error(
-        `Missing required SMTP settings for production: ${missing.join(', ')}. Email verification is ` +
+        `Missing required SMTP settings for production: ${missingSmtp.join(', ')}. Email verification is ` +
           `required to activate a new account — without these, registration silently stops working.`,
+      );
+    }
+
+    const missingStorage = REQUIRED_PRODUCTION_VARS.filter((key) => !config[key]);
+    if (missingStorage.length > 0) {
+      throw new Error(
+        `Missing required production settings: ${missingStorage.join(', ')}. Without ` +
+          `AZURE_STORAGE_CONNECTION_STRING, uploaded media silently falls back to local disk and is ` +
+          `lost on the next restart/deploy.`,
       );
     }
   }

@@ -57,9 +57,10 @@ service checks for it and degrades to a fallback behavior instead of failing.
 
 | Setting | Used by | Notes |
 |---|---|---|
-| `NODE_ENV=production` | `validate-env.ts`, `auth.controller.ts` (secure cookie flag) | When set to `production`, `validate-env.ts` additionally *requires* all four SMTP settings below — registration silently stops working (no verification email can send) if they're missing in production. |
+| `NODE_ENV=production` | `validate-env.ts`, `auth.controller.ts` (secure cookie flag) | When set to `production`, `validate-env.ts` additionally *requires* all four SMTP settings and `AZURE_STORAGE_CONNECTION_STRING` below — the app refuses to start rather than degrading silently. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `email.service.ts` | Required in production (see above). In any other `NODE_ENV`, missing values just make `EmailService` log what it would have sent instead of failing. |
 | `SMTP_FROM` | `email.service.ts` | Optional even in production — defaults to `"CampaignHub AI" <no-reply@campaignhub.ai>"`. |
+| `AZURE_STORAGE_CONNECTION_STRING` | `blob-storage.service.ts` | Required in production (see above and "Media storage" below) — without it, uploads would silently fall back to non-durable local disk. |
 
 ### Azure AI Foundry (AI Captions, AI Assistant, AI Strategy, AI Video Studio's script step)
 
@@ -88,7 +89,7 @@ All six `AZURE_AI_FOUNDRY_*` settings are read via `getOrThrow` inside `chat()`/
 
 | Setting | Notes |
 |---|---|
-| `AZURE_STORAGE_CONNECTION_STRING` | Optional — `blob-storage.service.ts` falls back to writing uploads to local disk (`backend/uploads`) if unset. Azure App Service's local disk is **not durable** (can be lost on restart/scale/slot-swap), so this must be set in production for uploads to actually persist. |
+| `AZURE_STORAGE_CONNECTION_STRING` | **Required in production** (`validate-env.ts` refuses to start without it when `NODE_ENV=production`) — `blob-storage.service.ts` otherwise falls back to writing uploads to local disk (`backend/uploads`), and Azure App Service's local disk is **not durable** (wiped on restart/scale/slot-swap). Optional outside production, to keep local dev working without an Azure Storage account. |
 
 ### Sign in with Google
 
@@ -113,10 +114,6 @@ connect flow is used — an unconfigured platform has no effect on the rest of t
 
 All six OAuth callback controllers (`*-oauth-callback.controller.ts`) also read `PUBLIC_APP_URL`
 (already listed under Core) to build the redirect URI.
-
-> These six pairs are set in the live production `.env`/App Settings but are **not yet listed in
-> `backend/.env.example`** — a gap worth closing separately; this doc reflects what the running
-> app actually reads, not just what the example file currently documents.
 
 ### AI Video Studio export (Magic Hour)
 
