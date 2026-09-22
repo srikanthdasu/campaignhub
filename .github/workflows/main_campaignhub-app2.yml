@@ -11,6 +11,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # TEST-3: the scheduler RBAC e2e suite (test/scheduler-rbac.e2e-spec.ts) is the only
+    # authorization regression test in the repo and previously never ran in CI — it could break
+    # silently and the product would still deploy. This service container gives it a real,
+    # ephemeral Postgres instance, entirely separate from the production DATABASE_URL secret used
+    # by the later "Apply database migrations" step.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: campaignhub
+          POSTGRES_PASSWORD: campaignhub
+          POSTGRES_DB: campaignhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +50,31 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         run: npm run test
+
+      # Applies the schema to the ephemeral CI Postgres service above, not production — the e2e
+      # suite below (AppModule booted for real, real HTTP requests via supertest) needs real
+      # tables to write to.
+      - name: Apply migrations to the test database
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://campaignhub:campaignhub@localhost:5432/campaignhub_test
+        run: npx prisma migrate deploy
+
+      # Exercises real guard/decorator behavior (@Roles, @UseGuards) that a service-only unit
+      # test can't observe — see scheduler-rbac.e2e-spec.ts's own comment. Every value below is a
+      # disposable placeholder for a throwaway CI database; none are read from repo secrets
+      # because none of the AppModule routes this suite actually calls (auth, clients, users,
+      # content, scheduler) touch Razorpay/OAuth/Azure AI, so only DB/JWT/app-URL need to be real
+      # enough to satisfy config validation and JwtStrategy's constructor-time getOrThrow.
+      - name: Run backend e2e tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://campaignhub:campaignhub@localhost:5432/campaignhub_test
+          JWT_ACCESS_SECRET: ci-test-only-access-secret-not-for-production-use
+          JWT_REFRESH_SECRET: ci-test-only-refresh-secret-not-for-production-use
+          TOKEN_ENCRYPTION_KEY: ci-test-only-encryption-key-not-for-production
+          PUBLIC_APP_URL: http://localhost:3000
+        run: npm run test:e2e
 
       - name: Build backend
         working-directory: backend
