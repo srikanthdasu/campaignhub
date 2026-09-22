@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 
@@ -15,28 +16,43 @@ export interface LogAuditEntryParams {
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * AUDIT-2: this used to be a plain throwing write, called inline after real business actions
+   * had already completed (e.g. billing.service.ts's activateSubscription, right after the
+   * subscription upsert and invoice creation) — a DB hiccup or FK violation here would surface as
+   * a failed subscription activation on an already-charged card. Audit logging should never be
+   * able to undo a real, already-completed action, so a failure here is caught, sent to Sentry
+   * (real alerting, not just a log line nobody watches), and swallowed rather than propagated.
+   */
   async log(params: LogAuditEntryParams) {
-    let agencyId = params.agencyId ?? null;
-    if (!agencyId && params.userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: params.userId },
-        select: { agencyId: true },
-      });
-      agencyId = user?.agencyId ?? null;
-    }
+    try {
+      let agencyId = params.agencyId ?? null;
+      if (!agencyId && params.userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: params.userId },
+          select: { agencyId: true },
+        });
+        agencyId = user?.agencyId ?? null;
+      }
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: params.userId ?? null,
-        agencyId,
-        action: params.action,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        metadata: params.metadata,
-      },
-    });
+      await this.prisma.auditLog.create({
+        data: {
+          userId: params.userId ?? null,
+          agencyId,
+          action: params.action,
+          entityType: params.entityType,
+          entityId: params.entityId,
+          metadata: params.metadata,
+        },
+      });
+    } catch (err) {
+      this.logger.error(`Failed to write audit log entry for action "${params.action}"`, err);
+      Sentry.captureException(err, { extra: { action: params.action, entityType: params.entityType } });
+    }
   }
 
   async listForAgency(agencyId: string, take = 100) {

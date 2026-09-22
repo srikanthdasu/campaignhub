@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuditService } from './audit.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 
+vi.mock('@sentry/nestjs', () => ({ captureException: vi.fn() }));
+
 function buildService(overrides: { user?: { agencyId: string } | null } = {}) {
   const prisma = {
     auditLog: {
@@ -44,6 +46,18 @@ describe('AuditService.log', () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ agencyId: null }) }),
+    );
+  });
+
+  it('never throws when the write itself fails — audit logging must not undo a real business action (AUDIT-2)', async () => {
+    const { service, prisma } = buildService();
+    prisma.auditLog.create = vi.fn(() => Promise.reject(new Error('DB hiccup')));
+    const Sentry = await import('@sentry/nestjs');
+
+    await expect(service.log({ agencyId: 'agency-1', action: 'SUBSCRIPTION_ACTIVATED' })).resolves.toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ extra: expect.objectContaining({ action: 'SUBSCRIPTION_ACTIVATED' }) }),
     );
   });
 });
