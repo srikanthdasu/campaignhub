@@ -9,6 +9,7 @@ function buildService(overrides: { user?: { agencyId: string } | null } = {}) {
     auditLog: {
       create: vi.fn(() => Promise.resolve({})),
       findMany: vi.fn(() => Promise.resolve([])),
+      deleteMany: vi.fn((_args: { where: { createdAt: { lt: Date } } }) => Promise.resolve({ count: 0 })),
     },
     user: {
       findUnique: vi.fn(() => Promise.resolve(overrides.user ?? { agencyId: 'agency-1' })),
@@ -59,6 +60,26 @@ describe('AuditService.log', () => {
       expect.any(Error),
       expect.objectContaining({ extra: expect.objectContaining({ action: 'SUBSCRIPTION_ACTIVATED' }) }),
     );
+  });
+});
+
+describe('AuditService.purgeOld (AUDIT-1)', () => {
+  it('deletes entries older than the given retention window', async () => {
+    const { service, prisma } = buildService();
+    prisma.auditLog.deleteMany.mockImplementation(() => Promise.resolve({ count: 3 }));
+
+    const count = await service.purgeOld(180);
+
+    expect(count).toBe(3);
+    const call = prisma.auditLog.deleteMany.mock.calls[0]!;
+    const cutoff = call[0].where.createdAt.lt;
+    const expectedCutoff = Date.now() - 180 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(cutoff.getTime() - expectedCutoff)).toBeLessThan(5000);
+  });
+
+  it('returns 0 when nothing is old enough to purge', async () => {
+    const { service } = buildService();
+    await expect(service.purgeOld(180)).resolves.toBe(0);
   });
 });
 

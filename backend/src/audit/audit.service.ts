@@ -65,4 +65,18 @@ export class AuditService {
       },
     });
   }
+
+  /**
+   * AUDIT-1: no retention policy existed at all — confirmed by exhaustive grep, the only
+   * operations against AuditLog anywhere in the backend were create and findMany. This is the
+   * highest-insert-rate table in the schema (a row on every login attempt, including failures),
+   * yet the team had already solved exactly this "table grows forever" problem twice
+   * (AuthCronService, ClientsCronService) and never applied the same fix here. Called by
+   * AuditCronService — no user in the loop, so no actor on this purge's own audit entry.
+   */
+  async purgeOld(retentionDays: number): Promise<number> {
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const result = await this.prisma.auditLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    return result.count;
+  }
 }
