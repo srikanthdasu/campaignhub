@@ -32,6 +32,15 @@ interface RazorpayWebhookPayload {
   };
 }
 
+// Prisma's unique-constraint-violation code (P2002) is stable across versions but not exported
+// as a typed class from a convenient path in this generated client — duck-typing the well-known
+// `code` field avoids reaching into generated internals for one check. No field-name match on
+// `meta.target` needed: paymentProviderRef is the only unique constraint this specific
+// invoice.create() call could ever hit (id is an auto-generated UUID).
+function isUniqueConstraintViolation(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002';
+}
+
 function resolvePlanAmount(dto: { plan: string; billingCycle: 'MONTHLY' | 'YEARLY' }) {
   const planDef = PLANS.find((p) => p.plan === dto.plan);
   if (!planDef) throw new BadRequestException('Unknown plan');
@@ -153,11 +162,17 @@ export class BillingService {
   ) {
     const existing = await this.prisma.subscription.findUnique({ where: { agencyId } });
     if (existing?.paymentProviderRef === paymentId) {
-      return { subscription: existing, alreadyProcessed: true as const };
+      // Keep the same {subscription, invoice, alreadyProcessed} shape as the path below returns
+      // — the invoice for this exact payment is the same one the original activation created.
+      const invoice = await this.prisma.invoice.findUniqueOrThrow({ where: { paymentProviderRef: paymentId } });
+      return { subscription: existing, invoice: invoiceToPlainNumbers(invoice), alreadyProcessed: true as const };
     }
 
-    const result = await this.activateSubscription(agencyId, paymentId, dto, null);
-    return { ...result, alreadyProcessed: false as const };
+    // activateSubscription's own alreadyProcessed (from the Invoice.paymentProviderRef unique
+    // constraint) is the authoritative answer here — the check above is just a cheap fast path
+    // that can miss an older payment once a newer one has overwritten Subscription's single
+    // paymentProviderRef field; don't let this method's own default silently override it.
+    return this.activateSubscription(agencyId, paymentId, dto, null);
   }
 
   private async activateSubscription(
@@ -190,16 +205,32 @@ export class BillingService {
       },
     });
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        agencyId,
-        subscriptionId: subscription.id,
-        amount,
-        gstAmount,
-        gstNumber: dto.gstNumber,
-        status: 'PAID',
-      },
-    });
+    let invoice: Awaited<ReturnType<typeof this.prisma.invoice.create>>;
+    try {
+      invoice = await this.prisma.invoice.create({
+        data: {
+          agencyId,
+          subscriptionId: subscription.id,
+          amount,
+          gstAmount,
+          gstNumber: dto.gstNumber,
+          status: 'PAID',
+          paymentProviderRef: paymentId,
+        },
+      });
+    } catch (err) {
+      // Invoice.paymentProviderRef's unique constraint is the real idempotency key — this exact
+      // payment was already invoiced, whether from a genuine replay (double-submit) or a race
+      // between confirmSubscription and the webhook both activating the same payment at once.
+      // Subscription.upsert above is safely repeatable either way; only the invoice write needs
+      // this guard. Returning the existing invoice keeps a duplicate call a no-op instead of
+      // surfacing a confusing error on what the user experiences as one successful checkout.
+      if (isUniqueConstraintViolation(err)) {
+        const existing = await this.prisma.invoice.findUniqueOrThrow({ where: { paymentProviderRef: paymentId } });
+        return { subscription, invoice: invoiceToPlainNumbers(existing), alreadyProcessed: true as const };
+      }
+      throw err;
+    }
 
     await this.audit.log({
       userId: actorId,
@@ -209,7 +240,7 @@ export class BillingService {
       metadata: { plan: dto.plan, billingCycle: dto.billingCycle, amount, razorpayPaymentId: paymentId },
     });
 
-    return { subscription, invoice: invoiceToPlainNumbers(invoice) };
+    return { subscription, invoice: invoiceToPlainNumbers(invoice), alreadyProcessed: false as const };
   }
 
   async cancel(agencyId: string, actorId: string) {

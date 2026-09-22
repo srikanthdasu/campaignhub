@@ -12,6 +12,10 @@ function buildService(
     verifies?: boolean;
     existingSubscription?: any;
     orderNotes?: Record<string, string> | undefined;
+    // Simulates Invoice.paymentProviderRef's unique constraint firing on create — the real
+    // idempotency backstop for BILL-2.
+    duplicatePaymentRef?: boolean;
+    existingInvoice?: any;
   } = {},
 ) {
   const prisma = {
@@ -20,7 +24,15 @@ function buildService(
       upsert: vi.fn((args: any) => Promise.resolve({ id: 'sub-1', agencyId: 'agency-1', ...args.create })),
     },
     invoice: {
-      create: vi.fn((args: any) => Promise.resolve({ id: 'inv-1', ...args.data })),
+      create: vi.fn((args: any) => {
+        if (overrides.duplicatePaymentRef) {
+          return Promise.reject(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
+        }
+        return Promise.resolve({ id: 'inv-1', ...args.data });
+      }),
+      findUniqueOrThrow: vi.fn(() =>
+        Promise.resolve(overrides.existingInvoice ?? { id: 'inv-existing', amount: 999, gstAmount: 179.82 }),
+      ),
     },
   };
   const audit = { log: vi.fn() };
@@ -172,6 +184,21 @@ describe('BillingService.confirmSubscription', () => {
       }),
     ).rejects.toThrow('Could not verify what this order was for');
   });
+
+  it('is idempotent against a double-submit — returns the existing invoice instead of creating a duplicate (BILL-2)', async () => {
+    const { service, prisma } = buildService({
+      duplicatePaymentRef: true,
+      existingInvoice: { id: 'inv-existing', amount: 999, gstAmount: 179.82 },
+    });
+    const result = await service.confirmSubscription('agency-1', 'owner-1', {
+      plan: SubscriptionPlan.STARTER,
+      billingCycle: 'MONTHLY',
+      ...VERIFIED_PAYMENT,
+    });
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.invoice.id).toBe('inv-existing');
+    expect(prisma.invoice.findUniqueOrThrow).toHaveBeenCalledWith({ where: { paymentProviderRef: 'pay_1' } });
+  });
 });
 
 describe('BillingService.activateFromWebhook', () => {
@@ -198,6 +225,23 @@ describe('BillingService.activateFromWebhook', () => {
     });
     expect(result.alreadyProcessed).toBe(true);
     expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the Invoice-level idempotency guard when the subscription fast path misses (BILL-2)', async () => {
+    // Subscription.paymentProviderRef has since moved on to a newer payment — the fast path
+    // above can't catch this older webhook retry, but the Invoice unique constraint still must.
+    const { service, prisma } = buildService({
+      existingSubscription: { id: 'sub-1', agencyId: 'agency-1', paymentProviderRef: 'pay_newer' },
+      duplicatePaymentRef: true,
+      existingInvoice: { id: 'inv-existing', amount: 999, gstAmount: 179.82 },
+    });
+    const result = await service.activateFromWebhook('agency-1', 'pay_webhook_1', {
+      plan: SubscriptionPlan.GROWTH,
+      billingCycle: 'MONTHLY',
+    });
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.invoice.id).toBe('inv-existing');
+    expect(prisma.subscription.upsert).toHaveBeenCalled();
   });
 });
 

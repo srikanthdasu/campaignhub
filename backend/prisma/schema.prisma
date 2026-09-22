@@ -806,6 +806,12 @@ model Invoice {
   agency         Agency        @relation(fields: [agencyId], references: [id], onDelete: Restrict)
   subscriptionId String?       @map("subscription_id") @db.Uuid
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  // The real idempotency key for BillingService.activateSubscription — a unique DB constraint
+  // (not just the single-field "last write wins" check on Subscription.paymentProviderRef) so a
+  // race between confirmSubscription and the webhook, or a plain double-submit, can never create
+  // two invoices for one Razorpay payment. Nullable because it's only set for Razorpay-sourced
+  // invoices going forward; existing rows predate this column.
+  paymentProviderRef String?  @unique @map("payment_provider_ref")
   // Decimal(12,2), not Float — GST/invoice totals must never accumulate binary floating-point
   // rounding error. CHECK(amount >= 0)/CHECK(gst_amount >= 0) are added via raw SQL in the
   // migration (Prisma's schema syntax can't express @@check).
