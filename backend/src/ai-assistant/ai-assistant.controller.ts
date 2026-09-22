@@ -6,12 +6,20 @@ import { AskDto } from './dto/ask.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
+import { RolesGuard } from '../common/guards/roles.guard.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Role } from '../generated/prisma/client.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
+// AUTH-4: DELETE had no role gate at all — any granted role, including CLIENT/ANALYST, could
+// delete any conversation for the client, not just their own (remove() has no per-creator
+// ownership check). Matches media.controller.ts's CAN_MANAGE precedent.
+const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
+
 @Controller('clients/:clientId/ai-assistant/conversations')
-@UseGuards(ClientAccessGuard)
+@UseGuards(ClientAccessGuard, RolesGuard)
 export class AiAssistantController {
   constructor(private aiAssistantService: AiAssistantService) {}
 
@@ -48,6 +56,7 @@ export class AiAssistantController {
   }
 
   @Delete(':id')
+  @Roles(...CAN_MANAGE)
   remove(
     @Param('clientId') clientId: string,
     @Param('id') id: string,

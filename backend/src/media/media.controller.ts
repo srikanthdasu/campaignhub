@@ -21,19 +21,29 @@ import { mediaMulterStorage, mediaMulterFileFilter } from './media-storage.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { ClientContentCreationGuard } from '../common/guards/client-content-creation.guard.js';
 import { AiSpendCapGuard } from '../common/guards/ai-spend-cap.guard.js';
+import { RolesGuard } from '../common/guards/roles.guard.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Role } from '../generated/prisma/client.js';
 import { AI_GENERATION_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+// Upload/generate stay open to CLIENT (gated separately by ClientContentCreationGuard, matching
+// every other content-creation route) — editing/deleting is agency-staff-only, since deletion is
+// irreversible (the blob is actually removed) and nothing here tracks per-creator ownership the
+// way content.service.ts does, unlike deleting one's own draft content.
+const CAN_CREATE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER, Role.CLIENT];
+const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
 
 @Controller('clients/:clientId/media')
-@UseGuards(ClientAccessGuard)
+@UseGuards(ClientAccessGuard, RolesGuard)
 export class MediaController {
   constructor(private mediaService: MediaService) {}
 
   @Post()
   @UseGuards(ClientContentCreationGuard)
+  @Roles(...CAN_CREATE)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: mediaMulterStorage,
@@ -59,6 +69,7 @@ export class MediaController {
   @Throttle(AI_GENERATION_THROTTLE)
   @UseGuards(ClientContentCreationGuard, AiSpendCapGuard)
   @Post('generate-image')
+  @Roles(...CAN_CREATE)
   generateImage(
     @Param('clientId') clientId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -81,6 +92,7 @@ export class MediaController {
   }
 
   @Patch(':id')
+  @Roles(...CAN_MANAGE)
   update(
     @Param('clientId') clientId: string,
     @Param('id') id: string,
@@ -90,6 +102,7 @@ export class MediaController {
   }
 
   @Delete(':id')
+  @Roles(...CAN_MANAGE)
   remove(
     @Param('clientId') clientId: string,
     @Param('id') id: string,
@@ -99,6 +112,7 @@ export class MediaController {
   }
 
   @Post('bulk-delete')
+  @Roles(...CAN_MANAGE)
   bulkRemove(
     @Param('clientId') clientId: string,
     @CurrentUser() user: AuthenticatedUser,
