@@ -50,7 +50,7 @@ export class AiCaptionsService {
     private foundry: AzureAiFoundryService,
   ) {}
 
-  async generate(dto: GenerateCaptionsDto): Promise<CaptionVariant[]> {
+  async generate(actorId: string, dto: GenerateCaptionsDto): Promise<CaptionVariant[]> {
     const tone = dto.tone ?? 'Friendly';
     const raw = await this.foundry.chat(
       [
@@ -62,7 +62,19 @@ export class AiCaptionsService {
       ],
       { maxTokens: 500, temperature: 0.8 },
     );
-    return parseModelJson(raw, isCaptionVariants);
+    const variants = parseModelJson(raw, isCaptionVariants);
+
+    // AI-2: this is the billable call — AI_CAPTION_SAVED (below, in save()) only fires for
+    // variants the user actually keeps, so without this there's no record of generation calls
+    // that were never saved.
+    await this.audit.log({
+      userId: actorId,
+      action: 'AI_CAPTION_GENERATED',
+      entityType: 'ai_caption',
+      metadata: { tone, platform: dto.platform },
+    });
+
+    return variants;
   }
 
   async save(clientId: string, actorId: string, dto: SaveCaptionDto) {

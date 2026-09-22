@@ -51,9 +51,10 @@ export class AiVideoStudioController {
   generateScript(
     @Param('clientId') clientId: string,
     @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: GenerateScriptDto,
   ) {
-    return this.aiVideoStudioService.generateScript(clientId, id, dto);
+    return this.aiVideoStudioService.generateScript(clientId, id, user.sub, dto);
   }
 
   @Post(':id/storyboard')

@@ -34,7 +34,7 @@ function buildService(overrides: { caption?: any; foundryReply?: string } = {
 describe('AiCaptionsService.generate', () => {
   it('parses a well-formed JSON array response into caption variants', async () => {
     const { service } = buildService();
-    const result = await service.generate({ input: 'our new product', tone: 'Bold' } as any);
+    const result = await service.generate('actor-1', { input: 'our new product', tone: 'Bold' } as any);
     expect(result).toEqual([{ text: 'Check out our new product!', hashtags: ['#new', '#launch'] }]);
   });
 
@@ -42,28 +42,40 @@ describe('AiCaptionsService.generate', () => {
     const { service } = buildService({
       foundryReply: '```json\n[{"text":"Hi","hashtags":["#a"]}]\n```',
     });
-    const result = await service.generate({ input: 'x' } as any);
+    const result = await service.generate('actor-1', { input: 'x' } as any);
     expect(result).toEqual([{ text: 'Hi', hashtags: ['#a'] }]);
   });
 
   it('rejects a response that is not valid JSON', async () => {
     const { service } = buildService({ foundryReply: 'Sure, here are some captions: ...' });
-    await expect(service.generate({ input: 'x' } as any)).rejects.toThrow(
+    await expect(service.generate('actor-1', { input: 'x' } as any)).rejects.toThrow(
       'could not parse',
     );
   });
 
   it('rejects a response whose shape does not match caption variants', async () => {
     const { service } = buildService({ foundryReply: JSON.stringify({ not: 'an array' }) });
-    await expect(service.generate({ input: 'x' } as any)).rejects.toThrow('unexpected response');
+    await expect(service.generate('actor-1', { input: 'x' } as any)).rejects.toThrow('unexpected response');
   });
 
   it('defaults to a Friendly tone and passes the platform through to the prompt', async () => {
     const { service, foundry } = buildService();
-    await service.generate({ input: 'x', platform: 'INSTAGRAM' } as any);
+    await service.generate('actor-1', { input: 'x', platform: 'INSTAGRAM' } as any);
     const [, userMessage] = foundry.chat.mock.calls[0][0];
     expect(userMessage.content).toContain('Friendly');
     expect(userMessage.content).toContain('INSTAGRAM');
+  });
+
+  it('audit-logs the generation call itself, not just the later save (AI-2)', async () => {
+    const { service, audit } = buildService();
+    await service.generate('actor-1', { input: 'x', tone: 'Bold', platform: 'INSTAGRAM' } as any);
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'actor-1',
+        action: 'AI_CAPTION_GENERATED',
+        metadata: expect.objectContaining({ tone: 'Bold', platform: 'INSTAGRAM' }),
+      }),
+    );
   });
 });
 

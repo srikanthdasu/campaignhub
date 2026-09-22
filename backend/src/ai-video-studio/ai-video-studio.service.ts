@@ -81,7 +81,7 @@ export class AiVideoStudioService {
     return this.requireInClient(id, clientId);
   }
 
-  async generateScript(clientId: string, id: string, dto: GenerateScriptDto) {
+  async generateScript(clientId: string, id: string, actorId: string, dto: GenerateScriptDto) {
     await this.requireInClient(id, clientId);
 
     const raw = await this.foundry.chat(
@@ -105,6 +105,15 @@ export class AiVideoStudioService {
       { maxTokens: 700, temperature: 0.7 },
     );
     const { script, scenes } = parseModelJson(raw, isScriptResult);
+
+    // AI-2: this is the billable call — render()/export() below already log their own audit
+    // events, but generateScript() never did, leaving no record of who generated what.
+    await this.audit.log({
+      userId: actorId,
+      action: 'AI_VIDEO_SCRIPT_GENERATED',
+      entityType: 'ai_video_project',
+      entityId: id,
+    });
 
     return this.prisma.aiVideoProject.update({
       where: { id },

@@ -68,7 +68,7 @@ describe('AiVideoStudioService — tenant scoping', () => {
   it('rejects generating a script for a project from a different client', async () => {
     const { service } = buildService({ project: otherClientProject });
     await expect(
-      service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
+      service.generateScript('client-1', 'proj-1', 'actor-1', { idea: 'x' } as any),
     ).rejects.toThrow('Video project not found for this client');
   });
 
@@ -91,7 +91,7 @@ describe('AiVideoStudioService — tenant scoping', () => {
 describe('AiVideoStudioService.generateScript', () => {
   it('stores the real model script and scenes, and advances the step machine', async () => {
     const { service, prisma } = buildService();
-    await service.generateScript('client-1', 'proj-1', { idea: 'eco water bottle launch' } as any);
+    await service.generateScript('client-1', 'proj-1', 'actor-1', { idea: 'eco water bottle launch' } as any);
     expect(prisma.aiVideoProject.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -109,15 +109,23 @@ describe('AiVideoStudioService.generateScript', () => {
   it('rejects a response that is not valid JSON', async () => {
     const { service } = buildService({ scriptReply: 'Sure, here is a script...' });
     await expect(
-      service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
+      service.generateScript('client-1', 'proj-1', 'actor-1', { idea: 'x' } as any),
     ).rejects.toThrow('could not parse');
   });
 
   it('rejects a response missing the scenes array', async () => {
     const { service } = buildService({ scriptReply: JSON.stringify({ script: 'just a script' }) });
     await expect(
-      service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
+      service.generateScript('client-1', 'proj-1', 'actor-1', { idea: 'x' } as any),
     ).rejects.toThrow('unexpected response');
+  });
+
+  it('audit-logs the generation call (AI-2)', async () => {
+    const { service, audit } = buildService();
+    await service.generateScript('client-1', 'proj-1', 'actor-1', { idea: 'eco water bottle launch' } as any);
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'actor-1', action: 'AI_VIDEO_SCRIPT_GENERATED', entityId: 'proj-1' }),
+    );
   });
 });
 
