@@ -58,7 +58,9 @@ export default function ClientPortalPage() {
         </p>
       </motion.div>
 
-      {clients && clients.length === 0 ? (
+      {clients === null ? (
+        <Skeleton className="h-16 w-full rounded-2xl" />
+      ) : clients.length === 0 ? (
         <Card padding="lg">
           <p className="text-sm text-neutral-400">
             You don&apos;t have access to any client workspace yet — ask your agency to grant it.

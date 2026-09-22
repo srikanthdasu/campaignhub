@@ -16,6 +16,10 @@ const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SU
 // what looks like progress. Past this, the fix is to reschedule with a corrected post.
 const MAX_RETRIES = 3;
 
+// Same reasoning as EMAIL_CAMPAIGN_BATCH_SIZE — bounds one cron tick's worth of sequential
+// external-API publish calls so a large backlog drains over several ticks, not one long one.
+const PUBLISH_BATCH_SIZE = 20;
+
 @Injectable()
 export class SchedulerService {
   constructor(
@@ -177,12 +181,17 @@ export class SchedulerService {
 
   /** Called by SchedulerCronService — no user in the loop, so no access check or actor on the audit entry. */
   async autoPublishDuePosts() {
+    // A backlog (e.g. after downtime) shouldn't be pushed through in one unbounded tick — this
+    // caps each EVERY_MINUTE run so a large backlog drains gradually over several ticks instead
+    // of one tick doing an open-ended amount of sequential external-API work.
     const due = await this.prisma.scheduledPost.findMany({
       where: {
         status: ScheduledPostStatus.PENDING,
         scheduledTime: { lte: new Date() },
         contentItem: { client: { deletedAt: null } },
       },
+      take: PUBLISH_BATCH_SIZE,
+      orderBy: { scheduledTime: 'asc' },
     });
 
     for (const post of due) {

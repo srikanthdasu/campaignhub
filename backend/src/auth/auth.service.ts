@@ -408,6 +408,18 @@ export class AuthService {
     }
   }
 
+  // Every login/refresh leaves a permanent row (see issueTokenPair/refresh above) — revoked or
+  // expired ones serve no purpose once past their own expiresAt, so this table grows forever
+  // without a cleanup pass. Called by AuthCronService, same shape as ClientsService.purgeExpired.
+  async purgeExpiredRefreshTokens(): Promise<number> {
+    const result = await this.prisma.refreshToken.deleteMany({
+      where: {
+        OR: [{ revokedAt: { not: null } }, { expiresAt: { lt: new Date() } }],
+      },
+    });
+    return result.count;
+  }
+
   private toSafeUser(user: {
     id: string;
     email: string;

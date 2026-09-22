@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -7,6 +7,7 @@ import { UpdateAdDto } from './dto/update-ad.dto.js';
 import { ReviewAdDto } from './dto/review-ad.dto.js';
 import { AdStatus } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
+import { requireInClient } from '../common/require-in-client.js';
 
 const EDITABLE_STATUSES: AdStatus[] = [AdStatus.DRAFT, AdStatus.REJECTED];
 
@@ -179,10 +180,6 @@ export class AdsService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const ad = await this.prisma.adCampaign.findUnique({ where: { id } });
-    if (!ad || ad.clientId !== clientId) {
-      throw new NotFoundException('Ad campaign not found for this client');
-    }
-    return ad;
+    return requireInClient(() => this.prisma.adCampaign.findUnique({ where: { id } }), clientId, 'Ad campaign');
   }
 }

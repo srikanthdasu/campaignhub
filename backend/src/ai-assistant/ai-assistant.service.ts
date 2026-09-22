@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService, type ChatMessage } from '../ai-common/azure-ai-foundry.service.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { AiMessageRole } from '../generated/prisma/client.js';
 
 const SYSTEM_PROMPT =
@@ -138,10 +139,6 @@ export class AiAssistantService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const conversation = await this.prisma.aiConversation.findUnique({ where: { id } });
-    if (!conversation || conversation.clientId !== clientId) {
-      throw new NotFoundException('Conversation not found for this client');
-    }
-    return conversation;
+    return requireInClient(() => this.prisma.aiConversation.findUnique({ where: { id } }), clientId, 'Conversation');
   }
 }

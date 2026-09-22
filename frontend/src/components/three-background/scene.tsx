@@ -220,9 +220,11 @@ function DriftingOrb({
 export function ThreeBackgroundScene({
   reduceMotion,
   onReady,
+  frameloop,
 }: {
   reduceMotion: boolean;
   onReady: () => void;
+  frameloop: 'always' | 'never';
 }) {
   return (
     <Canvas
@@ -230,6 +232,7 @@ export function ThreeBackgroundScene({
       dpr={[1, 1.5]}
       gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }}
       onCreated={onReady}
+      frameloop={frameloop}
     >
       <ManualResizer />
       <AmbientGlow />

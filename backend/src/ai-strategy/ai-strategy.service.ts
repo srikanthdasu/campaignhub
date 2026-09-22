@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { CreateStrategyDto } from './dto/create-strategy.dto.js';
 import { ReviewStrategyDto } from './dto/review-strategy.dto.js';
 import { FeedbackStrategyDto } from './dto/feedback-strategy.dto.js';
@@ -145,10 +146,6 @@ export class AiStrategyService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const request = await this.prisma.aiStrategyRequest.findUnique({ where: { id } });
-    if (!request || request.clientId !== clientId) {
-      throw new NotFoundException('Strategy request not found for this client');
-    }
-    return request;
+    return requireInClient(() => this.prisma.aiStrategyRequest.findUnique({ where: { id } }), clientId, 'Strategy request');
   }
 }

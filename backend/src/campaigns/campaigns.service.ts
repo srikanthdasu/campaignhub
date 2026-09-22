@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateCampaignDto } from './dto/create-campaign.dto.js';
 import { UpdateCampaignDto } from './dto/update-campaign.dto.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { CampaignStatus } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -120,10 +121,6 @@ export class CampaignsService {
   }
 
   async requireInClient(id: string, clientId: string) {
-    const campaign = await this.prisma.campaign.findUnique({ where: { id } });
-    if (!campaign || campaign.clientId !== clientId) {
-      throw new NotFoundException('Campaign not found for this client');
-    }
-    return campaign;
+    return requireInClient(() => this.prisma.campaign.findUnique({ where: { id } }), clientId, 'Campaign');
   }
 }

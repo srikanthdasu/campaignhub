@@ -46,6 +46,11 @@ export class ApprovalsService {
     mode: ApprovalMode = ApprovalMode.SEQUENTIAL,
     dueDate?: string,
   ) {
+    // The same approver named twice would violate the DB's own @@unique([approvalFlowId,
+    // approverId]) — de-duping here turns an accidental double-pick in the submit form into a
+    // silent no-op instead of a 500.
+    const uniqueApproverIds = [...new Set(approverIds)];
+
     const flow = await this.prisma.$transaction(async (tx) => {
       const flow = await tx.approvalFlow.create({
         data: {
@@ -54,7 +59,7 @@ export class ApprovalsService {
           dueDate: dueDate ? new Date(dueDate) : undefined,
           status: ApprovalFlowStatus.IN_REVIEW,
           steps: {
-            create: approverIds.map((approverId, i) => ({
+            create: uniqueApproverIds.map((approverId, i) => ({
               approverId,
               stepOrder: mode === ApprovalMode.SEQUENTIAL ? i + 1 : null,
             })),
@@ -76,11 +81,11 @@ export class ApprovalsService {
       action: 'CONTENT_SUBMITTED_FOR_APPROVAL',
       entityType: 'content_item',
       entityId: contentItemId,
-      metadata: { mode, approverIds },
+      metadata: { mode, approverIds: uniqueApproverIds },
     });
 
     await this.notifications.createMany(
-      approverIds,
+      uniqueApproverIds,
       'Content is waiting for your review',
       '/approvals',
     );

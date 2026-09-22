@@ -3,7 +3,8 @@ name: Build and deploy to Azure Web App - campaignhub-app2
 on:
   push:
     branches:
-      - main
+      # main is stale/diverged from the branch actually deployed to production — leaving it
+      # here meant a stray push there would silently roll prod back to months-old code.
       - rebuild
   workflow_dispatch:
 
@@ -70,10 +71,23 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma migrate deploy
 
+      # devDependencies (vitest, the Nest CLI, TypeScript, eslint, type declarations, ...) are
+      # needed to run the tests/builds above but never touched by `node dist/main.js` or `next
+      # start` at runtime — pruning here, after both are done, is what actually shrinks what ships.
+      - name: Prune dev dependencies before staging
+        run: |
+          cd backend && npm prune --omit=dev
+          cd ../frontend && npm prune --omit=dev
+
       - name: Stage deployment package
         run: |
           mkdir -p deploy/backend deploy/frontend
           cp -r backend/dist deploy/backend/dist
+          # .d.ts/.js.map are tsconfig's dev-time declaration/source-map output — nothing in the
+          # app registers source-map-support, so the maps were never even wired up to improve a
+          # production stack trace, and the declarations have no runtime use at all.
+          find deploy/backend/dist -name '*.d.ts' -delete
+          find deploy/backend/dist -name '*.js.map' -delete
           cp -r backend/node_modules deploy/backend/node_modules
           cp backend/package.json deploy/backend/package.json
           mkdir -p deploy/backend/uploads

@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SimulateMessageDto } from './dto/simulate-message.dto.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
+import { requireInClient } from '../common/require-in-client.js';
 
 @Injectable()
 export class InboxService {
@@ -65,10 +66,6 @@ export class InboxService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const message = await this.prisma.inboxMessage.findUnique({ where: { id } });
-    if (!message || message.clientId !== clientId) {
-      throw new NotFoundException('Inbox message not found for this client');
-    }
-    return message;
+    return requireInClient(() => this.prisma.inboxMessage.findUnique({ where: { id } }), clientId, 'Inbox message');
   }
 }

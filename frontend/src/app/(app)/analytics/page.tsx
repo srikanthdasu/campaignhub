@@ -38,7 +38,13 @@ export default function AnalyticsPage() {
         </p>
       </motion.div>
 
-      {clients && clients.length === 0 ? (
+      {clients === null ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : clients.length === 0 ? (
         <Card padding="lg">
           <p className="text-sm text-neutral-400">No clients yet — create one from Agency &amp; Clients first.</p>
         </Card>

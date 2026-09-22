@@ -8,6 +8,7 @@ import { CreateEmailCampaignDto } from './dto/create-email-campaign.dto.js';
 import { UpdateEmailCampaignDto } from './dto/update-email-campaign.dto.js';
 import { BulkImportRecipientsDto } from './dto/bulk-import-recipients.dto.js';
 import { EmailCampaignStatus, EmailRecipientStatus } from '../generated/prisma/client.js';
+import { requireInClient } from '../common/require-in-client.js';
 
 const DEFAULT_BATCH_SIZE = 20;
 const MERGE_FIELD = /\{\{\s*name\s*\}\}/gi;
@@ -310,10 +311,6 @@ export class EmailCampaignsService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const campaign = await this.prisma.emailCampaign.findUnique({ where: { id } });
-    if (!campaign || campaign.clientId !== clientId) {
-      throw new NotFoundException('Email campaign not found for this client');
-    }
-    return campaign;
+    return requireInClient(() => this.prisma.emailCampaign.findUnique({ where: { id } }), clientId, 'Email campaign');
   }
 }

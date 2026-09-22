@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { extname } from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -6,6 +6,7 @@ import { UpdateMediaDto } from './dto/update-media.dto.js';
 import { mediaTypeFromMimetype } from './media-storage.js';
 import { BlobStorageService } from './blob-storage.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { MediaType } from '../generated/prisma/client.js';
 
 @Injectable()
@@ -148,10 +149,6 @@ export class MediaService {
   }
 
   async requireInClient(id: string, clientId: string) {
-    const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
-    if (!asset || asset.clientId !== clientId) {
-      throw new NotFoundException('Media asset not found for this client');
-    }
-    return asset;
+    return requireInClient(() => this.prisma.mediaAsset.findUnique({ where: { id } }), clientId, 'Media asset');
   }
 }

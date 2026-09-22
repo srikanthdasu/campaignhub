@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ClientPlan, ClientStatus } from '../../generated/prisma/client.js';
 
 export class UpdateClientDto {
@@ -7,10 +7,6 @@ export class UpdateClientDto {
   @MinLength(2)
   @MaxLength(200)
   name?: string;
-
-  @IsOptional()
-  @IsUUID('4')
-  brandKitId?: string;
 
   @IsOptional()
   @IsString()

@@ -19,9 +19,44 @@ interface FoundryImageGeneration {
   data?: { b64_json?: string }[];
 }
 
+// A brief hiccup from the AI provider (a dropped connection, a transient 5xx) shouldn't become
+// an immediate user-facing error — a couple of quick retries covers that without masking a
+// genuinely broken request (4xx, or a request that fails 3 times in a row) behind false progress.
+const MAX_FETCH_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 @Injectable()
 export class AzureAiFoundryService {
   constructor(private config: ConfigService) {}
+
+  // Retries network failures and 5xx responses (the AI provider's fault, plausibly transient);
+  // a 4xx response returns immediately since retrying an invalid request just wastes time.
+  // A persistent 5xx after retries are exhausted returns that Response rather than throwing, so
+  // callers' existing `!res.ok` handling still produces its specific status-code message — only
+  // a run of genuine network-level failures (fetch itself rejecting) throws here.
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    let lastNetworkError: unknown;
+    let lastResponse: Response | undefined;
+    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+      try {
+        const res = await fetch(url, init);
+        if (res.ok || res.status < 500) return res;
+        lastResponse = res;
+      } catch (err) {
+        lastNetworkError = err;
+        lastResponse = undefined;
+      }
+      if (attempt < MAX_FETCH_ATTEMPTS) {
+        await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+      }
+    }
+    if (lastResponse) return lastResponse;
+    throw lastNetworkError;
+  }
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
     // Unlike VideoGenerationService's kill switch (default OFF, no budget yet), text/image
@@ -37,7 +72,7 @@ export class AzureAiFoundryService {
 
     let res: Response;
     try {
-      res = await fetch(endpoint, {
+      res = await this.fetchWithRetry(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'api-key': key },
         body: JSON.stringify({
@@ -76,7 +111,7 @@ export class AzureAiFoundryService {
 
     let res: Response;
     try {
-      res = await fetch(endpoint, {
+      res = await this.fetchWithRetry(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'api-key': key },
         body: JSON.stringify({ model, prompt, n: 1, size }),

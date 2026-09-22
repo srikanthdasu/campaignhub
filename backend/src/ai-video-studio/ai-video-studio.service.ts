@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { VideoGenerationService } from '../ai-common/video-generation.service.js';
 import { parseModelJson } from '../ai-common/parse-model-json.js';
 import { BlobStorageService } from '../media/blob-storage.service.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
 import { UpdateStoryboardDto } from './dto/update-storyboard.dto.js';
@@ -235,10 +236,6 @@ export class AiVideoStudioService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const project = await this.prisma.aiVideoProject.findUnique({ where: { id } });
-    if (!project || project.clientId !== clientId) {
-      throw new NotFoundException('Video project not found for this client');
-    }
-    return project;
+    return requireInClient(() => this.prisma.aiVideoProject.findUnique({ where: { id } }), clientId, 'Video project');
   }
 }

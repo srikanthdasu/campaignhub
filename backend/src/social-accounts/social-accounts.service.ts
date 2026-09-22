@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -64,6 +64,25 @@ export class SocialAccountsService {
   }
 
   async create(clientId: string, actorId: string, dto: CreateSocialAccountDto) {
+    // The DB's own @@unique([clientId, platform, externalAccountId]) is a no-op for manually-added
+    // accounts — externalAccountId is null on all of them, and Postgres treats every NULL as
+    // distinct, so it never rejects a second one. This is the actual duplicate guard for the
+    // normal (manual) connection path; label is a free-typed display name, so this only catches
+    // an exact case-insensitive repeat, not every possible real-world duplicate.
+    if (!dto.externalAccountId) {
+      const existing = await this.prisma.socialAccount.findFirst({
+        where: {
+          clientId,
+          platform: dto.platform,
+          externalAccountId: null,
+          label: { equals: dto.label, mode: 'insensitive' },
+        },
+      });
+      if (existing) {
+        throw new ConflictException('An account with this platform and label is already connected for this client.');
+      }
+    }
+
     const account = await this.prisma.socialAccount.create({
       data: {
         clientId,

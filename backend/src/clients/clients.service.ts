@@ -18,7 +18,6 @@ export class ClientsService {
       data: {
         agencyId,
         name: dto.name,
-        brandKitId: dto.brandKitId,
         contactName: dto.contactName,
         contactEmail: dto.contactEmail,
         phone: dto.phone,
@@ -151,7 +150,6 @@ export class ClientsService {
       where: { id: clientId },
       data: {
         name: dto.name,
-        brandKitId: dto.brandKitId,
         contactName: dto.contactName,
         contactEmail: dto.contactEmail,
         phone: dto.phone,

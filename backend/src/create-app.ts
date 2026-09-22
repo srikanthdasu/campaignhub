@@ -5,6 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 
@@ -45,7 +46,10 @@ export async function createApp(): Promise<NestExpressApplication> {
   // domain. That was the gap with CSP off entirely, and this closes it without touching how
   // Next.js hydrates. Verified locally against the built combined server (backend/dist +
   // frontend build-output), not just typechecked, given this exact configuration broke
-  // production once already.
+  // production once already. 'unsafe-eval' was dropped from scriptSrc below after the same
+  // local verification (full hydration, Google Sign-In button, Three.js background all worked
+  // with it removed) — a production Next.js build doesn't use eval-based devtool source maps,
+  // so it was never actually needed, only 'unsafe-inline' is required for the hydration bootstrap.
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -55,7 +59,7 @@ export async function createApp(): Promise<NestExpressApplication> {
           // 'https://accounts.google.com/gsi/client' + frameSrc/connectSrc below let Google
           // Identity Services load its script, render its iframe-based Sign-In button, and make
           // its own network calls — needed for Google Sign-In (auth.service.ts googleAuth()).
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://accounts.google.com/gsi/client'],
+          scriptSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/client'],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
           imgSrc: ["'self'", 'data:', 'blob:'],
           fontSrc: ["'self'", 'data:'],
@@ -69,7 +73,11 @@ export async function createApp(): Promise<NestExpressApplication> {
       },
     }),
   );
+  app.use(compression());
   app.use(cookieParser());
+  // Lets an in-flight request finish before the old process actually exits during a deploy,
+  // instead of being dropped mid-response the moment the new version's container takes over.
+  app.enableShutdownHooks();
   app.enableCors({
     origin: config.get<string>('CORS_ORIGIN', 'http://localhost:3000'),
     credentials: true,

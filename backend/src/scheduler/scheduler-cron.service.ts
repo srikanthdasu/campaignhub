@@ -10,14 +10,27 @@ import { SchedulerService } from './scheduler.service.js';
 @Injectable()
 export class SchedulerCronService {
   private readonly logger = new Logger(SchedulerCronService.name);
+  // A single NestJS instance runs this, so an in-memory flag is enough: without it, a slow
+  // publish run (a real backlog after downtime, or a slow external API) could still be mid-loop
+  // when the next EVERY_MINUTE tick fires, doubling up work on the same due posts.
+  private isRunning = false;
 
   constructor(private schedulerService: SchedulerService) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async handlePublishDuePosts() {
-    const count = await this.schedulerService.autoPublishDuePosts();
-    if (count > 0) {
-      this.logger.log(`Auto-published ${count} scheduled post(s)`);
+    if (this.isRunning) {
+      this.logger.warn('Skipping this tick — the previous publish run is still in progress');
+      return;
+    }
+    this.isRunning = true;
+    try {
+      const count = await this.schedulerService.autoPublishDuePosts();
+      if (count > 0) {
+        this.logger.log(`Auto-published ${count} scheduled post(s)`);
+      }
+    } finally {
+      this.isRunning = false;
     }
   }
 }

@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
+import { AuthCronService } from './auth-cron.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
@@ -10,7 +11,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 @Module({
   imports: [PassportModule, JwtModule.register({}), AuditModule, NotificationsModule],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, AuthCronService],
   exports: [AuthService],
 })
 export class AuthModule {}

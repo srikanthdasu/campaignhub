@@ -7,6 +7,19 @@ import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto.js';
 import { GST_RATE, PLANS } from './billing.constants.js';
 import { SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
 
+// Invoice.amount/gstAmount are Prisma Decimal (see schema.prisma) so GST math never accumulates
+// binary floating-point error — but a raw Decimal instance serializes to a *string* over JSON
+// (its toJSON()), and the frontend does real arithmetic on these (`inv.amount + inv.gstAmount`),
+// which would silently become string concatenation instead of addition. Converting back to a
+// plain number at the API boundary keeps that contract exactly as it was before this migration.
+// Number(...) works for both a real Decimal (its toString() feeds Number's ToNumber coercion)
+// and the plain JS numbers billing.service.spec.ts's mocked PrismaService already returns.
+function invoiceToPlainNumbers<T extends { amount: unknown; gstAmount: unknown }>(
+  invoice: T,
+): Omit<T, 'amount' | 'gstAmount'> & { amount: number; gstAmount: number } {
+  return { ...invoice, amount: Number(invoice.amount), gstAmount: Number(invoice.gstAmount) };
+}
+
 interface RazorpayWebhookPayload {
   event: string;
   payload?: {
@@ -46,11 +59,12 @@ export class BillingService {
     return this.prisma.subscription.findUnique({ where: { agencyId } });
   }
 
-  listInvoices(agencyId: string) {
-    return this.prisma.invoice.findMany({
+  async listInvoices(agencyId: string) {
+    const invoices = await this.prisma.invoice.findMany({
       where: { agencyId },
       orderBy: { issuedAt: 'desc' },
     });
+    return invoices.map(invoiceToPlainNumbers);
   }
 
   /** Step 1 of checkout: opens a real Razorpay order for the frontend to hand to Checkout.js. */
@@ -155,7 +169,7 @@ export class BillingService {
       metadata: { plan: dto.plan, billingCycle: dto.billingCycle, amount, razorpayPaymentId: paymentId },
     });
 
-    return { subscription, invoice };
+    return { subscription, invoice: invoiceToPlainNumbers(invoice) };
   }
 
   async cancel(agencyId: string, actorId: string) {

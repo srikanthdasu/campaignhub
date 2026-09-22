@@ -355,7 +355,14 @@ export default function MediaLibraryPage() {
                     <div className="h-20 overflow-hidden rounded-lg bg-white/[0.03]">
                       {active.type === 'IMAGE' || active.type === 'GIF' ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={resolveMediaUrl(active.storageUrl)} alt={active.title || active.fileName} className="h-full w-full object-cover" />
+                        <img
+                          src={resolveMediaUrl(active.storageUrl)}
+                          alt={active.title || active.fileName}
+                          className="h-full w-full object-cover"
+                          width={160}
+                          height={80}
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="flex h-full items-center justify-center text-neutral-500">{active.type}</div>
                       )}
@@ -551,7 +558,14 @@ export default function MediaLibraryPage() {
                         <div className="h-8 w-8 shrink-0 overflow-hidden rounded bg-white/[0.03]">
                           {a.type === 'IMAGE' || a.type === 'GIF' ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={resolveMediaUrl(a.storageUrl)} alt={a.title || a.fileName} className="h-full w-full object-cover" />
+                            <img
+                              src={resolveMediaUrl(a.storageUrl)}
+                              alt={a.title || a.fileName}
+                              className="h-full w-full object-cover"
+                              width={32}
+                              height={32}
+                              loading="lazy"
+                            />
                           ) : null}
                         </div>
                         <span className="truncate text-neutral-300">{a.title || a.fileName}</span>
@@ -597,7 +611,14 @@ export default function MediaLibraryPage() {
                         <div className="relative aspect-square bg-white/[0.03]">
                           {asset.type === 'IMAGE' || asset.type === 'GIF' ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={resolveMediaUrl(asset.storageUrl)} alt={asset.fileName} className="h-full w-full object-cover" />
+                            <img
+                              src={resolveMediaUrl(asset.storageUrl)}
+                              alt={asset.fileName}
+                              className="h-full w-full object-cover"
+                              width={200}
+                              height={200}
+                              loading="lazy"
+                            />
                           ) : asset.type === 'VIDEO' ? (
                             <video src={resolveMediaUrl(asset.storageUrl)} className="h-full w-full object-cover" />
                           ) : (

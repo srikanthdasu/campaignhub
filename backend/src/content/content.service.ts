@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MediaService } from '../media/media.service.js';
 import { ApprovalsService } from '../approvals/approvals.service.js';
 import { CampaignsService } from '../campaigns/campaigns.service.js';
+import { requireInClient } from '../common/require-in-client.js';
 import { CreateContentDto } from './dto/create-content.dto.js';
 import { UpdateContentDto } from './dto/update-content.dto.js';
 import { SubmitContentDto } from './dto/submit-content.dto.js';
@@ -162,10 +163,6 @@ export class ContentService {
   }
 
   private async requireInClient(id: string, clientId: string) {
-    const item = await this.prisma.contentItem.findUnique({ where: { id } });
-    if (!item || item.clientId !== clientId) {
-      throw new NotFoundException('Content item not found for this client');
-    }
-    return item;
+    return requireInClient(() => this.prisma.contentItem.findUnique({ where: { id } }), clientId, 'Content item');
   }
 }

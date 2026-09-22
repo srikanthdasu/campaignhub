@@ -23,7 +23,13 @@ export function NotificationBell() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   function loadCount() {
-    api.get<{ count: number }>('/notifications/unread-count').then((r) => setUnreadCount(r.count));
+    api
+      .get<{ count: number }>('/notifications/unread-count')
+      .then((r) => setUnreadCount(r.count))
+      .catch(() => {
+        // A single failed poll shouldn't spam the console every 30s while the tab stays open —
+        // the badge just keeps showing its last-known count until a later tick succeeds.
+      });
   }
 
   useEffect(() => {
@@ -38,14 +44,21 @@ export function NotificationBell() {
         setOpen(false);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
     document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, []);
 
   function toggleOpen() {
     setOpen((prev) => {
       const next = !prev;
-      if (next) api.get<Notification[]>('/notifications').then(setNotifications);
+      if (next) api.get<Notification[]>('/notifications').then(setNotifications).catch(() => setNotifications([]));
       return next;
     });
   }
