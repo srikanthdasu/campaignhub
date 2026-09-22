@@ -203,6 +203,11 @@ export default function UnifiedInboxPage() {
                             <div className="flex items-center gap-2">
                               <Badge tone="neutral">{m.platform}</Badge>
                               {!m.isRead && <Badge tone="accent">New</Badge>}
+                              <span
+                                title="No live platform connection exists yet — this message was added via the simulator, not received from a real webhook."
+                              >
+                                <Badge tone="neutral">Simulated</Badge>
+                              </span>
                               <span className="text-sm font-medium text-neutral-200">
                                 {m.senderName}
                               </span>
@@ -235,6 +240,10 @@ export default function UnifiedInboxPage() {
                               exit={{ height: 0, opacity: 0 }}
                               className="mt-3 overflow-hidden border-t border-white/10 pt-3"
                             >
+                              <p className="mb-2 text-xs text-amber-300/80">
+                                This reply will be recorded here but not delivered to {m.senderName}
+                                — no real platform connection exists yet.
+                              </p>
                               <div className="flex gap-2">
                                 <input
                                   placeholder="Write a reply…"
