@@ -6,7 +6,12 @@ import type { AuditService } from '../audit/audit.service.js';
 import type { ConfigService } from '@nestjs/config';
 import type { InstagramPublishService } from '../social-accounts/instagram-publish.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
+import type { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
+
+function makeBlobStorage() {
+  return { getReadUrl: vi.fn((url: string) => Promise.resolve(url)) } as unknown as BlobStorageService;
+}
 
 function buildService(overrides: { count?: number } = {}) {
   const audit = { log: vi.fn() };
@@ -39,6 +44,7 @@ function buildService(overrides: { count?: number } = {}) {
     config as unknown as ConfigService,
     instagramPublish as unknown as InstagramPublishService,
     notifications as unknown as NotificationsService,
+    makeBlobStorage(),
   );
   return { service, prisma, audit, notifications };
 }
@@ -129,6 +135,7 @@ describe('SchedulerService.autoPublishDuePosts', () => {
       config as unknown as ConfigService,
       instagramPublish as unknown as InstagramPublishService,
       notifications as unknown as NotificationsService,
+      makeBlobStorage(),
     );
 
     const count = await service.autoPublishDuePosts();
@@ -167,6 +174,7 @@ describe('SchedulerService.autoPublishDuePosts', () => {
       config as unknown as ConfigService,
       instagramPublish as unknown as InstagramPublishService,
       notifications as unknown as NotificationsService,
+      makeBlobStorage(),
     );
 
     await service.autoPublishDuePosts();
@@ -212,6 +220,7 @@ function buildRetryService(post: { status: ScheduledPostStatus; retryCount: numb
     config as unknown as ConfigService,
     instagramPublish as unknown as InstagramPublishService,
     notifications as unknown as NotificationsService,
+    makeBlobStorage(),
   );
   const user: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.OWNER, agencyId: 'agency-1' };
   return { service, prisma, audit, user, notifications };

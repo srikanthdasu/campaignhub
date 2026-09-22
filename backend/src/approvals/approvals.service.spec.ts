@@ -4,7 +4,12 @@ import { ApprovalDecision, ApprovalFlowStatus, ApprovalMode, ContentStatus, Role
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
+import type { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
+
+function makeBlobStorage() {
+  return { getReadUrl: vi.fn((url: string) => Promise.resolve(url)) } as unknown as BlobStorageService;
+}
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
   return { sub: 'user-1', email: 'a@b.com', role: Role.CREATOR, agencyId: 'agency-1', ...overrides };
@@ -79,6 +84,7 @@ describe('ApprovalsService.decide', () => {
       prisma as unknown as PrismaService,
       audit as unknown as AuditService,
       notifications as unknown as NotificationsService,
+      makeBlobStorage(),
     );
   });
 
@@ -172,6 +178,7 @@ describe('ApprovalsService.listForUser', () => {
       prisma as unknown as PrismaService,
       { log: vi.fn() } as unknown as AuditService,
       { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+      makeBlobStorage(),
     );
 
     await service.listForUser(makeUser({ sub: 'approver-1', role: Role.CREATOR, agencyId: 'agency-1' }));
@@ -192,6 +199,7 @@ describe('ApprovalsService.listForUser', () => {
       prisma as unknown as PrismaService,
       { log: vi.fn() } as unknown as AuditService,
       { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+      makeBlobStorage(),
     );
 
     await service.listForUser(makeUser({ sub: 'owner-1', role: Role.OWNER, agencyId: 'agency-1' }));

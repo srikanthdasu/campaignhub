@@ -1,19 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-
-// Resolved from this module's own location, not process.cwd() — the latter depends on how/where
-// the process was launched (e.g. Azure App Service's startup command may run from a different
-// working directory than this file lives in), so it isn't reliable for finding sibling folders.
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = join(MODULE_DIR, '..', 'uploads'); // backend/dist/../uploads = backend/uploads
 
 // Local dev runs the API on its own port with no prefix (frontend talks to it as a separate
 // origin). The combined production server (combined-server.ts) sets API_PREFIX=api so this same
@@ -61,11 +53,14 @@ export async function createApp(): Promise<NestExpressApplication> {
           // its own network calls — needed for Google Sign-In (auth.service.ts googleAuth()).
           scriptSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/client'],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
-          imgSrc: ["'self'", 'data:', 'blob:'],
+          // https://*.blob.core.windows.net: MediaAsset URLs are Azure Blob SAS links
+          // (BlobStorageService.getReadUrl) once AZURE_STORAGE_CONNECTION_STRING is configured —
+          // without this, CSP would block every uploaded image/video the moment that happens.
+          imgSrc: ["'self'", 'data:', 'blob:', 'https://*.blob.core.windows.net'],
           fontSrc: ["'self'", 'data:'],
           connectSrc: ["'self'", 'https://accounts.google.com'],
           frameSrc: ['https://accounts.google.com'],
-          mediaSrc: ["'self'", 'blob:'],
+          mediaSrc: ["'self'", 'blob:', 'https://*.blob.core.windows.net'],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],
           frameAncestors: ["'none'"],
@@ -89,8 +84,18 @@ export async function createApp(): Promise<NestExpressApplication> {
       transform: true,
     }),
   );
-  app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads' });
-  if (apiPrefix) app.setGlobalPrefix(apiPrefix);
+  // Local-disk uploads used to be served here via unauthenticated static middleware, outside
+  // the /api prefix — anyone with a blob's filename could read it, dev fallback or not.
+  // MediaFilesController (media-files.controller.ts) replaces it with a token-gated
+  // /media-files/:filename route; see BlobStorageService.getReadUrl for where the signed URL
+  // actually gets generated. Excluded from the prefix below so it stays reachable at the same
+  // unprefixed path the old static middleware used — resolveMediaUrl() on the frontend already
+  // resolves relative media paths against the API origin with /api stripped, matching this.
+  if (apiPrefix) {
+    app.setGlobalPrefix(apiPrefix, {
+      exclude: [{ path: 'media-files/:filename', method: RequestMethod.GET }],
+    });
+  }
 
   return app;
 }

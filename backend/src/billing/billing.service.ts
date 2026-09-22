@@ -88,12 +88,52 @@ export class BillingService {
    * Step 2: activates the subscription and issues a GST invoice, but only after verifying the
    * payment signature Razorpay's callback returned — that's what proves a real (test-mode)
    * charge happened rather than the client just claiming success.
+   *
+   * The signature proves *that* orderId/paymentId are a real, matched pair — it proves nothing
+   * about *what plan* that order was for. `dto.plan`/`dto.billingCycle` are client-supplied and
+   * were previously trusted directly here, which let a signature valid for a cheap plan's order
+   * be replayed with a different, more expensive plan substituted in the request body — the
+   * signature still verified, since it never referenced plan/cycle at all. Fixed by re-fetching
+   * the order from Razorpay and reading plan/billingCycle/gstNumber from its own `notes`, which
+   * only this service ever wrote (at createCheckoutOrder, under the caller's own authenticated
+   * session) — exactly the same trusted source processRazorpayWebhook below already used.
    */
   async confirmSubscription(agencyId: string, actorId: string, dto: ConfirmCheckoutDto) {
     const verified = this.razorpay.verifyPaymentSignature(dto.orderId, dto.paymentId, dto.signature);
     if (!verified) throw new BadRequestException('Payment verification failed');
 
-    return this.activateSubscription(agencyId, dto.paymentId, dto, actorId);
+    const order = await this.razorpay.fetchOrder(dto.orderId);
+    const activation = this.parseActivationNotes(order.notes);
+    if (!activation) {
+      throw new BadRequestException('Could not verify what this order was for — please contact support.');
+    }
+    // The signature ties orderId to paymentId, but says nothing about which agency's order this
+    // is — without this check, a leaked orderId+paymentId+signature triple from Agency A could be
+    // replayed by Agency B (who has their own valid JWT session) to activate Agency B's plan on
+    // Agency A's payment. Confirming the order's own notes.agencyId matches the caller closes that.
+    if (activation.agencyId !== agencyId) {
+      throw new BadRequestException('This order does not belong to your agency.');
+    }
+
+    return this.activateSubscription(agencyId, dto.paymentId, activation, actorId);
+  }
+
+  /**
+   * Shared with processRazorpayWebhook below — both paths must derive plan/billingCycle/gstNumber
+   * from Razorpay's own order notes (set once, server-side, at createCheckoutOrder), never from
+   * anything a client sends back later. Returns null (never throws) so each caller can decide its
+   * own failure behavior — the webhook logs and 200s to stop Razorpay retry-storming us for data
+   * it can't fix, while confirmSubscription throws a real error back to the browser.
+   */
+  private parseActivationNotes(notes: Record<string, string> | undefined) {
+    if (!notes?.agencyId || !notes.plan || !notes.billingCycle) return null;
+    if (!Object.values(SubscriptionPlan).includes(notes.plan as SubscriptionPlan)) return null;
+    return {
+      agencyId: notes.agencyId,
+      plan: notes.plan as SubscriptionPlan,
+      billingCycle: notes.billingCycle as 'MONTHLY' | 'YEARLY',
+      gstNumber: notes.gstNumber || undefined,
+    };
   }
 
   /**
@@ -205,21 +245,17 @@ export class BillingService {
     }
 
     const entity = body.payload?.payment?.entity;
-    const notes = entity?.notes;
-    if (!entity?.id || !notes?.agencyId || !notes.plan || !notes.billingCycle) {
-      this.logger.warn(`payment.captured webhook missing expected notes — payment ${entity?.id ?? 'unknown'}`);
+    if (!entity?.id) {
+      this.logger.warn('payment.captured webhook missing a payment id');
       return { received: true, handled: false };
     }
-    if (!Object.values(SubscriptionPlan).includes(notes.plan as SubscriptionPlan)) {
-      this.logger.warn(`payment.captured webhook had an unrecognized plan in notes: ${notes.plan}`);
+    const activation = this.parseActivationNotes(entity.notes);
+    if (!activation) {
+      this.logger.warn(`payment.captured webhook had missing/unrecognized notes — payment ${entity.id}`);
       return { received: true, handled: false };
     }
 
-    const result = await this.activateFromWebhook(notes.agencyId, entity.id, {
-      plan: notes.plan as SubscriptionPlan,
-      billingCycle: notes.billingCycle as 'MONTHLY' | 'YEARLY',
-      gstNumber: notes.gstNumber || undefined,
-    });
+    const result = await this.activateFromWebhook(activation.agencyId, entity.id, activation);
 
     return { received: true, handled: true, alreadyProcessed: result.alreadyProcessed };
   }

@@ -6,6 +6,7 @@ interface RazorpayOrder {
   id: string;
   amount: number;
   currency: string;
+  notes?: Record<string, string>;
 }
 
 // Raw REST calls rather than the razorpay npm SDK — same reasoning as AzureAiFoundryService:
@@ -47,6 +48,31 @@ export class RazorpayService {
       throw new BadGatewayException(
         detail ? `Razorpay order creation failed: ${detail}` : `Razorpay order creation failed (${res.status}).`,
       );
+    }
+
+    return (await res.json()) as RazorpayOrder;
+  }
+
+  /**
+   * Re-fetches an order directly from Razorpay by id, including the `notes` this service itself
+   * set at createOrder time (plan/billingCycle/agencyId/gstNumber). The checkout-confirmation
+   * path uses this to recover which plan an order was actually for, rather than trusting the
+   * plan/billingCycle a client sends back in the confirm request body — the payment signature
+   * only proves a payment happened, never what it was for, so anything about *what plan to
+   * activate* has to come from Razorpay's own record of the order, not the client.
+   */
+  async fetchOrder(orderId: string): Promise<RazorpayOrder> {
+    let res: Response;
+    try {
+      res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
+        headers: { Authorization: this.authHeader() },
+      });
+    } catch {
+      throw new BadGatewayException('Could not reach Razorpay. Please try again.');
+    }
+
+    if (!res.ok) {
+      throw new BadGatewayException(`Could not verify the Razorpay order (${res.status}).`);
     }
 
     return (await res.json()) as RazorpayOrder;

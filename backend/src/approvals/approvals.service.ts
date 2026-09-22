@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { BlobStorageService } from '../media/blob-storage.service.js';
 import {
   ApprovalDecision,
   ApprovalFlowStatus,
@@ -37,7 +38,28 @@ export class ApprovalsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private blobStorage: BlobStorageService,
   ) {}
+
+  // APPROVAL_STEP_INCLUDE embeds contentItem.mediaAsset, whose storageUrl is a bare,
+  // unauthenticated blob reference (see BlobStorageService.getReadUrl) — every flow returned to
+  // the frontend needs it signed, same reasoning as content.service.ts's signMediaAsset.
+  private async signFlow<T extends { contentItem: { mediaAsset: { storageUrl: string } | null } }>(
+    flow: T,
+  ): Promise<T> {
+    const mediaAsset = flow.contentItem.mediaAsset;
+    if (!mediaAsset) return flow;
+    return {
+      ...flow,
+      contentItem: { ...flow.contentItem, mediaAsset: { ...mediaAsset, storageUrl: await this.blobStorage.getReadUrl(mediaAsset.storageUrl) } },
+    };
+  }
+
+  private signFlows<T extends { contentItem: { mediaAsset: { storageUrl: string } | null } }>(
+    flows: T[],
+  ): Promise<T[]> {
+    return Promise.all(flows.map((f) => this.signFlow(f)));
+  }
 
   async createFlowForContent(
     contentItemId: string,
@@ -90,19 +112,20 @@ export class ApprovalsService {
       '/approvals',
     );
 
-    return flow;
+    return this.signFlow(flow);
   }
 
   async listForUser(user: AuthenticatedUser) {
     if (user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
-      return this.prisma.approvalFlow.findMany({
+      const flows = await this.prisma.approvalFlow.findMany({
         where: { contentItem: { client: { agencyId: user.agencyId! } } },
         include: APPROVAL_STEP_INCLUDE,
         orderBy: { createdAt: 'desc' },
       });
+      return this.signFlows(flows);
     }
 
-    return this.prisma.approvalFlow.findMany({
+    const flows = await this.prisma.approvalFlow.findMany({
       where: {
         steps: { some: { approverId: user.sub } },
         contentItem: { client: { agencyId: user.agencyId! } },
@@ -110,6 +133,7 @@ export class ApprovalsService {
       include: APPROVAL_STEP_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
+    return this.signFlows(flows);
   }
 
   /** Controller-facing read: enforces the requester can actually see this flow. */
@@ -129,7 +153,7 @@ export class ApprovalsService {
       throw new ForbiddenException('You do not have access to this approval flow');
     }
 
-    return flow;
+    return this.signFlow(flow);
   }
 
   private async fetchFlow(id: string) {
@@ -236,11 +260,12 @@ export class ApprovalsService {
       entityId: contentItemId,
     });
 
-    return this.prisma.approvalFlow.update({
+    const updated = await this.prisma.approvalFlow.update({
       where: { id: flow.id },
       data: { status: ApprovalFlowStatus.IN_REVIEW },
       include: APPROVAL_STEP_INCLUDE,
     });
+    return this.signFlow(updated);
   }
 
   /** Recomputes flow + content status from the current step decisions. */
@@ -271,6 +296,7 @@ export class ApprovalsService {
       });
     }
 
-    return this.fetchFlow(flowId);
+    const finalFlow = await this.fetchFlow(flowId);
+    return this.signFlow(finalFlow);
   }
 }

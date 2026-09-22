@@ -7,6 +7,7 @@ import { ContentStatus, Role, ScheduledPostStatus, SocialPlatform } from '../gen
 import { decryptToken } from '../social-accounts/token-crypto.js';
 import { InstagramPublishService, InstagramPublishError } from '../social-accounts/instagram-publish.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SUPER_ADMIN];
@@ -28,6 +29,7 @@ export class SchedulerService {
     private config: ConfigService,
     private instagramPublish: InstagramPublishService,
     private notifications: NotificationsService,
+    private blobStorage: BlobStorageService,
   ) {}
 
   async schedule(clientId: string, contentItemId: string, user: AuthenticatedUser, dto: CreateScheduleDto) {
@@ -313,10 +315,17 @@ export class SchedulerService {
     const encryptionKey = this.config.getOrThrow<string>('TOKEN_ENCRYPTION_KEY');
     const accessToken = decryptToken(account.accessTokenEncrypted, encryptionKey);
 
+    // Instagram's own servers fetch this URL directly (see InstagramPublishService's docstring)
+    // — since BlobStorageService's container is private as of the SEC-1 fix, the bare storageUrl
+    // is no longer fetchable by anyone outside our own signing flow. A signed read URL restores
+    // exactly the "publicly reachable" access Instagram needs, just short-lived instead of
+    // permanent.
+    const mediaUrl = await this.blobStorage.getReadUrl(content.mediaAsset.storageUrl);
+
     return this.instagramPublish.publishImage(
       account.externalAccountId,
       accessToken,
-      content.mediaAsset.storageUrl,
+      mediaUrl,
       content.body ?? '',
     );
   }

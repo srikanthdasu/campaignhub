@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MediaService } from '../media/media.service.js';
+import { BlobStorageService } from '../media/blob-storage.service.js';
 import { ApprovalsService } from '../approvals/approvals.service.js';
 import { CampaignsService } from '../campaigns/campaigns.service.js';
 import { requireInClient } from '../common/require-in-client.js';
@@ -22,6 +23,7 @@ export class ContentService {
     private media: MediaService,
     private approvals: ApprovalsService,
     private campaigns: CampaignsService,
+    private blobStorage: BlobStorageService,
   ) {}
 
   async create(clientId: string, user: AuthenticatedUser, dto: CreateContentDto) {
@@ -54,19 +56,31 @@ export class ContentService {
   }
 
   async list(clientId: string, status?: ContentStatus, campaignId?: string) {
-    return this.prisma.contentItem.findMany({
+    const items = await this.prisma.contentItem.findMany({
       where: { clientId, status, campaignId },
       orderBy: { createdAt: 'desc' },
       include: { mediaAsset: true, approvalFlow: { include: { steps: true } } },
     });
+    return Promise.all(items.map((item) => this.signMediaAsset(item)));
   }
 
   async getOne(clientId: string, id: string) {
     const item = await this.requireInClient(id, clientId);
-    return this.prisma.contentItem.findUnique({
+    const found = await this.prisma.contentItem.findUnique({
       where: { id: item.id },
       include: { mediaAsset: true, approvalFlow: { include: { steps: true } } },
     });
+    return found && this.signMediaAsset(found);
+  }
+
+  // contentItem.mediaAsset carries the same bare, unauthenticated storageUrl MediaService.list
+  // would otherwise leak (see BlobStorageService.getReadUrl) — this `include` bypasses
+  // MediaService entirely, so it needs its own signing step here.
+  private async signMediaAsset<T extends { mediaAsset: { storageUrl: string } | null }>(
+    item: T,
+  ): Promise<T> {
+    if (!item.mediaAsset) return item;
+    return { ...item, mediaAsset: { ...item.mediaAsset, storageUrl: await this.blobStorage.getReadUrl(item.mediaAsset.storageUrl) } };
   }
 
   async update(clientId: string, id: string, user: AuthenticatedUser, dto: UpdateContentDto) {

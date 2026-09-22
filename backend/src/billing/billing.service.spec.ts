@@ -7,7 +7,13 @@ import type { RazorpayService } from './razorpay.service.js';
 
 const VERIFIED_PAYMENT = { orderId: 'order_1', paymentId: 'pay_1', signature: 'sig_1' };
 
-function buildService(overrides: { verifies?: boolean; existingSubscription?: any } = {}) {
+function buildService(
+  overrides: {
+    verifies?: boolean;
+    existingSubscription?: any;
+    orderNotes?: Record<string, string> | undefined;
+  } = {},
+) {
   const prisma = {
     subscription: {
       findUnique: vi.fn(() => Promise.resolve(overrides.existingSubscription ?? null)),
@@ -21,6 +27,17 @@ function buildService(overrides: { verifies?: boolean; existingSubscription?: an
   const razorpay = {
     keyId: 'rzp_test_fake',
     createOrder: vi.fn((amount: number) => Promise.resolve({ id: 'order_1', amount: amount * 100, currency: 'INR' })),
+    fetchOrder: vi.fn(() =>
+      Promise.resolve({
+        id: 'order_1',
+        amount: 99900,
+        currency: 'INR',
+        notes:
+          overrides.orderNotes === undefined
+            ? { agencyId: 'agency-1', plan: SubscriptionPlan.STARTER, billingCycle: 'MONTHLY' }
+            : overrides.orderNotes,
+      }),
+    ),
     verifyPaymentSignature: vi.fn(() => overrides.verifies ?? true),
     verifyWebhookSignature: vi.fn(() => overrides.verifies ?? true),
   };
@@ -112,6 +129,48 @@ describe('BillingService.confirmSubscription', () => {
         create: expect.objectContaining({ paymentProviderRef: 'pay_1' }),
       }),
     );
+  });
+
+  it('activates the plan recorded on the verified Razorpay order, ignoring a different plan sent in the request body', async () => {
+    // Regression test for the plan-tampering fix: the order was genuinely created (and paid for)
+    // as STARTER/MONTHLY — a request claiming GROWTH/YEARLY in the body must not be trusted.
+    const { service, prisma } = buildService({
+      orderNotes: { agencyId: 'agency-1', plan: SubscriptionPlan.STARTER, billingCycle: 'MONTHLY' },
+    });
+    const { subscription, invoice } = await service.confirmSubscription('agency-1', 'owner-1', {
+      plan: SubscriptionPlan.GROWTH,
+      billingCycle: 'YEARLY',
+      ...VERIFIED_PAYMENT,
+    });
+    expect(subscription.plan).toBe(SubscriptionPlan.STARTER);
+    expect(invoice.amount).toBe(999);
+    expect(prisma.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ plan: SubscriptionPlan.STARTER, billingCycle: 'MONTHLY' }) }),
+    );
+  });
+
+  it('rejects confirmation when the verified order belongs to a different agency', async () => {
+    const { service } = buildService({
+      orderNotes: { agencyId: 'agency-OTHER', plan: SubscriptionPlan.STARTER, billingCycle: 'MONTHLY' },
+    });
+    await expect(
+      service.confirmSubscription('agency-1', 'owner-1', {
+        plan: SubscriptionPlan.STARTER,
+        billingCycle: 'MONTHLY',
+        ...VERIFIED_PAYMENT,
+      }),
+    ).rejects.toThrow('does not belong to your agency');
+  });
+
+  it('rejects confirmation when the order has no recoverable plan notes', async () => {
+    const { service } = buildService({ orderNotes: {} });
+    await expect(
+      service.confirmSubscription('agency-1', 'owner-1', {
+        plan: SubscriptionPlan.STARTER,
+        billingCycle: 'MONTHLY',
+        ...VERIFIED_PAYMENT,
+      }),
+    ).rejects.toThrow('Could not verify what this order was for');
   });
 });
 

@@ -51,7 +51,7 @@ export class MediaService {
       metadata: { prompt },
     });
 
-    return asset;
+    return this.signAsset(asset);
   }
 
   async recordUpload(
@@ -88,19 +88,20 @@ export class MediaService {
       entityId: asset.id,
     });
 
-    return asset;
+    return this.signAsset(asset);
   }
 
   async list(clientId: string, folder?: string, campaignId?: string) {
-    return this.prisma.mediaAsset.findMany({
+    const assets = await this.prisma.mediaAsset.findMany({
       where: { clientId, folder, campaignId },
       orderBy: { createdAt: 'desc' },
     });
+    return Promise.all(assets.map((a) => this.signAsset(a)));
   }
 
   async update(id: string, clientId: string, dto: UpdateMediaDto) {
     await this.requireInClient(id, clientId);
-    return this.prisma.mediaAsset.update({
+    const asset = await this.prisma.mediaAsset.update({
       where: { id },
       data: {
         folder: dto.folder,
@@ -110,6 +111,7 @@ export class MediaService {
         campaignId: dto.campaignId,
       },
     });
+    return this.signAsset(asset);
   }
 
   async bulkRemove(ids: string[], clientId: string, actorId: string) {
@@ -150,5 +152,12 @@ export class MediaService {
 
   async requireInClient(id: string, clientId: string) {
     return requireInClient(() => this.prisma.mediaAsset.findUnique({ where: { id } }), clientId, 'Media asset');
+  }
+
+  // The stored storageUrl is a bare, unauthenticated blob reference (private container as of
+  // the SEC-1 fix) — every response that hands a MediaAsset to the frontend must replace it with
+  // a short-lived signed URL here, or the asset becomes unreadable rather than merely private.
+  private async signAsset<T extends { storageUrl: string }>(asset: T): Promise<T> {
+    return { ...asset, storageUrl: await this.blobStorage.getReadUrl(asset.storageUrl) };
   }
 }

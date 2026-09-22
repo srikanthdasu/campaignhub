@@ -6,6 +6,7 @@ import type { AuditService } from '../audit/audit.service.js';
 import type { MediaService } from '../media/media.service.js';
 import type { ApprovalsService } from '../approvals/approvals.service.js';
 import type { CampaignsService } from '../campaigns/campaigns.service.js';
+import type { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
@@ -44,12 +45,14 @@ function buildService(overrides: { item?: any; agencyUsers?: any[] } = {}) {
     resubmit: vi.fn(() => Promise.resolve({ resubmitted: true })),
     createFlowForContent: vi.fn(() => Promise.resolve({ created: true })),
   };
+  const blobStorage = { getReadUrl: vi.fn((url: string) => Promise.resolve(url)) };
   const service = new ContentService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     media as unknown as MediaService,
     approvals as unknown as ApprovalsService,
     campaigns as unknown as CampaignsService,
+    blobStorage as unknown as BlobStorageService,
   );
   return { service, prisma, audit, media, approvals, campaigns, item };
 }

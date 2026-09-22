@@ -18,7 +18,11 @@ function buildService(overrides: { asset?: any } = {}) {
       create: vi.fn((args: any) => Promise.resolve({ id: 'asset-generated', ...args.data })),
     },
   };
-  const blobStorage = { upload: vi.fn(() => Promise.resolve('/uploads/new.png')), remove: vi.fn(() => Promise.resolve()) };
+  const blobStorage = {
+    upload: vi.fn(() => Promise.resolve('/uploads/new.png')),
+    remove: vi.fn(() => Promise.resolve()),
+    getReadUrl: vi.fn((url: string) => Promise.resolve(`${url}?signed=1`)),
+  };
   const foundry = { generateImage: vi.fn(() => Promise.resolve(Buffer.from(''))) };
   const service = new MediaService(
     prisma as unknown as PrismaService,

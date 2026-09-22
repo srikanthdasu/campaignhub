@@ -75,6 +75,56 @@ describe('RazorpayService.createOrder', () => {
   });
 });
 
+describe('RazorpayService.fetchOrder', () => {
+  it('fetches the order by id and returns its notes', async () => {
+    const service = buildService();
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 'order_1',
+            amount: 99900,
+            currency: 'INR',
+            notes: { agencyId: 'agency-1', plan: 'STARTER', billingCycle: 'MONTHLY' },
+          }),
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const order = await service.fetchOrder('order_1');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.razorpay.com/v1/orders/order_1');
+    expect(order.notes).toEqual({ agencyId: 'agency-1', plan: 'STARTER', billingCycle: 'MONTHLY' });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('throws a clear error when Razorpay cannot be reached', async () => {
+    const service = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('network down'))),
+    );
+
+    await expect(service.fetchOrder('order_1')).rejects.toThrow('Could not reach Razorpay');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('throws when Razorpay responds with a non-OK status', async () => {
+    const service = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 })),
+    );
+
+    await expect(service.fetchOrder('order_bad')).rejects.toThrow('404');
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('RazorpayService.verifyWebhookSignature', () => {
   it('accepts a signature genuinely computed over the raw body with the webhook secret', () => {
     const service = buildService();
