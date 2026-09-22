@@ -45,7 +45,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateCampaignDto,
   ) {
-    return this.campaignsService.update(clientId, id, user.sub, dto);
+    return this.campaignsService.update(clientId, id, user.sub, user.agencyId!, dto);
   }
 
   @Delete(':id')

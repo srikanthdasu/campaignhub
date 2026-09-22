@@ -4,6 +4,8 @@ import { AdStatus, Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
+import type { CampaignsService } from '../campaigns/campaigns.service.js';
+import type { MediaService } from '../media/media.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
@@ -53,10 +55,14 @@ describe('AdsService', () => {
     };
     audit = { log: vi.fn() };
     notifications = { create: vi.fn(), createMany: vi.fn() };
+    const campaigns = { requireInClient: vi.fn(() => Promise.resolve({})) };
+    const media = { requireInClient: vi.fn(() => Promise.resolve({})) };
     service = new AdsService(
       prisma as unknown as PrismaService,
       audit as unknown as AuditService,
       notifications as unknown as NotificationsService,
+      campaigns as unknown as CampaignsService,
+      media as unknown as MediaService,
     );
   });
 
@@ -128,5 +134,48 @@ describe('AdsService', () => {
     await expect(service.remove('client-1', 'ad-1', 'owner-1')).rejects.toThrow(
       'Only a draft ad can be deleted',
     );
+  });
+});
+
+describe('AdsService — cross-tenant foreign key ownership (AUTH-2)', () => {
+  function buildServiceWithSpies() {
+    const adState = buildAd();
+    const prisma = {
+      adCampaign: {
+        create: vi.fn((args: any) => Promise.resolve({ id: 'ad-new', ...args.data })),
+        findUnique: vi.fn(() => Promise.resolve(adState)),
+        update: vi.fn((args: any) => Promise.resolve({ ...adState, ...args.data })),
+      },
+    };
+    const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn(), createMany: vi.fn() };
+    const campaigns = { requireInClient: vi.fn(() => Promise.reject(new Error('Campaign not found for this client'))) };
+    const media = { requireInClient: vi.fn(() => Promise.reject(new Error('Media asset not found for this client'))) };
+    const service = new AdsService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      notifications as unknown as NotificationsService,
+      campaigns as unknown as CampaignsService,
+      media as unknown as MediaService,
+    );
+    return { service, prisma, campaigns, media };
+  }
+
+  it('rejects creating an ad against a campaign that belongs to a different client', async () => {
+    const { service, prisma, campaigns } = buildServiceWithSpies();
+    await expect(
+      service.create('client-1', 'creator-1', { name: 'x', platform: 'INSTAGRAM', campaignId: 'foreign-campaign' } as any),
+    ).rejects.toThrow('Campaign not found for this client');
+    expect(campaigns.requireInClient).toHaveBeenCalledWith('foreign-campaign', 'client-1');
+    expect(prisma.adCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating an ad to reference a media asset from a different client', async () => {
+    const { service, prisma, media } = buildServiceWithSpies();
+    await expect(
+      service.update('client-1', 'ad-1', 'creator-1', { creativeMediaAssetId: 'foreign-asset' }),
+    ).rejects.toThrow('Media asset not found for this client');
+    expect(media.requireInClient).toHaveBeenCalledWith('foreign-asset', 'client-1');
+    expect(prisma.adCampaign.update).not.toHaveBeenCalled();
   });
 });

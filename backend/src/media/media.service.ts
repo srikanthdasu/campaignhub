@@ -6,6 +6,7 @@ import { UpdateMediaDto } from './dto/update-media.dto.js';
 import { mediaTypeFromMimetype } from './media-storage.js';
 import { BlobStorageService } from './blob-storage.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import { CampaignsService } from '../campaigns/campaigns.service.js';
 import { requireInClient } from '../common/require-in-client.js';
 import { MediaType } from '../generated/prisma/client.js';
 
@@ -16,6 +17,7 @@ export class MediaService {
     private audit: AuditService,
     private blobStorage: BlobStorageService,
     private foundry: AzureAiFoundryService,
+    private campaigns: CampaignsService,
   ) {}
 
   async generateImage(
@@ -24,6 +26,8 @@ export class MediaService {
     prompt: string,
     options: { size?: string; folder?: string; campaignId?: string } = {},
   ) {
+    if (options.campaignId) await this.campaigns.requireInClient(options.campaignId, clientId);
+
     const imageBuffer = await this.foundry.generateImage(prompt, options.size);
     const storageUrl = await this.blobStorage.upload(imageBuffer, '.png', 'image/png');
 
@@ -61,6 +65,8 @@ export class MediaService {
     folder?: string,
     campaignId?: string,
   ) {
+    if (campaignId) await this.campaigns.requireInClient(campaignId, clientId);
+
     const storageUrl = await this.blobStorage.upload(
       file.buffer,
       extname(file.originalname),
@@ -100,7 +106,10 @@ export class MediaService {
   }
 
   async update(id: string, clientId: string, dto: UpdateMediaDto) {
-    await this.requireInClient(id, clientId);
+    const existing = await this.requireInClient(id, clientId);
+    if (dto.campaignId && dto.campaignId !== existing.campaignId) {
+      await this.campaigns.requireInClient(dto.campaignId, clientId);
+    }
     const asset = await this.prisma.mediaAsset.update({
       where: { id },
       data: {

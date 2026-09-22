@@ -4,8 +4,9 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { BlobStorageService } from './blob-storage.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import type { CampaignsService } from '../campaigns/campaigns.service.js';
 
-function buildService(overrides: { asset?: any } = {}) {
+function buildService(overrides: { asset?: any; campaignsRequireInClient?: () => Promise<unknown> } = {}) {
   const asset = overrides.asset ?? { id: 'asset-1', clientId: 'client-1', storageUrl: '/uploads/x.png' };
   const audit = { log: vi.fn() };
   const prisma = {
@@ -24,13 +25,17 @@ function buildService(overrides: { asset?: any } = {}) {
     getReadUrl: vi.fn((url: string) => Promise.resolve(`${url}?signed=1`)),
   };
   const foundry = { generateImage: vi.fn(() => Promise.resolve(Buffer.from(''))) };
+  const campaigns = {
+    requireInClient: vi.fn(overrides.campaignsRequireInClient ?? (() => Promise.resolve({}))),
+  };
   const service = new MediaService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     blobStorage as unknown as BlobStorageService,
     foundry as unknown as AzureAiFoundryService,
+    campaigns as unknown as CampaignsService,
   );
-  return { service, prisma, audit, asset, blobStorage, foundry };
+  return { service, prisma, audit, asset, blobStorage, foundry, campaigns };
 }
 
 describe('MediaService.generateImage', () => {
@@ -62,6 +67,17 @@ describe('MediaService.generateImage', () => {
         data: expect.objectContaining({ folder: 'Campaign Assets', campaignId: 'campaign-1' }),
       }),
     );
+  });
+
+  it('rejects generating into a campaign that belongs to a different client (AUTH-2)', async () => {
+    const { service, campaigns, prisma } = buildService({
+      campaignsRequireInClient: () => Promise.reject(new Error('Campaign not found for this client')),
+    });
+    await expect(
+      service.generateImage('client-1', 'actor-1', 'x', { campaignId: 'foreign-campaign' }),
+    ).rejects.toThrow('Campaign not found for this client');
+    expect(campaigns.requireInClient).toHaveBeenCalledWith('foreign-campaign', 'client-1');
+    expect(prisma.mediaAsset.create).not.toHaveBeenCalled();
   });
 });
 
@@ -105,6 +121,16 @@ describe('MediaService', () => {
         }),
       }),
     );
+  });
+
+  it('rejects reassigning an asset to a campaign that belongs to a different client (AUTH-2)', async () => {
+    const { service, campaigns } = buildService({
+      campaignsRequireInClient: () => Promise.reject(new Error('Campaign not found for this client')),
+    });
+    await expect(
+      service.update('asset-1', 'client-1', { campaignId: 'foreign-campaign' } as any),
+    ).rejects.toThrow('Campaign not found for this client');
+    expect(campaigns.requireInClient).toHaveBeenCalledWith('foreign-campaign', 'client-1');
   });
 
   it('bulk-deletes only assets scoped to the correct client', async () => {

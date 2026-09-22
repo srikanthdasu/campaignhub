@@ -6,6 +6,7 @@ import type { AuditService } from '../audit/audit.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import type { VideoGenerationService } from '../ai-common/video-generation.service.js';
 import type { BlobStorageService } from '../media/blob-storage.service.js';
+import type { MediaService } from '../media/media.service.js';
 
 const VALID_SCRIPT_REPLY = JSON.stringify({
   script: 'Scene 1: intro. Scene 2: product.',
@@ -15,7 +16,9 @@ const VALID_SCRIPT_REPLY = JSON.stringify({
   ],
 });
 
-function buildService(overrides: { project?: any; scriptReply?: string } = {}) {
+function buildService(
+  overrides: { project?: any; scriptReply?: string; mediaRequireInClient?: () => Promise<unknown> } = {},
+) {
   const project = overrides.project ?? {
     id: 'proj-1',
     clientId: 'client-1',
@@ -45,14 +48,18 @@ function buildService(overrides: { project?: any; scriptReply?: string } = {}) {
     ),
     remove: vi.fn(() => Promise.resolve()),
   };
+  const media = {
+    requireInClient: vi.fn(overrides.mediaRequireInClient ?? (() => Promise.resolve({}))),
+  };
   const service = new AiVideoStudioService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     foundry as unknown as AzureAiFoundryService,
     videoGen as unknown as VideoGenerationService,
     blobStorage as unknown as BlobStorageService,
+    media as unknown as MediaService,
   );
-  return { service, prisma, audit, foundry, videoGen, blobStorage, project };
+  return { service, prisma, audit, foundry, videoGen, blobStorage, media, project };
 }
 
 describe('AiVideoStudioService — tenant scoping', () => {
@@ -111,6 +118,29 @@ describe('AiVideoStudioService.generateScript', () => {
     await expect(
       service.generateScript('client-1', 'proj-1', { idea: 'x' } as any),
     ).rejects.toThrow('unexpected response');
+  });
+});
+
+describe('AiVideoStudioService.updateAssets', () => {
+  it('rejects an asset id that belongs to a different client (AUTH-2)', async () => {
+    const { service, media, prisma } = buildService({
+      mediaRequireInClient: () => Promise.reject(new Error('Media asset not found for this client')),
+    });
+    await expect(
+      service.updateAssets('client-1', 'proj-1', { assetIds: ['foreign-asset'] } as any),
+    ).rejects.toThrow('Media asset not found for this client');
+    expect(media.requireInClient).toHaveBeenCalledWith('foreign-asset', 'client-1');
+    expect(prisma.aiVideoProject.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts asset ids that belong to this client', async () => {
+    const { service, media, prisma } = buildService();
+    await service.updateAssets('client-1', 'proj-1', { assetIds: ['asset-1', 'asset-2'] } as any);
+    expect(media.requireInClient).toHaveBeenCalledWith('asset-1', 'client-1');
+    expect(media.requireInClient).toHaveBeenCalledWith('asset-2', 'client-1');
+    expect(prisma.aiVideoProject.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ assets: ['asset-1', 'asset-2'] }) }),
+    );
   });
 });
 

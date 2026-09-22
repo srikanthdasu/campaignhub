@@ -5,9 +5,10 @@ import { MediaFilesController } from './media-files.controller.js';
 import { BlobStorageService } from './blob-storage.service.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { AiCommonModule } from '../ai-common/ai-common.module.js';
+import { CampaignsModule } from '../campaigns/campaigns.module.js';
 
 @Module({
-  imports: [AuditModule, AiCommonModule],
+  imports: [AuditModule, AiCommonModule, CampaignsModule],
   controllers: [MediaController, MediaFilesController],
   providers: [MediaService, BlobStorageService],
   exports: [MediaService, BlobStorageService],

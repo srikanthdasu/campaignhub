@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { CampaignsService } from '../campaigns/campaigns.service.js';
+import { MediaService } from '../media/media.service.js';
 import { CreateAdDto } from './dto/create-ad.dto.js';
 import { UpdateAdDto } from './dto/update-ad.dto.js';
 import { ReviewAdDto } from './dto/review-ad.dto.js';
@@ -17,9 +19,13 @@ export class AdsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private campaigns: CampaignsService,
+    private media: MediaService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateAdDto) {
+    if (dto.campaignId) await this.campaigns.requireInClient(dto.campaignId, clientId);
+
     const ad = await this.prisma.adCampaign.create({
       data: {
         clientId,
@@ -56,6 +62,9 @@ export class AdsService {
     const ad = await this.requireInClient(id, clientId);
     if (!EDITABLE_STATUSES.includes(ad.status)) {
       throw new BadRequestException('This ad can no longer be edited — it is pending review or already launched');
+    }
+    if (dto.creativeMediaAssetId && dto.creativeMediaAssetId !== ad.creativeMediaAssetId) {
+      await this.media.requireInClient(dto.creativeMediaAssetId, clientId);
     }
 
     const updated = await this.prisma.adCampaign.update({

@@ -5,6 +5,7 @@ import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js'
 import { VideoGenerationService } from '../ai-common/video-generation.service.js';
 import { parseModelJson } from '../ai-common/parse-model-json.js';
 import { BlobStorageService } from '../media/blob-storage.service.js';
+import { MediaService } from '../media/media.service.js';
 import { requireInClient } from '../common/require-in-client.js';
 import { CreateVideoProjectDto } from './dto/create-video-project.dto.js';
 import { GenerateScriptDto } from './dto/generate-script.dto.js';
@@ -53,6 +54,7 @@ export class AiVideoStudioService {
     private foundry: AzureAiFoundryService,
     private videoGen: VideoGenerationService,
     private blobStorage: BlobStorageService,
+    private media: MediaService,
   ) {}
 
   async create(clientId: string, actorId: string, dto: CreateVideoProjectDto) {
@@ -123,6 +125,9 @@ export class AiVideoStudioService {
 
   async updateAssets(clientId: string, id: string, dto: UpdateAssetsDto) {
     await this.requireInClient(id, clientId);
+    // Every asset id must actually belong to this client — otherwise a video project could
+    // reference (and later surface) another client's media by id with zero ownership check.
+    await Promise.all(dto.assetIds.map((assetId) => this.media.requireInClient(assetId, clientId)));
     return this.prisma.aiVideoProject.update({
       where: { id },
       data: {

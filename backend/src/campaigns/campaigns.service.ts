@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateCampaignDto } from './dto/create-campaign.dto.js';
@@ -73,8 +73,9 @@ export class CampaignsService {
     });
   }
 
-  async update(clientId: string, id: string, actorId: string, dto: UpdateCampaignDto) {
+  async update(clientId: string, id: string, actorId: string, agencyId: string, dto: UpdateCampaignDto) {
     await this.requireInClient(id, clientId);
+    await this.assertAssigneesInAgency(agencyId, dto);
 
     const campaign = await this.prisma.campaign.update({
       where: { id },
@@ -122,5 +123,18 @@ export class CampaignsService {
 
   async requireInClient(id: string, clientId: string) {
     return requireInClient(() => this.prisma.campaign.findUnique({ where: { id } }), clientId, 'Campaign');
+  }
+
+  // assignedToId/reviewerId are staff picks, not client-scoped resources — without this, either
+  // field would accept any User id in the database, including one from a different agency
+  // entirely, with zero validation.
+  private async assertAssigneesInAgency(agencyId: string, dto: { assignedToId?: string; reviewerId?: string }) {
+    const ids = [...new Set([dto.assignedToId, dto.reviewerId].filter((id): id is string => !!id))];
+    if (!ids.length) return;
+
+    const users = await this.prisma.user.findMany({ where: { id: { in: ids }, agencyId }, select: { id: true } });
+    if (users.length !== ids.length) {
+      throw new ForbiddenException('assignedToId and reviewerId must belong to your agency');
+    }
   }
 }
