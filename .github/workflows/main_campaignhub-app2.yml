@@ -57,6 +57,9 @@ jobs:
           # silently renders nothing (no error) since NEXT_PUBLIC_* vars are inlined at build,
           # not read at request time — that's exactly what happened on the first deploy attempt.
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: 447671100716-bgejntbph1ki9pud5l1b25sqpdign9fv.apps.googleusercontent.com
+          # Same reasoning as GOOGLE_CLIENT_ID above — a DSN is a public-safe identifier (only
+          # lets events be sent, not read), so it's fine directly here rather than as a secret.
+          NEXT_PUBLIC_SENTRY_DSN: https://87ac69a4b882b6fe1a57ecb8ae7bf2b9@o4512129443102720.ingest.de.sentry.io/4512130113273936
         run: npm run build
 
       # Runs only after both builds have already succeeded — applying a migration ahead of an

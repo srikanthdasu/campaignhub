@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -33,6 +34,9 @@ import { validateEnv } from './config/validate-env.js';
 
 @Module({
   imports: [
+    // Must be the first import — see Sentry's NestJS integration docs. No-ops safely when
+    // SENTRY_DSN isn't set (instrument.ts skips Sentry.init entirely in that case).
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
     // App-wide default of 60 requests/minute per IP; individual routes tighten this further
@@ -65,6 +69,9 @@ import { validateEnv } from './config/validate-env.js';
   ],
   controllers: [AppController],
   providers: [
+    // Must be the first provider — Sentry's own requirement, so it wraps every other exception
+    // filter and reliably reports unhandled errors before Nest's default handling takes over.
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],

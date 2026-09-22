@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
   // Azure's zip-deploy pipeline silently drops dot-prefixed directories when packaging the
@@ -27,4 +28,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: "sreematechhub",
+  project: "javascript-nextjs",
+  silent: true,
+  // No SENTRY_AUTH_TOKEN configured — source map upload needs one, and readable stack traces
+  // in the Sentry dashboard are a nice-to-have, not required for error capture/alerts to work.
+  // Disabling this outright avoids the build depending on a secret we don't have and don't need
+  // yet, rather than letting it silently no-op every build.
+  sourcemaps: { disable: true },
+});

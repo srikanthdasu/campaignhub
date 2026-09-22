@@ -131,6 +131,15 @@ All six OAuth callback controllers (`*-oauth-callback.controller.ts`) also read 
 |---|---|
 | `EMAIL_CAMPAIGN_BATCH_SIZE` | Defaults to `20` if unset/non-numeric. How many bulk-campaign emails `EmailCampaignsCronService` sends per minute-tick — kept low to stay under typical SMTP provider rate limits. |
 
+### Error tracking (Sentry)
+
+| Setting | Notes |
+|---|---|
+| `SENTRY_DSN` | Optional — `instrument.ts` skips `Sentry.init()` entirely if unset, same degrade-gracefully pattern as SMTP/storage. **Must be set as an Azure App Setting** for the backend to report errors in production (this is a runtime env var, not baked in at build time). Get it from the `campaignhub-backend` Sentry project's Settings → Client Keys. |
+
+The frontend's equivalent, `NEXT_PUBLIC_SENTRY_DSN`, is a **build-time** variable — see below, not
+an Azure App Setting.
+
 ### Not an App Setting — set programmatically
 
 `API_PREFIX` is force-set to `"api"` by `combined-server.ts` itself before the app boots
@@ -149,6 +158,7 @@ effect, they must be present in the CI build step's environment:
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `/api` | The combined server mounts the API under `/api` on the same origin as the frontend in production — a same-origin relative path, unlike local dev's separate-port URL. |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Same OAuth Client ID as the backend's `GOOGLE_CLIENT_ID` | A public identifier by design (not a secret) — hardcoded directly in the workflow file rather than needing its own GitHub secret. |
+| `NEXT_PUBLIC_SENTRY_DSN` | The `campaignhub-frontend` Sentry project's DSN | Same public-safe-identifier reasoning as above. |
 
 Both are set as `env:` on the "Build frontend" step in
 `.github/workflows/main_campaignhub-app2.yml` — see that file for the exact values.

@@ -1,3 +1,4 @@
+import './instrument.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { ConfigService } from '@nestjs/config';
