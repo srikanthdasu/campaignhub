@@ -13,6 +13,14 @@ import { requireInClient } from '../common/require-in-client.js';
 
 const EDITABLE_STATUSES: AdStatus[] = [AdStatus.DRAFT, AdStatus.REJECTED];
 
+// budgetAmount is a Prisma Decimal (see schema.prisma — same reasoning as Invoice.amount) so it
+// serializes to a *string* over JSON, and the frontend does real arithmetic on it
+// (analytics.ads.totalBudget, budget comparisons) — converting back to a plain number at the API
+// boundary keeps that contract exactly as it was before this migration.
+function adToPlainNumbers<T extends { budgetAmount: unknown }>(ad: T): Omit<T, 'budgetAmount'> & { budgetAmount: number | null } {
+  return { ...ad, budgetAmount: ad.budgetAmount === null ? null : Number(ad.budgetAmount) };
+}
+
 @Injectable()
 export class AdsService {
   constructor(
@@ -44,18 +52,19 @@ export class AdsService {
       entityId: ad.id,
     });
 
-    return ad;
+    return adToPlainNumbers(ad);
   }
 
-  list(clientId: string) {
-    return this.prisma.adCampaign.findMany({
+  async list(clientId: string) {
+    const ads = await this.prisma.adCampaign.findMany({
       where: { clientId },
       orderBy: { updatedAt: 'desc' },
     });
+    return ads.map(adToPlainNumbers);
   }
 
   async getOne(clientId: string, id: string) {
-    return this.requireInClient(id, clientId);
+    return adToPlainNumbers(await this.requireInClient(id, clientId));
   }
 
   async update(clientId: string, id: string, actorId: string, dto: UpdateAdDto) {
@@ -90,7 +99,7 @@ export class AdsService {
       entityId: id,
     });
 
-    return updated;
+    return adToPlainNumbers(updated);
   }
 
   async submitForApproval(clientId: string, id: string, actorId: string) {
@@ -98,7 +107,10 @@ export class AdsService {
     if (ad.status !== AdStatus.DRAFT) {
       throw new BadRequestException('Only a draft ad can be submitted for approval');
     }
-    if (!ad.budgetAmount || !ad.creativeText) {
+    // ad.budgetAmount is a Decimal instance (or null) — a bare truthiness check would treat a
+    // real $0 Decimal as "set" (objects are always truthy), unlike the plain-number check this
+    // replaces. Number(...) restores the original "unset or zero" semantics.
+    if (!ad.budgetAmount || Number(ad.budgetAmount) <= 0 || !ad.creativeText) {
       throw new BadRequestException('Budget and creative must be set before submitting for approval');
     }
 
@@ -114,7 +126,7 @@ export class AdsService {
       entityId: id,
     });
 
-    return updated;
+    return adToPlainNumbers(updated);
   }
 
   async review(clientId: string, id: string, user: AuthenticatedUser, dto: ReviewAdDto) {
@@ -148,7 +160,7 @@ export class AdsService {
       );
     }
 
-    return updated;
+    return adToPlainNumbers(updated);
   }
 
   async launch(clientId: string, id: string, actorId: string) {
@@ -170,7 +182,7 @@ export class AdsService {
       metadata: { simulated: true },
     });
 
-    return updated;
+    return adToPlainNumbers(updated);
   }
 
   async remove(clientId: string, id: string, actorId: string) {

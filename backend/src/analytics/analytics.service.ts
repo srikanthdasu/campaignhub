@@ -68,7 +68,9 @@ export class AnalyticsService {
       campaigns: { byStatus: toCountMap(campaignsByStatus) },
       ads: {
         byStatus: toCountMap(adsByStatus),
-        totalBudget: adsBudget._sum.budgetAmount ?? 0,
+        // budgetAmount is a Prisma Decimal (see schema.prisma) — its _sum aggregate is a Decimal
+        // too, not a plain number, and serializes to a string over JSON if returned as-is.
+        totalBudget: adsBudget._sum.budgetAmount ? Number(adsBudget._sum.budgetAmount) : 0,
       },
       scheduledPosts: { byStatus: toCountMap(scheduledPostsByStatus) },
       approvals: {
