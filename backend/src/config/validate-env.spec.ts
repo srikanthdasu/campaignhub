@@ -32,7 +32,7 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/SMTP_HOST/);
   });
 
-  it('passes a production config with all SMTP and storage settings present', () => {
+  it('passes a production config with all SMTP, storage, and encryption-key settings present', () => {
     const config = {
       NODE_ENV: 'production',
       SMTP_HOST: 'smtp.gmail.com',
@@ -40,6 +40,7 @@ describe('validateEnv', () => {
       SMTP_USER: 'user@gmail.com',
       SMTP_PASSWORD: 'app-password',
       AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
+      TOKEN_ENCRYPTION_KEY: 'd'.repeat(32),
     };
     expect(validateEnv(config)).toEqual(config);
   });
@@ -55,7 +56,26 @@ describe('validateEnv', () => {
       SMTP_PORT: '587',
       SMTP_USER: 'user@gmail.com',
       SMTP_PASSWORD: 'app-password',
+      TOKEN_ENCRYPTION_KEY: 'd'.repeat(32),
     };
     expect(() => validateEnv(config)).toThrow(/AZURE_STORAGE_CONNECTION_STRING/);
+  });
+
+  it('rejects a production config missing TOKEN_ENCRYPTION_KEY (SEC-2)', () => {
+    const config = {
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'user@gmail.com',
+      SMTP_PASSWORD: 'app-password',
+      AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
+    };
+    expect(() => validateEnv(config)).toThrow(/TOKEN_ENCRYPTION_KEY/);
+  });
+
+  it('rejects a long but un-replaced "change-me" placeholder, not just a short one (SEC-2)', () => {
+    expect(() =>
+      validateEnv({ TOKEN_ENCRYPTION_KEY: 'change-me-to-something-at-least-20-characters-long' }),
+    ).toThrow(/placeholder/);
   });
 });
