@@ -393,7 +393,13 @@ enum ApprovalFlowStatus {
 model ApprovalFlow {
   id            String             @id @default(uuid()) @db.Uuid
   contentItemId String             @unique @map("content_item_id") @db.Uuid
-  contentItem   ContentItem        @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade — approval decision history (who approved/rejected, when, with what
+  // comments) must survive its content item, for audit/dispute purposes. ContentService.remove()
+  // already only permits deleting DRAFT content, which can never have an ApprovalFlow (a flow
+  // only ever gets created by submitting content, which moves it out of DRAFT) — so this changes
+  // no real behavior today, it only removes the DB-level path to silently destroying that history
+  // if that application guard is ever bypassed or changed.
+  contentItem   ContentItem        @relation(fields: [contentItemId], references: [id], onDelete: Restrict)
   mode          ApprovalMode       @default(SEQUENTIAL)
   dueDate       DateTime?          @map("due_date")
   status        ApprovalFlowStatus @default(SUBMITTED)
@@ -784,7 +790,10 @@ enum InvoiceStatus {
 model Invoice {
   id             String        @id @default(uuid()) @db.Uuid
   agencyId       String        @map("agency_id") @db.Uuid
-  agency         Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade — GST invoices are statutory records that must survive regardless of
+  // what happens to the agency account; nothing in the app deletes an Agency today, so this is a
+  // pure safety rail against a future/accidental one silently destroying them.
+  agency         Agency        @relation(fields: [agencyId], references: [id], onDelete: Restrict)
   subscriptionId String?       @map("subscription_id") @db.Uuid
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
   // Decimal(12,2), not Float — GST/invoice totals must never accumulate binary floating-point
@@ -865,10 +874,15 @@ model EmailRecipient {
 // A persistent per-client suppression list — once someone unsubscribes, every future campaign
 // to that client must skip them too, not just the one they clicked from.
 model EmailUnsubscribe {
-  id        String   @id @default(uuid()) @db.Uuid
-  clientId  String   @map("client_id") @db.Uuid
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  email     String   @db.VarChar(255)
+  id       String  @id @default(uuid()) @db.Uuid
+  // Nullable + SetNull, not Cascade — clients.service.ts's purgeExpired() genuinely hard-deletes
+  // Client rows on a cron, and a suppression record must outlive that (CAN-SPAM/GDPR: "this
+  // person said stop" has to stay provable even after the client account is gone). A purged
+  // client's UUID can never be reassigned, so the orphaned row can no longer match any live
+  // campaign's lookup either way — this only prevents the record itself from being destroyed.
+  clientId String? @map("client_id") @db.Uuid
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  email    String  @db.VarChar(255)
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([clientId, email])
