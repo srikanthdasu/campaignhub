@@ -256,6 +256,11 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
                     {a.name}
                   </button>
                   <Badge tone={STATUS_TONE[a.status]}>{a.status.replace('_', ' ')}</Badge>
+                  {a.status === 'LAUNCHED' && (
+                    <span title="No Ads API credentials are configured yet — this marks the record launched but never placed a real paid ad buy.">
+                      <Badge tone="neutral">Simulated</Badge>
+                    </span>
+                  )}
                   {a.status === 'DRAFT' && (
                     <button onClick={() => onDelete(a.id)} className="shrink-0 opacity-0 group-hover:opacity-100">
                       <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
@@ -323,7 +328,14 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
               <Card padding="lg" className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-neutral-50">{active.name}</h3>
-                  <Badge tone={STATUS_TONE[active.status]}>{active.status.replace('_', ' ')}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={STATUS_TONE[active.status]}>{active.status.replace('_', ' ')}</Badge>
+                    {active.status === 'LAUNCHED' && (
+                      <span title="No Ads API credentials are configured yet — this marks the record launched but never placed a real paid ad buy.">
+                        <Badge tone="neutral">Simulated</Badge>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {activeTab === 'BRIEF' && (
@@ -454,11 +466,24 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
                 {activeTab === 'LAUNCH' && (
                   <div className="space-y-3">
                     {active.launchedAt ? (
-                      <Badge tone="success">Launched {new Date(active.launchedAt).toLocaleString()}</Badge>
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Badge tone="success">Launched {new Date(active.launchedAt).toLocaleString()}</Badge>
+                          <Badge tone="neutral">Simulated</Badge>
+                        </div>
+                        <p className="text-xs text-amber-300/80">
+                          No Ads API credentials are configured yet — this marked the record launched
+                          but never placed a real paid ad buy on {active.platform}.
+                        </p>
+                      </>
                     ) : (
                       <>
                         <p className="text-sm text-neutral-400">
                           Budget, permission, and platform validation are all confirmed. Ready to launch.
+                        </p>
+                        <p className="text-xs text-amber-300/80">
+                          No Ads API credentials are configured yet — this will mark the record
+                          launched but won&apos;t place a real paid ad buy.
                         </p>
                         <Button size="sm" onClick={onLaunch} loading={busy} disabled={!canApprove}>
                           <Rocket className="h-3.5 w-3.5" /> Launch
