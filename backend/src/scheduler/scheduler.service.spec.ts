@@ -257,3 +257,66 @@ describe('SchedulerService.retry', () => {
     expect(prisma.scheduledPost.updateMany).not.toHaveBeenCalled();
   });
 });
+
+function buildAccessScopedService(hasAccess: boolean) {
+  const audit = { log: vi.fn() };
+  const userClientAccessFindUnique = vi.fn(() =>
+    Promise.resolve(hasAccess ? { userId: 'user-1', clientId: 'client-1' } : null),
+  );
+  const prisma = {
+    scheduledPost: {
+      findUnique: vi.fn(() =>
+        Promise.resolve({
+          id: 'post-1',
+          status: ScheduledPostStatus.PENDING,
+          contentItemId: 'content-1',
+          contentItem: { clientId: 'client-1', client: { agencyId: 'agency-1' } },
+        }),
+      ),
+      delete: vi.fn(() => Promise.resolve({})),
+    },
+    userClientAccess: { findUnique: userClientAccessFindUnique },
+  };
+  const config = { getOrThrow: vi.fn() };
+  const instagramPublish = { publishImage: vi.fn() };
+  const notifications = { create: vi.fn() };
+  const service = new SchedulerService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    config as unknown as ConfigService,
+    instagramPublish as unknown as InstagramPublishService,
+    notifications as unknown as NotificationsService,
+    makeBlobStorage(),
+  );
+  return { service, prisma, audit, userClientAccessFindUnique };
+}
+
+describe('SchedulerService.requireAccess (client-access scoping — AUTH-1)', () => {
+  it('blocks a MANAGER with no UserClientAccess grant from cancelling a scheduled post', async () => {
+    const { service, prisma, userClientAccessFindUnique } = buildAccessScopedService(false);
+    const manager: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.MANAGER, agencyId: 'agency-1' };
+
+    await expect(service.cancel('post-1', manager)).rejects.toThrow('You do not have access to this client');
+    expect(userClientAccessFindUnique).toHaveBeenCalledWith({
+      where: { userId_clientId: { userId: 'user-1', clientId: 'client-1' } },
+    });
+    expect(prisma.scheduledPost.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows a MANAGER with an explicit UserClientAccess grant to cancel', async () => {
+    const { service, prisma } = buildAccessScopedService(true);
+    const manager: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.MANAGER, agencyId: 'agency-1' };
+
+    await service.cancel('post-1', manager);
+    expect(prisma.scheduledPost.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
+  });
+
+  it('allows an OWNER to cancel with no UserClientAccess lookup at all', async () => {
+    const { service, prisma, userClientAccessFindUnique } = buildAccessScopedService(false);
+    const owner: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.OWNER, agencyId: 'agency-1' };
+
+    await service.cancel('post-1', owner);
+    expect(userClientAccessFindUnique).not.toHaveBeenCalled();
+    expect(prisma.scheduledPost.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
+  });
+});

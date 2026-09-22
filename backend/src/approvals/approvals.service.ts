@@ -143,11 +143,12 @@ export class ApprovalsService {
     if (flow.contentItem.client.agencyId !== user.agencyId) {
       throw new NotFoundException('Approval flow not found');
     }
+    // MANAGER deliberately excluded — matches listForUser/decide below and ClientAccessGuard's
+    // own policy (Manager scope is "assigned clients," not whole-agency; see
+    // CampaignHub_Technical_Spec.md's RBAC matrix). A non-agency-wide user only ever sees flows
+    // they're personally named as an approver on, regardless of any UserClientAccess grant.
     const isAgencyWide =
-      user.role === Role.OWNER ||
-      user.role === Role.ADMIN ||
-      user.role === Role.MANAGER ||
-      user.role === Role.SUPER_ADMIN;
+      user.role === Role.OWNER || user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN;
     const isAssignedApprover = flow.steps.some((s) => s.approverId === user.sub);
     if (!isAgencyWide && !isAssignedApprover) {
       throw new ForbiddenException('You do not have access to this approval flow');

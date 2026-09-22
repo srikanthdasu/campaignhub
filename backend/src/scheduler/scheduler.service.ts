@@ -10,7 +10,10 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { BlobStorageService } from '../media/blob-storage.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
-const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SUPER_ADMIN];
+// MANAGER deliberately excluded — matches ClientAccessGuard's policy (Manager scope is
+// "assigned clients," not whole-agency) and every other agency-wide check in this codebase.
+// requireAccess()'s UserClientAccess fallback below is what actually enforces that for Manager.
+const AGENCY_WIDE_ROLES: Role[] = [Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN];
 
 // A transient failure (a momentary rate limit, a network blip) deserves a few real attempts —
 // but an endlessly-retryable post masks a genuinely broken one (bad media, revoked token) behind

@@ -171,6 +171,52 @@ describe('ApprovalsService.decide', () => {
   });
 });
 
+describe('ApprovalsService.getById', () => {
+  it('blocks a MANAGER with no UserClientAccess grant who is not a named approver on the flow (AUTH-1)', async () => {
+    const flow = buildFlow();
+    const prisma = { approvalFlow: { findUnique: vi.fn(() => Promise.resolve(flow)) } };
+    const service = new ApprovalsService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    const manager = makeUser({ sub: 'manager-1', role: Role.MANAGER, agencyId: 'agency-1' });
+    await expect(service.getById('flow-1', manager)).rejects.toThrow(
+      'You do not have access to this approval flow',
+    );
+  });
+
+  it('still allows a MANAGER who is personally the assigned approver on the flow', async () => {
+    const flow = buildFlow();
+    const prisma = { approvalFlow: { findUnique: vi.fn(() => Promise.resolve(flow)) } };
+    const service = new ApprovalsService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    const manager = makeUser({ sub: 'approver-1', role: Role.MANAGER, agencyId: 'agency-1' });
+    await expect(service.getById('flow-1', manager)).resolves.toBeDefined();
+  });
+
+  it('still allows an OWNER/ADMIN agency-wide, with no UserClientAccess grant needed', async () => {
+    const flow = buildFlow();
+    const prisma = { approvalFlow: { findUnique: vi.fn(() => Promise.resolve(flow)) } };
+    const service = new ApprovalsService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    const owner = makeUser({ sub: 'owner-1', role: Role.OWNER, agencyId: 'agency-1' });
+    await expect(service.getById('flow-1', owner)).resolves.toBeDefined();
+  });
+});
+
 describe('ApprovalsService.listForUser', () => {
   it('scopes a non-admin approver\'s list to their own agency (cross-tenant leak fix)', async () => {
     const prisma = { approvalFlow: { findMany: vi.fn(() => Promise.resolve([])) } };
