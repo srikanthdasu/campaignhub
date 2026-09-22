@@ -74,9 +74,12 @@ jobs:
       # devDependencies (vitest, the Nest CLI, TypeScript, eslint, type declarations, ...) are
       # needed to run the tests/builds above but never touched by `node dist/main.js` or `next
       # start` at runtime — pruning here, after both are done, is what actually shrinks what ships.
+      # Backend needs --legacy-peer-deps for the same reason `npm ci` above does: `npm prune` does
+      # its own peer-dependency resolution too, not just removal, and hits the identical
+      # @nestjs/throttler ERESOLVE conflict (confirmed by actually running it, not assumed).
       - name: Prune dev dependencies before staging
         run: |
-          cd backend && npm prune --omit=dev
+          cd backend && npm prune --omit=dev --legacy-peer-deps
           cd ../frontend && npm prune --omit=dev
 
       - name: Stage deployment package
