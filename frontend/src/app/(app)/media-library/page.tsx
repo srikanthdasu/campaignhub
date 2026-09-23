@@ -21,6 +21,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api, ApiError, resolveMediaUrl } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { canManageMedia, Role } from '@/lib/roles';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,6 +85,8 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 }
 
 export default function MediaLibraryPage() {
+  const { user } = useAuth();
+  const canManage = canManageMedia(user?.role as Role | undefined);
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -339,9 +343,13 @@ export default function MediaLibraryPage() {
                         Add
                       </Button>
                     </div>
-                    <Button size="sm" className="w-full" loading={saving} onClick={() => saveField({ tags: tagsDraft })}>
-                      Save Tags
-                    </Button>
+                    {canManage ? (
+                      <Button size="sm" className="w-full" loading={saving} onClick={() => saveField({ tags: tagsDraft })}>
+                        Save Tags
+                      </Button>
+                    ) : (
+                      <p className="text-[10px] text-neutral-500">Only agency staff can edit media.</p>
+                    )}
                   </div>
                 )}
               </Card>
@@ -374,14 +382,18 @@ export default function MediaLibraryPage() {
                       onChange={(e) => setDescDraft(e.target.value)}
                       rows={2}
                     />
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      loading={saving}
-                      onClick={() => saveField({ title: titleDraft, description: descDraft })}
-                    >
-                      Save Info
-                    </Button>
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        loading={saving}
+                        onClick={() => saveField({ title: titleDraft, description: descDraft })}
+                      >
+                        Save Info
+                      </Button>
+                    ) : (
+                      <p className="text-[10px] text-neutral-500">Only agency staff can edit media.</p>
+                    )}
                   </div>
                 )}
               </Card>
@@ -405,14 +417,18 @@ export default function MediaLibraryPage() {
                     <p className="text-[10px] text-neutral-500">
                       Per-asset permissions/access control aren&apos;t built yet.
                     </p>
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      loading={saving}
-                      onClick={() => saveField({ folder: orgFolder || undefined, campaignId: orgCampaignId || null })}
-                    >
-                      Save
-                    </Button>
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        loading={saving}
+                        onClick={() => saveField({ folder: orgFolder || undefined, campaignId: orgCampaignId || null })}
+                      >
+                        Save
+                      </Button>
+                    ) : (
+                      <p className="text-[10px] text-neutral-500">Only agency staff can edit media.</p>
+                    )}
                   </div>
                 )}
               </Card>
@@ -514,7 +530,7 @@ export default function MediaLibraryPage() {
                       Generate AI Image →
                     </Link>
                   </li>
-                  {selectedIds.length > 0 && (
+                  {canManage && selectedIds.length > 0 && (
                     <li>
                       {confirmBulkDelete ? (
                         <span className="flex items-center gap-2">
@@ -635,44 +651,45 @@ export default function MediaLibraryPage() {
                             onChange={() => toggleSelected(asset.id)}
                             className="absolute left-2 top-2 h-4 w-4 accent-accent-500"
                           />
-                          {confirmDeleteId === asset.id ? (
-                            <span className="absolute right-2 top-2 flex gap-1">
+                          {canManage &&
+                            (confirmDeleteId === asset.id ? (
+                              <span className="absolute right-2 top-2 flex gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(asset.id);
+                                  }}
+                                  title="Confirm delete"
+                                  aria-label={`Confirm delete ${asset.title || asset.fileName}`}
+                                  className="rounded-lg bg-red-500/90 p-1.5 backdrop-blur-sm"
+                                >
+                                  <Check className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  title="Cancel"
+                                  aria-label="Cancel delete"
+                                  className="rounded-lg bg-black/60 p-1.5 backdrop-blur-sm"
+                                >
+                                  <X className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                                </button>
+                              </span>
+                            ) : (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDelete(asset.id);
+                                  setConfirmDeleteId(asset.id);
                                 }}
-                                title="Confirm delete"
-                                aria-label={`Confirm delete ${asset.title || asset.fileName}`}
-                                className="rounded-lg bg-red-500/90 p-1.5 backdrop-blur-sm"
+                                title="Delete"
+                                aria-label={`Delete ${asset.title || asset.fileName}`}
+                                className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
                               >
-                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                                <Trash2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />
                               </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfirmDeleteId(null);
-                                }}
-                                title="Cancel"
-                                aria-label="Cancel delete"
-                                className="rounded-lg bg-black/60 p-1.5 backdrop-blur-sm"
-                              >
-                                <X className="h-3.5 w-3.5 text-white" strokeWidth={2} />
-                              </button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmDeleteId(asset.id);
-                              }}
-                              title="Delete"
-                              aria-label={`Delete ${asset.title || asset.fileName}`}
-                              className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />
-                            </button>
-                          )}
+                            ))}
                         </div>
                         <div className="p-2.5">
                           <p className="truncate text-xs font-medium text-neutral-200">{asset.title || asset.fileName}</p>

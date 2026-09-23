@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { canManageMedia, Role } from '@/lib/roles';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -61,6 +63,8 @@ export default function AiAssistantPage() {
 }
 
 function AssistantWorkspace({ clientId }: { clientId: string }) {
+  const { user } = useAuth();
+  const canManage = canManageMedia(user?.role as Role | undefined);
   const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -179,9 +183,11 @@ function AssistantWorkspace({ clientId }: { clientId: string }) {
                 <button onClick={() => openConversation(c.id)} className="flex-1 truncate text-left" title={c.title}>
                   {c.title}
                 </button>
-                <button onClick={() => removeConversation(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100">
-                  <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
-                </button>
+                {canManage && (
+                  <button onClick={() => removeConversation(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100">
+                    <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
+                  </button>
+                )}
               </div>
             ))
           )}

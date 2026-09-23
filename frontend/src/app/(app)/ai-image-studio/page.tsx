@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, Wand2, Users, LayoutGrid, MessageSquareText, Sparkles, Images, Send, type LucideIcon } from 'lucide-react';
 import { api, ApiError, resolveMediaUrl } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { canManageMedia, Role } from '@/lib/roles';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,6 +87,8 @@ export default function AiImageStudioPage() {
 }
 
 function AiImageStudioPageContent() {
+  const { user } = useAuth();
+  const canManage = canManageMedia(user?.role as Role | undefined);
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignId, setCampaignId] = useState('');
@@ -424,15 +428,17 @@ function AiImageStudioPageContent() {
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={resolveMediaUrl(asset.storageUrl)} alt={asset.prompt ?? 'AI-generated image'} className="h-full w-full object-cover" />
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(asset.id);
-                            }}
-                            className="absolute right-1 top-1 rounded bg-black/60 p-1 opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="h-3 w-3 text-white" />
-                          </span>
+                          {canManage && (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(asset.id);
+                              }}
+                              className="absolute right-1 top-1 rounded bg-black/60 p-1 opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-3 w-3 text-white" />
+                            </span>
+                          )}
                         </button>
                       </motion.div>
                     ))}
