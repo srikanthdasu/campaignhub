@@ -20,8 +20,19 @@ function buildService() {
   return { service, config };
 }
 
-function jsonResponse(status: number, body: unknown, ok = status >= 200 && status < 300) {
-  return { ok, status, json: () => Promise.resolve(body) } as Response;
+function jsonResponse(
+  status: number,
+  body: unknown,
+  options: { ok?: boolean; headers?: Record<string, string> } = {},
+) {
+  const ok = options.ok ?? (status >= 200 && status < 300);
+  const headerMap = new Map(Object.entries(options.headers ?? {}));
+  return {
+    ok,
+    status,
+    json: () => Promise.resolve(body),
+    headers: { get: (name: string) => headerMap.get(name.toLowerCase()) ?? null },
+  } as unknown as Response;
 }
 
 describe('AzureAiFoundryService.chat', () => {
@@ -108,6 +119,41 @@ describe('AzureAiFoundryService.chat', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, {}))));
 
     await expect(service.chat([{ role: 'user', content: 'hi' }])).rejects.toThrow('failed (500)');
+  });
+
+  it('throws a distinct rate-limit error on 429, not the generic gateway message (AI-3)', async () => {
+    const { service } = buildService();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(429, {}, { headers: { 'retry-after': '0' } }))));
+
+    await expect(service.chat([{ role: 'user', content: 'hi' }])).rejects.toThrow('rate-limiting');
+  });
+
+  it('retries a 429 and succeeds if a later attempt clears', async () => {
+    const { service } = buildService();
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        calls++;
+        if (calls === 1) return Promise.resolve(jsonResponse(429, {}, { headers: { 'retry-after': '0' } }));
+        return Promise.resolve(jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }));
+      }),
+    );
+
+    await expect(service.chat([{ role: 'user', content: 'hi' }])).resolves.toBe('ok');
+    expect(calls).toBe(2);
+  });
+
+  it('honors a Retry-After header as the actual retry delay, not the default backoff schedule', async () => {
+    const { service } = buildService();
+    const sleepSpy = vi.spyOn(global, 'setTimeout');
+    // 1s is distinct from the default backoff (300ms, then 600ms) — proves the header value, not
+    // the schedule, drove the wait. Kept small so this test doesn't meaningfully slow the suite.
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(429, {}, { headers: { 'retry-after': '1' } }))));
+
+    await expect(service.chat([{ role: 'user', content: 'hi' }])).rejects.toThrow('rate-limiting');
+    expect(sleepSpy.mock.calls.some(([, ms]) => ms === 1000)).toBe(true);
+    sleepSpy.mockRestore();
   });
 
   it('throws BadGatewayException when the response has no message content', async () => {
@@ -203,6 +249,13 @@ describe('AzureAiFoundryService.generateImage', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, {}))));
 
     await expect(service.generateImage('a red circle')).rejects.toThrow('failed (500)');
+  });
+
+  it('throws a distinct rate-limit error on 429, not the generic gateway message (AI-3)', async () => {
+    const { service } = buildService();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(429, {}, { headers: { 'retry-after': '0' } }))));
+
+    await expect(service.generateImage('a red circle')).rejects.toThrow('rate-limiting');
   });
 
   it('throws BadGatewayException when the response has no image data', async () => {

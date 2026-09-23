@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, HttpException, HttpStatus, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export interface ChatMessage {
@@ -25,33 +25,68 @@ interface FoundryImageGeneration {
 const MAX_FETCH_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 300;
 
+// AI-3: a 429 is a different failure mode from a genuine bad request — it's the provider saying
+// "you're going too fast," and this is the single most likely real-world AI failure mode under
+// load. It's worth retrying (unlike other 4xx status codes, which mean the request itself is
+// invalid and retrying wastes time) — but only up to this cap on how long a Retry-After header is
+// honored, so a provider asking for a multi-minute backoff doesn't hang the request instead of
+// just failing fast with a clear message.
+const MAX_RETRY_AFTER_MS = 5000;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimited(res: Response): boolean {
+  return res.status === 429;
+}
+
+// Retry-After can be sent as either a delay in seconds or an HTTP-date — this only trusts the
+// simple, common seconds form; anything else (including no header at all) falls back to the same
+// exponential backoff every other retryable failure already uses.
+function retryAfterMs(res: Response): number | null {
+  const header = res.headers.get('retry-after');
+  if (!header) return null;
+  const seconds = Number(header);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+}
+
+// Distinct from both BadGatewayException (a generic provider failure) and this app's own
+// @nestjs/throttler 429 (us rate-limiting the caller) — this is specifically the AI provider
+// telling *us* to slow down, after retries already failed to get past it.
+function rateLimitException(serviceName: string): HttpException {
+  return new HttpException(
+    `The AI provider is rate-limiting ${serviceName} requests right now. Please wait a moment and try again.`,
+    HttpStatus.TOO_MANY_REQUESTS,
+  );
 }
 
 @Injectable()
 export class AzureAiFoundryService {
   constructor(private config: ConfigService) {}
 
-  // Retries network failures and 5xx responses (the AI provider's fault, plausibly transient);
-  // a 4xx response returns immediately since retrying an invalid request just wastes time.
-  // A persistent 5xx after retries are exhausted returns that Response rather than throwing, so
-  // callers' existing `!res.ok` handling still produces its specific status-code message — only
-  // a run of genuine network-level failures (fetch itself rejecting) throws here.
+  // Retries network failures, 5xx responses, and 429s (all plausibly transient); any other 4xx
+  // returns immediately since retrying a genuinely invalid request just wastes time. A persistent
+  // failure after retries are exhausted returns that Response rather than throwing, so callers'
+  // existing `!res.ok`/isRateLimited handling still produces its specific message — only a run of
+  // genuine network-level failures (fetch itself rejecting) throws here.
   private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
     let lastNetworkError: unknown;
     let lastResponse: Response | undefined;
     for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+      let delayMs = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
       try {
         const res = await fetch(url, init);
-        if (res.ok || res.status < 500) return res;
+        if (res.ok || (res.status < 500 && !isRateLimited(res))) return res;
         lastResponse = res;
+        if (isRateLimited(res)) delayMs = retryAfterMs(res) ?? delayMs;
       } catch (err) {
         lastNetworkError = err;
         lastResponse = undefined;
       }
       if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+        await sleep(delayMs);
       }
     }
     if (lastResponse) return lastResponse;
@@ -86,6 +121,7 @@ export class AzureAiFoundryService {
       throw new BadGatewayException('Could not reach the AI service. Please try again.');
     }
 
+    if (isRateLimited(res)) throw rateLimitException('chat');
     if (!res.ok) {
       throw new BadGatewayException(`AI service request failed (${res.status}). Please try again.`);
     }
@@ -120,6 +156,7 @@ export class AzureAiFoundryService {
       throw new BadGatewayException('Could not reach the AI image service. Please try again.');
     }
 
+    if (isRateLimited(res)) throw rateLimitException('image generation');
     if (!res.ok) {
       throw new BadGatewayException(`AI image service request failed (${res.status}). Please try again.`);
     }
