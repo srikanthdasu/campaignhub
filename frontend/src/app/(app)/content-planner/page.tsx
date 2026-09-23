@@ -139,6 +139,9 @@ function ContentPlannerPageContent() {
   const [aiImagePrompt, setAiImagePrompt] = useState('');
   const [generatingImage, setGeneratingImage] = useState(false);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [approverIds, setApproverIds] = useState<string[]>([]);
   const [mode, setMode] = useState<'SEQUENTIAL' | 'PARALLEL'>('SEQUENTIAL');
@@ -240,6 +243,30 @@ function ContentPlannerPageContent() {
     }
   }
 
+  function resetComposer() {
+    setBody('');
+    setHashtags('');
+    setMentions('');
+    setPlatforms([]);
+    setMediaAssetId('');
+    setCampaignId('');
+    setAiGenerated(false);
+  }
+
+  function startEdit(item: ContentItem) {
+    setEditingId(item.id);
+    setBody(item.body ?? '');
+    setHashtags('');
+    setMentions('');
+    setPlatforms(item.platforms);
+    setMediaAssetId(item.mediaAsset?.id ?? '');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    resetComposer();
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!selectedClientId) return;
@@ -255,18 +282,34 @@ function ContentPlannerPageContent() {
         campaignId: campaignId || undefined,
         aiGenerated,
       });
-      setBody('');
-      setHashtags('');
-      setMentions('');
-      setPlatforms([]);
-      setMediaAssetId('');
-      setCampaignId('');
-      setAiGenerated(false);
+      resetComposer();
       loadItems(selectedClientId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create content');
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function onSaveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedClientId || !editingId) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const fullBody = [body, hashtags, mentions].map((s) => s.trim()).filter(Boolean).join('\n\n');
+      await api.patch(`/clients/${selectedClientId}/content/${editingId}`, {
+        body: fullBody,
+        platforms,
+        mediaAssetId: mediaAssetId || undefined,
+      });
+      setEditingId(null);
+      resetComposer();
+      loadItems(selectedClientId);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save changes');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -585,18 +628,38 @@ function ContentPlannerPageContent() {
             {/* 8. Review & Save */}
             <Card padding="lg">
               <PanelHeader n={8} title="Review & Save" icon={CheckCircle2} color="#f97316" />
-              <form onSubmit={onCreate} className="space-y-2">
+              <form onSubmit={editingId ? onSaveEdit : onCreate} className="space-y-2">
                 <p className="text-[11px] text-neutral-500">
-                  Uses the client, platforms, details, and media from the panels above.
+                  {editingId
+                    ? 'Editing an existing draft — uses the platforms, details, and media from the panels above.'
+                    : 'Uses the client, platforms, details, and media from the panels above.'}
                 </p>
-                <Button type="submit" size="sm" className="w-full" loading={creating} disabled={!selectedClientId}>
-                  Save as Draft
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="w-full"
+                    loading={editingId ? saving : creating}
+                    disabled={!selectedClientId}
+                  >
+                    {editingId ? 'Save Changes' : 'Save as Draft'}
+                  </Button>
+                  {editingId && (
+                    <Button type="button" size="sm" variant="secondary" onClick={cancelEdit}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </form>
               {drafts.length > 0 && (
                 <div className="mt-3 max-h-40 space-y-2 overflow-y-auto border-t border-white/10 pt-3">
                   {drafts.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-white/10 px-2.5 py-2 text-[11px]">
+                    <div
+                      key={item.id}
+                      className={`rounded-lg border px-2.5 py-2 text-[11px] ${
+                        editingId === item.id ? 'border-accent-400/40 bg-accent-500/10' : 'border-white/10'
+                      }`}
+                    >
                       <p className="truncate text-neutral-300">
                         {item.aiGenerated && (
                           <span
@@ -637,14 +700,14 @@ function ContentPlannerPageContent() {
                           </Button>
                         </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="mt-1.5"
-                          onClick={() => setSubmittingId(item.id)}
-                        >
-                          Send for Approval
-                        </Button>
+                        <div className="mt-1.5 flex gap-1.5">
+                          <Button size="sm" variant="secondary" onClick={() => setSubmittingId(item.id)}>
+                            Send for Approval
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => startEdit(item)}>
+                            Edit
+                          </Button>
+                        </div>
                       )}
                     </div>
                   ))}

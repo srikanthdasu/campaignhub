@@ -102,6 +102,12 @@ function EmailCampaignsPageContent() {
   const [importing, setImporting] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSubject, setEditSubject] = useState('');
+  const [editBody, setEditBody] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
+
   function loadCampaigns() {
     if (!selectedClientId) return;
     api
@@ -120,6 +126,7 @@ function EmailCampaignsPageContent() {
   useEffect(() => {
     setSelected(null);
     setCampaigns(null);
+    setEditingDetails(false);
     loadCampaigns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId]);
@@ -188,6 +195,35 @@ function EmailCampaignsPageContent() {
       loadCampaigns();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to remove recipient');
+    }
+  }
+
+  function startEditDetails() {
+    if (!selected) return;
+    setEditName(selected.name);
+    setEditSubject(selected.subject);
+    setEditBody(selected.bodyTemplate);
+    setEditingDetails(true);
+  }
+
+  async function onSaveDetails(e: FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    setSavingDetails(true);
+    setError(null);
+    try {
+      await api.patch(`/clients/${selectedClientId}/email-campaigns/${selected.id}`, {
+        name: editName,
+        subject: editSubject,
+        bodyTemplate: editBody,
+      });
+      setEditingDetails(false);
+      loadSelected(selected.id);
+      loadCampaigns();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save changes');
+    } finally {
+      setSavingDetails(false);
     }
   }
 
@@ -269,7 +305,10 @@ function EmailCampaignsPageContent() {
                 {campaigns.map((c) => (
                   <li key={c.id}>
                     <button
-                      onClick={() => loadSelected(c.id)}
+                      onClick={() => {
+                        setEditingDetails(false);
+                        loadSelected(c.id);
+                      }}
                       className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-neutral-300 hover:bg-white/[0.05]"
                     >
                       <span className="truncate">{c.name}</span>
@@ -289,13 +328,45 @@ function EmailCampaignsPageContent() {
             </Card>
           ) : (
             <Card padding="lg" className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-neutral-50">{selected.name}</h2>
-                  <p className="text-sm text-neutral-400">{selected.subject}</p>
+              {editingDetails ? (
+                <form onSubmit={onSaveDetails} className="space-y-3">
+                  <Input label="Internal name" required value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <Input label="Subject" required value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-neutral-300">Body</label>
+                    <textarea
+                      required
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      rows={5}
+                      className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-sm text-neutral-50 outline-none placeholder:text-neutral-500 focus:border-accent-400"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" loading={savingDetails}>
+                      Save Changes
+                    </Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setEditingDetails(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-neutral-50">{selected.name}</h2>
+                    <p className="text-sm text-neutral-400">{selected.subject}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isDraft && (
+                      <Button size="sm" variant="secondary" onClick={startEditDetails}>
+                        Edit
+                      </Button>
+                    )}
+                    <Badge tone={STATUS_TONE[selected.status]}>{selected.status}</Badge>
+                  </div>
                 </div>
-                <Badge tone={STATUS_TONE[selected.status]}>{selected.status}</Badge>
-              </div>
+              )}
 
               {isDraft && (
                 <div className="border-t border-white/10 pt-4">
