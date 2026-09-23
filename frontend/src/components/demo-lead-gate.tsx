@@ -60,6 +60,7 @@ export function DemoLeadGate() {
           account and pricing afterward.
         </p>
         <Input
+          id="demo-lead-name"
           label="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -69,6 +70,7 @@ export function DemoLeadGate() {
           autoFocus
         />
         <Input
+          id="demo-lead-email"
           label="Your email"
           type="email"
           value={email}
