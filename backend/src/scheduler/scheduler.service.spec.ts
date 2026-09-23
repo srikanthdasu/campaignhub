@@ -388,6 +388,97 @@ describe('SchedulerService.autoPublishDuePosts', () => {
       '/scheduler',
     );
   });
+
+  it('auto-requeues a failed publish for a later tick instead of finalizing it (§21 — no auto-retry)', async () => {
+    const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn() };
+    const config = { getOrThrow: vi.fn() };
+    const prisma = {
+      scheduledPost: {
+        findMany: vi.fn(() =>
+          Promise.resolve([{ id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.INSTAGRAM }]),
+        ),
+        findUniqueOrThrow: vi.fn(() =>
+          Promise.resolve({ id: 'post-1', platform: SocialPlatform.INSTAGRAM, retryCount: 0 }),
+        ),
+        updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+        update: vi.fn((args: any) => Promise.resolve({ id: 'post-1', ...args.data })),
+      },
+      contentItem: {
+        update: vi.fn(),
+        findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+        findUniqueOrThrow: vi.fn(() => Promise.resolve({ mediaAsset: null })),
+      },
+    };
+    const instagramPublish = { publishImage: vi.fn() };
+    const service = new SchedulerService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      config as unknown as ConfigService,
+      instagramPublish as unknown as InstagramPublishService,
+      notifications as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    await service.autoPublishDuePosts();
+
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith({
+      where: { id: 'post-1' },
+      data: {
+        status: ScheduledPostStatus.PENDING,
+        retryCount: { increment: 1 },
+        errorMessage: expect.stringContaining('Instagram requires an image or video'),
+      },
+    });
+    // Not a terminal failure yet — nobody should be bothered, and the content item's status
+    // shouldn't flip to FAILED, until auto-retries are actually exhausted.
+    expect(notifications.create).not.toHaveBeenCalled();
+    expect(prisma.contentItem.update).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'SCHEDULED_POST_AUTO_RETRY_QUEUED' }),
+    );
+  });
+
+  it('gives up and finalizes as FAILED once auto-retries are exhausted', async () => {
+    const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn() };
+    const config = { getOrThrow: vi.fn() };
+    const prisma = {
+      scheduledPost: {
+        findMany: vi.fn(() =>
+          Promise.resolve([{ id: 'post-1', contentItemId: 'content-1', platform: SocialPlatform.INSTAGRAM }]),
+        ),
+        // Already at MAX_RETRIES (3) — this attempt should be the terminal one, not another requeue.
+        findUniqueOrThrow: vi.fn(() =>
+          Promise.resolve({ id: 'post-1', platform: SocialPlatform.INSTAGRAM, retryCount: 3 }),
+        ),
+        updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+        update: vi.fn((args: any) => Promise.resolve({ id: 'post-1', ...args.data })),
+      },
+      contentItem: {
+        update: vi.fn(),
+        findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+        findUniqueOrThrow: vi.fn(() => Promise.resolve({ mediaAsset: null })),
+      },
+    };
+    const instagramPublish = { publishImage: vi.fn() };
+    const service = new SchedulerService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      config as unknown as ConfigService,
+      instagramPublish as unknown as InstagramPublishService,
+      notifications as unknown as NotificationsService,
+      makeBlobStorage(),
+    );
+
+    await service.autoPublishDuePosts();
+
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: ScheduledPostStatus.FAILED }) }),
+    );
+    expect(notifications.create).toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'SCHEDULED_POST_FAILED' }));
+  });
 });
 
 function buildRetryService(post: { status: ScheduledPostStatus; retryCount: number }) {

@@ -215,17 +215,32 @@ export class SchedulerService {
     });
 
     for (const post of due) {
-      const result = await this.publishPost(post.id, post.contentItemId);
+      const result = await this.publishPost(post.id, post.contentItemId, { autoRetry: true });
       const content = await this.prisma.contentItem.findUnique({
         where: { id: post.contentItemId },
         select: { client: { select: { agencyId: true } } },
       });
+      // PENDING here (distinct from the claim-race no-op returning a stale PENDING, which
+      // predates this and is rare enough not to special-case) means publishPost just requeued a
+      // failed attempt for a later tick rather than giving up — worth its own audit action so
+      // "still retrying" doesn't read as either a silent success or a final failure.
+      const action =
+        result.status === ScheduledPostStatus.FAILED
+          ? 'SCHEDULED_POST_FAILED'
+          : result.status === ScheduledPostStatus.PENDING
+            ? 'SCHEDULED_POST_AUTO_RETRY_QUEUED'
+            : 'SCHEDULED_POST_PUBLISHED';
       await this.audit.log({
         agencyId: content?.client.agencyId,
-        action: result.status === ScheduledPostStatus.FAILED ? 'SCHEDULED_POST_FAILED' : 'SCHEDULED_POST_PUBLISHED',
+        action,
         entityType: 'scheduled_post',
         entityId: post.id,
-        metadata: { auto: true, simulated: result.simulated, errorMessage: result.errorMessage ?? undefined },
+        metadata: {
+          auto: true,
+          simulated: result.simulated,
+          errorMessage: result.errorMessage ?? undefined,
+          retryCount: result.retryCount,
+        },
       });
     }
 
@@ -270,7 +285,7 @@ export class SchedulerService {
     return stuck.length;
   }
 
-  private async publishPost(id: string, contentItemId: string) {
+  private async publishPost(id: string, contentItemId: string, opts: { autoRetry?: boolean } = {}) {
     // Atomically claim the row before doing anything external. Without this, two overlapping
     // cron ticks (or a cron tick racing a manual "Publish Now" click) could both read the same
     // PENDING row and both call the real Instagram API for it — an actual duplicate post, not
@@ -292,6 +307,21 @@ export class SchedulerService {
         externalPostId = await this.publishToInstagram(contentItemId);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to publish to Instagram';
+
+        // An unattended (cron) failure gets a few automatic attempts on later ticks before
+        // anyone is bothered — the ~1-minute gap between EVERY_MINUTE ticks doubles as a simple
+        // backoff. A manual retry/"Publish Now" failure never auto-requeues: a human is already
+        // watching and gets the result immediately instead of a silent extra attempt they didn't
+        // ask for. Shares the same MAX_RETRIES budget as the manual retry() flow — once a post
+        // has been attempted MAX_RETRIES times by any combination of cron and human, retry()
+        // itself refuses further attempts and it needs a reschedule instead.
+        if (opts.autoRetry && post.retryCount < MAX_RETRIES) {
+          return this.prisma.scheduledPost.update({
+            where: { id },
+            data: { status: ScheduledPostStatus.PENDING, retryCount: { increment: 1 }, errorMessage: message },
+          });
+        }
+
         const failed = await this.prisma.scheduledPost.update({
           where: { id },
           data: { status: ScheduledPostStatus.FAILED, errorMessage: message },
