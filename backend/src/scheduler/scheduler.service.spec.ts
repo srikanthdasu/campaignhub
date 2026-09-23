@@ -17,6 +17,17 @@ function makeBlobStorage() {
 function buildService(overrides: { count?: number } = {}) {
   const audit = { log: vi.fn() };
   const notifications = { create: vi.fn() };
+  // `count` here drives the mocked groupBy result finalizeContentItemStatus() reads: 0 means every
+  // scheduled post for the content item already reached PUBLISHED (nothing left to finalize but
+  // "done"), anything else means one is still PENDING (the batch isn't finished, so the content
+  // item should NOT be finalized yet) — mirrors the old "remaining posts" count this replaced.
+  const groupByResult =
+    overrides.count === 0
+      ? [{ status: ScheduledPostStatus.PUBLISHED, _count: 2 }]
+      : [
+          { status: ScheduledPostStatus.PENDING, _count: overrides.count ?? 1 },
+          { status: ScheduledPostStatus.PUBLISHED, _count: 1 },
+        ];
   const prisma = {
     scheduledPost: {
       findMany: vi.fn(() =>
@@ -30,11 +41,13 @@ function buildService(overrides: { count?: number } = {}) {
       ),
       updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
       update: vi.fn(() => Promise.resolve({ id: 'post-1', status: ScheduledPostStatus.PUBLISHED, errorMessage: null })),
-      count: vi.fn(() => Promise.resolve(overrides.count ?? 0)),
+      groupBy: vi.fn(() => Promise.resolve(groupByResult)),
     },
     contentItem: {
       update: vi.fn(() => Promise.resolve({})),
-      findUnique: vi.fn(() => Promise.resolve({ createdById: 'creator-1', client: { name: 'Acme' } })),
+      findUnique: vi.fn(() =>
+        Promise.resolve({ status: ContentStatus.SCHEDULED, createdById: 'creator-1', client: { name: 'Acme' } }),
+      ),
     },
   };
   const config = { getOrThrow: vi.fn() };
@@ -83,6 +96,92 @@ describe('SchedulerService.reapStuckPublishing', () => {
 
     expect(count).toBe(0);
     expect(prisma.scheduledPost.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+function buildFinalizeService(overrides: {
+  contentItemStatus?: ContentStatus;
+  groupByResult?: { status: ScheduledPostStatus; _count: number }[];
+} = {}) {
+  const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn() };
+  const prisma = {
+    scheduledPost: {
+      findMany: vi.fn(() => Promise.resolve([{ id: 'stuck-1', contentItemId: 'content-1' }])),
+      updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+      groupBy: vi.fn(() =>
+        Promise.resolve(overrides.groupByResult ?? [{ status: ScheduledPostStatus.FAILED, _count: 1 }]),
+      ),
+    },
+    contentItem: {
+      findUnique: vi.fn(() =>
+        Promise.resolve({
+          status: overrides.contentItemStatus ?? ContentStatus.SCHEDULED,
+          createdById: 'creator-1',
+          client: { name: 'Acme' },
+        }),
+      ),
+      update: vi.fn(() => Promise.resolve({})),
+    },
+  };
+  const config = { getOrThrow: vi.fn() };
+  const instagramPublish = { publishImage: vi.fn() };
+  const service = new SchedulerService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    config as unknown as ConfigService,
+    instagramPublish as unknown as InstagramPublishService,
+    notifications as unknown as NotificationsService,
+    makeBlobStorage(),
+  );
+  return { service, prisma };
+}
+
+describe('SchedulerService — content item FAILED status (§21 ContentStatus terminal state)', () => {
+  it('moves the content item to FAILED once every scheduled post is terminal and at least one failed', async () => {
+    const { service, prisma } = buildFinalizeService({
+      groupByResult: [{ status: ScheduledPostStatus.FAILED, _count: 1 }],
+    });
+
+    await service.reapStuckPublishing();
+
+    expect(prisma.contentItem.update).toHaveBeenCalledWith({
+      where: { id: 'content-1' },
+      data: { status: ContentStatus.FAILED },
+    });
+  });
+
+  it('leaves the content item at SCHEDULED while another post is still PENDING or PUBLISHING', async () => {
+    const { service, prisma } = buildFinalizeService({
+      groupByResult: [
+        { status: ScheduledPostStatus.FAILED, _count: 1 },
+        { status: ScheduledPostStatus.PENDING, _count: 1 },
+      ],
+    });
+
+    await service.reapStuckPublishing();
+
+    expect(prisma.contentItem.update).not.toHaveBeenCalled();
+  });
+
+  it('never touches a content item outside the scheduler pipeline (e.g. still DRAFT)', async () => {
+    const { service, prisma } = buildFinalizeService({ contentItemStatus: ContentStatus.DRAFT });
+
+    await service.reapStuckPublishing();
+
+    expect(prisma.scheduledPost.groupBy).not.toHaveBeenCalled();
+    expect(prisma.contentItem.update).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when the content item is already FAILED and stays that way', async () => {
+    const { service, prisma } = buildFinalizeService({
+      contentItemStatus: ContentStatus.FAILED,
+      groupByResult: [{ status: ScheduledPostStatus.FAILED, _count: 1 }],
+    });
+
+    await service.reapStuckPublishing();
+
+    expect(prisma.contentItem.update).not.toHaveBeenCalled();
   });
 });
 
@@ -433,17 +532,89 @@ describe('SchedulerService.requireAccess (client-access scoping — AUTH-1)', ()
 });
 
 describe('SchedulerService — content item completion after a cancel (terminal-state enum)', () => {
-  it('excludes CANCELLED alongside PUBLISHED when deciding whether a content item is fully published', async () => {
-    const { service, prisma } = buildService();
+  it('treats a CANCELLED sibling as resolved — moves the content item to PUBLISHED once nothing is left in flight or failed', async () => {
+    const { service, prisma } = buildFinalizeService({
+      groupByResult: [
+        { status: ScheduledPostStatus.PUBLISHED, _count: 1 },
+        { status: ScheduledPostStatus.CANCELLED, _count: 1 },
+      ],
+    });
 
-    await service.autoPublishDuePosts();
+    await service.reapStuckPublishing();
 
-    expect(prisma.scheduledPost.count).toHaveBeenCalledWith(
+    expect(prisma.contentItem.update).toHaveBeenCalledWith({
+      where: { id: 'content-1' },
+      data: { status: ContentStatus.PUBLISHED },
+    });
+  });
+});
+
+function buildRescheduleService(overrides: { postStatus?: ScheduledPostStatus } = {}) {
+  const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn() };
+  const prisma = {
+    scheduledPost: {
+      findUnique: vi.fn(() =>
+        Promise.resolve({
+          id: 'post-1',
+          status: overrides.postStatus ?? ScheduledPostStatus.PENDING,
+          contentItemId: 'content-1',
+          contentItem: { clientId: 'client-1', client: { agencyId: 'agency-1' } },
+        }),
+      ),
+      update: vi.fn((args: any) => Promise.resolve({ id: 'post-1', ...args.data })),
+      groupBy: vi.fn(() => Promise.resolve([{ status: ScheduledPostStatus.PENDING, _count: 1 }])),
+    },
+    contentItem: {
+      findUnique: vi.fn(() =>
+        Promise.resolve({ status: ContentStatus.FAILED, createdById: 'creator-1', client: { name: 'Acme' } }),
+      ),
+      update: vi.fn(() => Promise.resolve({})),
+    },
+  };
+  const config = { getOrThrow: vi.fn() };
+  const instagramPublish = { publishImage: vi.fn() };
+  const service = new SchedulerService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    config as unknown as ConfigService,
+    instagramPublish as unknown as InstagramPublishService,
+    notifications as unknown as NotificationsService,
+    makeBlobStorage(),
+  );
+  const owner: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.OWNER, agencyId: 'agency-1' };
+  return { service, prisma, owner };
+}
+
+describe('SchedulerService.reschedule', () => {
+  it('rejects a post that is neither PENDING nor FAILED', async () => {
+    const { service, owner } = buildRescheduleService({ postStatus: ScheduledPostStatus.PUBLISHED });
+    await expect(service.reschedule('post-1', owner, '2030-01-01T00:00:00.000Z')).rejects.toThrow(
+      'Only pending or failed posts can be rescheduled',
+    );
+  });
+
+  it('accepts a FAILED post — the Scheduler UI offers this as the way back once retries are exhausted', async () => {
+    const { service, prisma, owner } = buildRescheduleService({ postStatus: ScheduledPostStatus.FAILED });
+    await service.reschedule('post-1', owner, '2030-01-01T00:00:00.000Z');
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          status: { notIn: [ScheduledPostStatus.PUBLISHED, ScheduledPostStatus.CANCELLED] },
+        where: { id: 'post-1' },
+        data: expect.objectContaining({
+          status: ScheduledPostStatus.PENDING,
+          errorMessage: null,
+          retryCount: 0,
         }),
       }),
     );
+  });
+
+  it('resets a FAILED content item back to SCHEDULED once one of its posts is rescheduled', async () => {
+    const { service, prisma, owner } = buildRescheduleService({ postStatus: ScheduledPostStatus.FAILED });
+    await service.reschedule('post-1', owner, '2030-01-01T00:00:00.000Z');
+    expect(prisma.contentItem.update).toHaveBeenCalledWith({
+      where: { id: 'content-1' },
+      data: { status: ContentStatus.SCHEDULED },
+    });
   });
 });

@@ -52,6 +52,7 @@ const STATUS_TONE: Record<string, 'accent' | 'success' | 'warning' | 'danger' | 
   SCHEDULED: 'accent',
   PUBLISHED: 'success',
   REJECTED: 'danger',
+  FAILED: 'danger',
 };
 
 interface ContentItem {
@@ -381,6 +382,7 @@ function ContentPlannerPageContent() {
   const scheduled = items?.filter((i) => i.status === 'SCHEDULED') ?? [];
   const published = items?.filter((i) => i.status === 'PUBLISHED') ?? [];
   const rejected = items?.filter((i) => i.status === 'REJECTED') ?? [];
+  const failed = items?.filter((i) => i.status === 'FAILED') ?? [];
 
   const counts = [
     { label: 'Drafts', value: drafts.length },
@@ -389,6 +391,7 @@ function ContentPlannerPageContent() {
     { label: 'Scheduled', value: scheduled.length },
     { label: 'Published', value: published.length },
     { label: 'Rejected', value: rejected.length },
+    { label: 'Failed', value: failed.length },
   ];
 
   return (

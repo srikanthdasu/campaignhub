@@ -95,13 +95,23 @@ export class SchedulerService {
 
   async reschedule(id: string, user: AuthenticatedUser, scheduledTime: string) {
     const post = await this.requireAccess(id, user);
-    if (post.status !== ScheduledPostStatus.PENDING) {
-      throw new BadRequestException('Only pending posts can be rescheduled');
+    // A FAILED post past MAX_RETRIES (see retry() below) has no other path back to PENDING — the
+    // Scheduler UI's "Reschedule" control is offered specifically as that path, so this has to
+    // accept FAILED too, not just PENDING, or that control 400s every time it's used.
+    if (post.status !== ScheduledPostStatus.PENDING && post.status !== ScheduledPostStatus.FAILED) {
+      throw new BadRequestException('Only pending or failed posts can be rescheduled');
     }
 
     const updated = await this.prisma.scheduledPost.update({
       where: { id },
-      data: { scheduledTime: new Date(scheduledTime) },
+      data: {
+        scheduledTime: new Date(scheduledTime),
+        // Rescheduling a FAILED post is a fresh attempt at a new time, not a retry of the same
+        // one — clearing retryCount means a later real failure isn't silently pre-exhausted.
+        status: ScheduledPostStatus.PENDING,
+        errorMessage: null,
+        retryCount: 0,
+      },
     });
 
     await this.audit.log({
@@ -110,6 +120,8 @@ export class SchedulerService {
       entityType: 'scheduled_post',
       entityId: id,
     });
+
+    await this.finalizeContentItemStatus(post.contentItemId);
 
     return updated;
   }
@@ -252,6 +264,7 @@ export class SchedulerService {
 
     for (const post of stuck) {
       await this.notifyCreatorOfFailure(post.contentItemId, 'it never completed, likely due to a server restart');
+      await this.finalizeContentItemStatus(post.contentItemId);
     }
 
     return stuck.length;
@@ -284,6 +297,10 @@ export class SchedulerService {
           data: { status: ScheduledPostStatus.FAILED, errorMessage: message },
         });
         await this.notifyCreatorOfFailure(contentItemId, message);
+        // Previously missing entirely — a failed publish never touched the content item's own
+        // status, so it silently stayed SCHEDULED forever with no way to tell "still pending" and
+        // "every platform actually failed" apart from opening the Scheduler and reading badges.
+        await this.finalizeContentItemStatus(contentItemId);
         return failed;
       }
     }
@@ -302,24 +319,49 @@ export class SchedulerService {
       },
     });
 
-    // CANCELLED is excluded alongside PUBLISHED — a cancelled sibling is a resolved terminal
-    // state (the user chose not to publish it), not something still blocking on resolution the
-    // way a FAILED sibling is. Without this, cancelling one platform's post would permanently
-    // stop the content item from ever reaching PUBLISHED once every other platform succeeded.
-    const remaining = await this.prisma.scheduledPost.count({
-      where: {
-        contentItemId,
-        status: { notIn: [ScheduledPostStatus.PUBLISHED, ScheduledPostStatus.CANCELLED] },
-      },
-    });
-    if (remaining === 0) {
-      await this.prisma.contentItem.update({
-        where: { id: contentItemId },
-        data: { status: ContentStatus.PUBLISHED },
-      });
-    }
+    await this.finalizeContentItemStatus(contentItemId);
 
     return updated;
+  }
+
+  /**
+   * The single place that decides what a content item's own status should be once its scheduled
+   * posts change, based on the whole batch (one row per platform) rather than just the one row
+   * that just changed — PENDING/PUBLISHING anywhere means the batch isn't done; FAILED anywhere
+   * (with nothing left in flight) means it needs attention; otherwise everything that could finish
+   * has (PUBLISHED or CANCELLED — a cancelled post is a resolved choice, not something blocking
+   * completion the same way FAILED is). Only touches content items already in the scheduler
+   * pipeline (SCHEDULED/PUBLISHED/FAILED) — never a DRAFT or IN_REVIEW item that happens to share
+   * an id collision-free UUID space with nothing here.
+   */
+  private async finalizeContentItemStatus(contentItemId: string): Promise<void> {
+    const contentItem = await this.prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { status: true },
+    });
+    if (!contentItem) return;
+    const PIPELINE_STATUSES: ContentStatus[] = [ContentStatus.SCHEDULED, ContentStatus.PUBLISHED, ContentStatus.FAILED];
+    if (!PIPELINE_STATUSES.includes(contentItem.status)) return;
+
+    const counts = await this.prisma.scheduledPost.groupBy({
+      by: ['status'],
+      where: { contentItemId },
+      _count: true,
+    });
+    const countFor = (status: ScheduledPostStatus) => counts.find((c) => c.status === status)?._count ?? 0;
+    const stillInFlight =
+      countFor(ScheduledPostStatus.PENDING) + countFor(ScheduledPostStatus.PUBLISHING) > 0;
+    const hasFailed = countFor(ScheduledPostStatus.FAILED) > 0;
+
+    const nextStatus = stillInFlight
+      ? ContentStatus.SCHEDULED
+      : hasFailed
+        ? ContentStatus.FAILED
+        : ContentStatus.PUBLISHED;
+
+    if (nextStatus !== contentItem.status) {
+      await this.prisma.contentItem.update({ where: { id: contentItemId }, data: { status: nextStatus } });
+    }
   }
 
   // The one truly async, unattended failure in this whole pipeline (the cron can hit it with

@@ -335,6 +335,10 @@ enum ContentStatus {
   SCHEDULED
   PUBLISHED
   REJECTED
+  // At least one of this item's scheduled posts ended up FAILED and none are left
+  // PENDING/PUBLISHING — previously this had no representation and the item just stayed
+  // SCHEDULED forever, indistinguishable from one still healthily waiting to publish.
+  FAILED
 }
 
 enum SocialPlatform {
