@@ -66,6 +66,30 @@ export class AuditService {
     });
   }
 
+  // FE-1: the audit log is the highest-insert-rate table in the schema (a row on every login
+  // attempt alone) with no way for the UI to see past whatever the first page returns. skip/take
+  // is a plain offset here rather than a cursor — simple, and fine at this table's scale even
+  // with 180 days of retention (see purgeOld) — capped so a client can't ask for an unbounded page.
+  private static readonly MAX_PAGE_SIZE = 200;
+
+  async listForAgencyPaginated(agencyId: string, skip = 0, take = 50) {
+    const boundedTake = Math.min(Math.max(take, 1), AuditService.MAX_PAGE_SIZE);
+    const boundedSkip = Math.max(skip, 0);
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where: { agencyId },
+        orderBy: { createdAt: 'desc' },
+        skip: boundedSkip,
+        take: boundedTake,
+        include: {
+          user: { select: { id: true, name: true, email: true, role: true } },
+        },
+      }),
+      this.prisma.auditLog.count({ where: { agencyId } }),
+    ]);
+    return { items, total, skip: boundedSkip, take: boundedTake };
+  }
+
   /**
    * AUDIT-1: no retention policy existed at all — confirmed by exhaustive grep, the only
    * operations against AuditLog anywhere in the backend were create and findMany. This is the

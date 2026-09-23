@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { RequireRole } from '@/components/require-role';
 import { Role } from '@/lib/roles';
@@ -18,6 +19,15 @@ interface AuditEntry {
   createdAt: string;
   user: { id: string; name: string; email: string; role: string } | null;
 }
+
+interface AuditPage {
+  items: AuditEntry[];
+  total: number;
+  skip: number;
+  take: number;
+}
+
+const PAGE_SIZE = 50;
 
 const ACTION_TONE: Record<string, 'accent' | 'success' | 'warning' | 'danger' | 'neutral'> = {
   LOGIN_SUCCESS: 'success',
@@ -37,17 +47,25 @@ export default function AuditLogPage() {
 
 function AuditLogPageContent() {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [skip, setSkip] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get<AuditEntry[]>('/audit-logs')
-      .then(setEntries)
+      .get<AuditPage>(`/audit-logs?skip=${skip}&take=${PAGE_SIZE}`)
+      .then((page) => {
+        setEntries(page.items);
+        setTotal(page.total);
+      })
       .catch((err) => {
         setError(err instanceof ApiError ? err.message : 'Failed to load audit log');
         setEntries([]);
       });
-  }, []);
+  }, [skip]);
+
+  const from = total === 0 ? 0 : skip + 1;
+  const to = Math.min(skip + PAGE_SIZE, total);
 
   return (
     <motion.div
@@ -59,7 +77,8 @@ function AuditLogPageContent() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">Security &amp; audit</h1>
         <p className="text-sm text-neutral-400">
-          Recent security-relevant activity across your agency.
+          Security-relevant activity across your agency
+          {total > 0 && ` — showing ${from}–${to} of ${total}`}.
         </p>
       </motion.div>
 
@@ -112,6 +131,30 @@ function AuditLogPageContent() {
           </ul>
         )}
       </motion.div>
+
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={skip === 0}
+            onClick={() => setSkip((s) => Math.max(s - PAGE_SIZE, 0))}
+          >
+            ← Newer
+          </Button>
+          <span className="text-xs text-neutral-500">
+            {from}–{to} of {total}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={skip + PAGE_SIZE >= total}
+            onClick={() => setSkip((s) => s + PAGE_SIZE)}
+          >
+            Older →
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }

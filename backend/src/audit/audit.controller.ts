@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -13,7 +13,17 @@ export class AuditController {
 
   @Get()
   @Roles(Role.OWNER, Role.ADMIN)
-  list(@CurrentUser() user: AuthenticatedUser) {
-    return this.auditService.listForAgency(user.agencyId!);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    const parsedSkip = skip !== undefined ? Number.parseInt(skip, 10) : undefined;
+    const parsedTake = take !== undefined ? Number.parseInt(take, 10) : undefined;
+    return this.auditService.listForAgencyPaginated(
+      user.agencyId!,
+      Number.isFinite(parsedSkip) ? parsedSkip : undefined,
+      Number.isFinite(parsedTake) ? parsedTake : undefined,
+    );
   }
 }

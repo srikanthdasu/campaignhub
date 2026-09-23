@@ -9,6 +9,7 @@ function buildService(overrides: { user?: { agencyId: string } | null } = {}) {
     auditLog: {
       create: vi.fn(() => Promise.resolve({})),
       findMany: vi.fn(() => Promise.resolve([])),
+      count: vi.fn(() => Promise.resolve(0)),
       deleteMany: vi.fn((_args: { where: { createdAt: { lt: Date } } }) => Promise.resolve({ count: 0 })),
     },
     user: {
@@ -90,5 +91,39 @@ describe('AuditService.listForAgency', () => {
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { agencyId: 'agency-1' } }),
     );
+  });
+});
+
+describe('AuditService.listForAgencyPaginated (FE-1)', () => {
+  it('defaults to the first page of 50 and returns the total count alongside it', async () => {
+    const { service, prisma } = buildService();
+    prisma.auditLog.count.mockResolvedValueOnce(137);
+    const result = await service.listForAgencyPaginated('agency-1');
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { agencyId: 'agency-1' }, skip: 0, take: 50 }),
+    );
+    expect(result.total).toBe(137);
+    expect(result.skip).toBe(0);
+    expect(result.take).toBe(50);
+  });
+
+  it('passes through an explicit skip/take', async () => {
+    const { service, prisma } = buildService();
+    await service.listForAgencyPaginated('agency-1', 100, 25);
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 100, take: 25 }),
+    );
+  });
+
+  it('caps take at the max page size so a client cannot request an unbounded page', async () => {
+    const { service, prisma } = buildService();
+    await service.listForAgencyPaginated('agency-1', 0, 10_000);
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
+  });
+
+  it('floors a negative skip to 0', async () => {
+    const { service, prisma } = buildService();
+    await service.listForAgencyPaginated('agency-1', -50, 50);
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0 }));
   });
 });
