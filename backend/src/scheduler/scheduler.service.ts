@@ -217,6 +217,43 @@ export class SchedulerService {
     return due.length;
   }
 
+  /**
+   * publishPost() atomically claims a row (PENDING -> PUBLISHING) before doing any external work
+   * — if the process crashes or restarts between that claim and the final FAILED/PUBLISHED write
+   * (a deploy mid-publish, an OOM kill during the Instagram API call), the row is stuck in
+   * PUBLISHING forever: autoPublishDuePosts() only ever looks at PENDING rows, so nothing would
+   * ever pick it back up. ScheduledPost has no updatedAt column to measure "how long has this
+   * been claimed," so scheduledTime is used as the age proxy instead — it's already in the past
+   * by the time a row gets claimed, and a real publish call finishes in seconds, so a row still
+   * PUBLISHING this long after its own scheduledTime can only be one that crashed mid-flight.
+   * Reaped rows go to FAILED, which puts them right back in the existing manual-retry path
+   * (SchedulerService.retry / the reschedule UI once retries are exhausted) instead of a new one.
+   */
+  private static readonly STUCK_PUBLISHING_MINUTES = 10;
+
+  async reapStuckPublishing(): Promise<number> {
+    const cutoff = new Date(Date.now() - SchedulerService.STUCK_PUBLISHING_MINUTES * 60 * 1000);
+    const stuck = await this.prisma.scheduledPost.findMany({
+      where: { status: ScheduledPostStatus.PUBLISHING, scheduledTime: { lte: cutoff } },
+      select: { id: true, contentItemId: true },
+    });
+    if (stuck.length === 0) return 0;
+
+    await this.prisma.scheduledPost.updateMany({
+      where: { id: { in: stuck.map((s) => s.id) } },
+      data: {
+        status: ScheduledPostStatus.FAILED,
+        errorMessage: 'Publish did not complete, likely due to a server restart — retry to try again.',
+      },
+    });
+
+    for (const post of stuck) {
+      await this.notifyCreatorOfFailure(post.contentItemId, 'it never completed, likely due to a server restart');
+    }
+
+    return stuck.length;
+  }
+
   private async publishPost(id: string, contentItemId: string) {
     // Atomically claim the row before doing anything external. Without this, two overlapping
     // cron ticks (or a cron tick racing a manual "Publish Now" click) could both read the same

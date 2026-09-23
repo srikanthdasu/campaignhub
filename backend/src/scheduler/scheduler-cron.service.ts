@@ -25,6 +25,10 @@ export class SchedulerCronService {
     }
     this.isRunning = true;
     try {
+      const reaped = await this.schedulerService.reapStuckPublishing();
+      if (reaped > 0) {
+        this.logger.warn(`Reaped ${reaped} scheduled post(s) stuck in PUBLISHING (likely a prior restart mid-publish)`);
+      }
       const count = await this.schedulerService.autoPublishDuePosts();
       if (count > 0) {
         this.logger.log(`Auto-published ${count} scheduled post(s)`);

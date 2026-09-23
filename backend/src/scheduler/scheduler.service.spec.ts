@@ -50,6 +50,42 @@ function buildService(overrides: { count?: number } = {}) {
   return { service, prisma, audit, notifications };
 }
 
+describe('SchedulerService.reapStuckPublishing', () => {
+  it('marks rows stuck in PUBLISHING past the threshold as FAILED and notifies the creator', async () => {
+    const { service, prisma, notifications } = buildService();
+    prisma.scheduledPost.findMany.mockResolvedValueOnce([
+      { id: 'stuck-1', contentItemId: 'content-1' },
+      { id: 'stuck-2', contentItemId: 'content-1' },
+    ] as never);
+
+    const count = await service.reapStuckPublishing();
+
+    expect(count).toBe(2);
+    expect(prisma.scheduledPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: ScheduledPostStatus.PUBLISHING }),
+      }),
+    );
+    expect(prisma.scheduledPost.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: ['stuck-1', 'stuck-2'] } },
+        data: expect.objectContaining({ status: ScheduledPostStatus.FAILED }),
+      }),
+    );
+    expect(notifications.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('is a no-op when nothing is stuck', async () => {
+    const { service, prisma } = buildService();
+    prisma.scheduledPost.findMany.mockResolvedValueOnce([] as never);
+
+    const count = await service.reapStuckPublishing();
+
+    expect(count).toBe(0);
+    expect(prisma.scheduledPost.updateMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('SchedulerService.autoPublishDuePosts', () => {
   it('publishes only posts whose scheduled time has passed', async () => {
     const { service, prisma, audit } = buildService();
