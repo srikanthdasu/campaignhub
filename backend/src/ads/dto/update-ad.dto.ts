@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MinLength } from 'class-validator';
-import { SocialPlatform } from '../../generated/prisma/client.js';
+import { Currency, SocialPlatform } from '../../generated/prisma/client.js';
 
 export class UpdateAdDto {
   @IsOptional()
@@ -25,8 +25,8 @@ export class UpdateAdDto {
   budgetAmount?: number;
 
   @IsOptional()
-  @IsString()
-  budgetCurrency?: string;
+  @IsEnum(Currency)
+  budgetCurrency?: Currency;
 
   @IsOptional()
   @IsString()

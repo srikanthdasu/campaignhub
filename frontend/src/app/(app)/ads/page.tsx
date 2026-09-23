@@ -28,6 +28,8 @@ const PLATFORMS = [
   'WHATSAPP',
 ] as const;
 
+const CURRENCIES = ['USD', 'INR', 'EUR', 'GBP'] as const;
+
 const STEPS = [
   { key: 'BRIEF', label: 'Brief' },
   { key: 'AUDIENCE_BUDGET', label: 'Audience / Budget' },
@@ -401,12 +403,20 @@ function AdsWorkspace({ clientId }: { clientId: string }) {
                         type="number"
                         onSave={(v) => patch({ budgetAmount: v ? Number(v) : undefined })}
                       />
-                      <Field
-                        label="Currency"
-                        value={active.budgetCurrency}
-                        disabled={!editable}
-                        onSave={(v) => patch({ budgetCurrency: v })}
-                      />
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-neutral-300">Currency</label>
+                        <Select
+                          value={active.budgetCurrency}
+                          disabled={!editable}
+                          onChange={(e) => patch({ budgetCurrency: e.target.value })}
+                        >
+                          {CURRENCIES.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -29,13 +29,11 @@ enum Role {
 }
 
 model Agency {
-  id                 String   @id @default(uuid()) @db.Uuid
-  name               String
-  plan               String   @default("SILVER")
-  subscriptionStatus String   @default("TRIAL") @map("subscription_status")
-  stripeCustomerId   String?  @map("stripe_customer_id")
-  settings           Json?
-  createdAt          DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  stripeCustomerId String?  @map("stripe_customer_id")
+  settings         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
 
   clients Client[]
   users   User[]
@@ -62,6 +60,18 @@ enum ClientStatus {
   BLOCKED
 }
 
+// Shared across every money-adjacent field below (Client's reporting currency, AdCampaign's
+// budget, Invoice's GST total) so they can't drift into free-text typos of the same concept.
+// Different defaults are deliberate, not inconsistency: ad budgets default USD (global ad
+// platforms), invoices default INR (GST/Razorpay is India-specific) — this only makes both of
+// those a validated value from one vocabulary instead of an unchecked string.
+enum Currency {
+  USD
+  INR
+  EUR
+  GBP
+}
+
 model Client {
   id           String       @id @default(uuid()) @db.Uuid
   agencyId     String       @map("agency_id") @db.Uuid
@@ -75,7 +85,7 @@ model Client {
   industry     String?
   address      String?
   timeZone     String?      @map("time_zone")
-  currency     String?
+  currency     Currency?
   defaultLanguage String?   @map("default_language")
   allowClientPortalAccess Boolean @default(true) @map("allow_client_portal_access")
   // Off by default — a client can only create/submit content (Content Planner, AI Captions/
@@ -368,6 +378,7 @@ model ContentItem {
   createdById  String?          @map("created_by") @db.Uuid
   createdBy    User?            @relation("ContentCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
 
   approvalFlow   ApprovalFlow?
   scheduledPosts ScheduledPost[]
@@ -727,7 +738,7 @@ model AdCampaign {
   // comment): money must never accumulate binary floating-point rounding error. CHECK(>= 0)
   // added via raw SQL in the migration, matching the Invoice precedent.
   budgetAmount   Decimal?   @db.Decimal(12, 2) @map("budget_amount")
-  budgetCurrency String     @default("USD") @map("budget_currency")
+  budgetCurrency Currency   @default(USD) @map("budget_currency")
   creativeText   String?    @map("creative_text")
   creativeMediaAssetId String? @map("creative_media_asset_id") @db.Uuid
   creativeMediaAsset    MediaAsset? @relation(fields: [creativeMediaAssetId], references: [id])
@@ -839,7 +850,7 @@ model Invoice {
   amount         Decimal       @db.Decimal(12, 2)
   gstAmount      Decimal       @default(0) @db.Decimal(12, 2) @map("gst_amount")
   gstNumber      String?       @map("gst_number")
-  currency       String        @default("INR")
+  currency       Currency      @default(INR)
   status         InvoiceStatus @default(ISSUED)
   issuedAt       DateTime      @default(now()) @map("issued_at")
 

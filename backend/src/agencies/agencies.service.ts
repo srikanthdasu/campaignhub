@@ -16,9 +16,9 @@ export class AgenciesService {
   // call this — so it must never include anything sensitive. stripeCustomerId has no legitimate
   // reader on either the frontend or backend; leave it out rather than exposing it agency-wide.
   //
-  // plan/subscriptionStatus are derived from the real Subscription row, not Agency's own
-  // plan/subscriptionStatus columns — those are frozen at their schema defaults ("SILVER"/
-  // "TRIAL") forever since nothing ever writes to them; Subscription (updated by billing.service
+  // plan/subscriptionStatus are derived from the real Subscription row — Agency itself has no
+  // plan/subscriptionStatus columns of its own (removed: they were frozen at their schema
+  // defaults forever since nothing ever wrote to them). Subscription (updated by billing.service
   // on every checkout/cancel) is the only place that reflects what an agency actually has.
   async getMine(agencyId: string) {
     const agency = await this.prisma.agency.findUnique({

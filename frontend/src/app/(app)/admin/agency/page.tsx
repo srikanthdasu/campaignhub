@@ -33,6 +33,7 @@ const DELETE_GRACE_DAYS = 15;
 
 const PLANS = ['BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'] as const;
 const STATUSES = ['ACTIVE', 'PENDING_ONBOARDING', 'INACTIVE', 'BLOCKED'] as const;
+const CURRENCIES = ['USD', 'INR', 'EUR', 'GBP'] as const;
 type ClientPlan = (typeof PLANS)[number];
 type ClientStatus = (typeof STATUSES)[number];
 
@@ -328,7 +329,11 @@ function AgencyAdminPageContent() {
     setSavingDetails(true);
     setError(null);
     try {
-      const updated = await api.patch<Client>(`/clients/${activeClientId}`, details);
+      // currency is now a validated enum server-side (unlike the other free-text fields here) —
+      // '' means "left blank in this form", not a valid enum value, so omit it entirely rather
+      // than sending a value @IsEnum would reject.
+      const payload = { ...details, currency: details.currency || undefined };
+      const updated = await api.patch<Client>(`/clients/${activeClientId}`, payload);
       setActiveClient(updated);
       setClients((prev) => prev?.map((c) => (c.id === activeClientId ? updated : c)) ?? null);
     } catch (err) {
@@ -720,11 +725,17 @@ function AgencyAdminPageContent() {
                   value={details.timeZone}
                   onChange={(e) => setDetails((p) => (p ? { ...p, timeZone: e.target.value } : p))}
                 />
-                <Input
-                  placeholder="Currency"
+                <Select
                   value={details.currency}
                   onChange={(e) => setDetails((p) => (p ? { ...p, currency: e.target.value } : p))}
-                />
+                >
+                  <option value="">Currency</option>
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <Input
                 placeholder="Default language"

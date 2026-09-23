@@ -1,5 +1,5 @@
 import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { ClientPlan, ClientStatus } from '../../generated/prisma/client.js';
+import { ClientPlan, ClientStatus, Currency } from '../../generated/prisma/client.js';
 
 export class UpdateClientDto {
   @IsOptional()
@@ -48,9 +48,8 @@ export class UpdateClientDto {
   timeZone?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  currency?: string;
+  @IsEnum(Currency)
+  currency?: Currency;
 
   @IsOptional()
   @IsString()
