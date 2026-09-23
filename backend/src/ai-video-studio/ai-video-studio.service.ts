@@ -19,8 +19,9 @@ import type { Prisma } from '../generated/prisma/client.js';
 // Script generation and the render preview image call Azure AI Foundry (chat, MAI-Image); the
 // export video calls Kling 3.0 via Magic Hour instead of Azure Sora — Azure's sora-2 deployment
 // shuts down 2026-09-24 with no successor, and Kling independently tests ahead on facial
-// realism, which was the deciding requirement. No simulated output remains anywhere in this
-// flow. Storyboard/asset selection/enhancements stay user-driven, not AI-generated, by design.
+// realism, which was the deciding requirement. Storyboard/asset selection/enhancements stay
+// user-driven, not AI-generated, by design. render()/publish() below each stamp their own audit
+// entry simulated:true — see their own comments for exactly what's simulated in each case.
 
 interface ScriptScene {
   title: string;
@@ -222,6 +223,8 @@ export class AiVideoStudioService {
     return project;
   }
 
+  // Marks the project done — real distribution happens through Scheduler (Instagram only, see
+  // scheduler.service.ts), not here. No platform call is ever made from this method.
   async publish(clientId: string, id: string, actorId: string) {
     await this.requireInClient(id, clientId);
     const project = await this.prisma.aiVideoProject.update({

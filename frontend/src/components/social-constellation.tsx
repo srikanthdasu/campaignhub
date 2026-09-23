@@ -15,8 +15,11 @@ interface StatChip {
   delay: number;
 }
 
+// FE-3: this used to include an { label: 'ENGAGEMENT', value: '+87%' } chip — a fabricated
+// number with no real data behind it, inconsistent with the product's otherwise careful honesty
+// about not having real engagement data anywhere (see the audit's §10). Dropped rather than
+// relabeled; the other two chips are illustrative UI chrome, not factual claims.
 const STATS: StatChip[] = [
-  { label: 'ENGAGEMENT', value: '+87%', tone: 'success', className: 'left-0 top-[6%]', delay: 0 },
   { label: 'AI ENGINE', value: 'Ready', tone: 'accent', className: 'right-0 top-0', delay: 0.6 },
   { label: 'NEXT POST', value: 'Tomorrow · 10:30', tone: 'neutral', className: 'left-[4%] bottom-0', delay: 1.2 },
 ];

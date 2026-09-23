@@ -185,8 +185,7 @@ export default function AiImageStudioPage() {
           Everything below is real: image type, style, and aspect ratio genuinely change what
           gets generated, and every image is really saved to the client&apos;s Media Library.
           What isn&apos;t built yet: in-browser editing (adding text/logo overlays, background
-          removal, filters, cropping) — that&apos;s a much larger feature on its own. Let me know
-          if you want that built next.
+          removal, filters, cropping) — that&apos;s a much larger feature on its own.
         </p>
       </motion.div>
 
