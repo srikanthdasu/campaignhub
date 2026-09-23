@@ -120,7 +120,10 @@ export class SchedulerService {
       throw new BadRequestException('Only pending posts can be cancelled');
     }
 
-    await this.prisma.scheduledPost.delete({ where: { id } });
+    // Was a hard delete — the audit entry below recorded the cancellation, but the row it
+    // referenced no longer existed, so there was no way to actually see a post was cancelled
+    // (vs. never having existed) once you navigated away. CANCELLED is a real terminal status now.
+    await this.prisma.scheduledPost.update({ where: { id }, data: { status: ScheduledPostStatus.CANCELLED } });
     await this.audit.log({
       userId: user.sub,
       action: 'SCHEDULED_POST_CANCELLED',
@@ -299,8 +302,15 @@ export class SchedulerService {
       },
     });
 
+    // CANCELLED is excluded alongside PUBLISHED — a cancelled sibling is a resolved terminal
+    // state (the user chose not to publish it), not something still blocking on resolution the
+    // way a FAILED sibling is. Without this, cancelling one platform's post would permanently
+    // stop the content item from ever reaching PUBLISHED once every other platform succeeded.
     const remaining = await this.prisma.scheduledPost.count({
-      where: { contentItemId, status: { not: ScheduledPostStatus.PUBLISHED } },
+      where: {
+        contentItemId,
+        status: { notIn: [ScheduledPostStatus.PUBLISHED, ScheduledPostStatus.CANCELLED] },
+      },
     });
     if (remaining === 0) {
       await this.prisma.contentItem.update({

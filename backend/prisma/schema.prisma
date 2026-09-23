@@ -497,6 +497,10 @@ enum ScheduledPostStatus {
   PUBLISHING
   PUBLISHED
   FAILED
+  // A user-initiated cancel of a still-PENDING post. Previously cancel() just hard-deleted the
+  // row, so there was no way to see "this was cancelled" vs. "this never existed" — the audit
+  // log recorded the action, but the row it referred to was already gone.
+  CANCELLED
 }
 
 model ScheduledPost {

@@ -47,6 +47,7 @@ const POST_TONE: Record<string, 'accent' | 'success' | 'warning' | 'danger' | 'n
   PUBLISHING: 'warning',
   PUBLISHED: 'success',
   FAILED: 'danger',
+  CANCELLED: 'neutral',
 };
 
 interface ContentItem {
@@ -70,7 +71,7 @@ interface ScheduledPost {
   id: string;
   platform: string;
   scheduledTime: string;
-  status: 'PENDING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
+  status: 'PENDING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED';
   errorMessage: string | null;
   publishedAt: string | null;
   externalPostId: string | null;

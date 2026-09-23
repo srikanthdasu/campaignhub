@@ -377,7 +377,7 @@ function buildAccessScopedService(hasAccess: boolean) {
           contentItem: { clientId: 'client-1', client: { agencyId: 'agency-1' } },
         }),
       ),
-      delete: vi.fn(() => Promise.resolve({})),
+      update: vi.fn(() => Promise.resolve({})),
     },
     userClientAccess: { findUnique: userClientAccessFindUnique },
   };
@@ -404,7 +404,7 @@ describe('SchedulerService.requireAccess (client-access scoping — AUTH-1)', ()
     expect(userClientAccessFindUnique).toHaveBeenCalledWith({
       where: { userId_clientId: { userId: 'user-1', clientId: 'client-1' } },
     });
-    expect(prisma.scheduledPost.delete).not.toHaveBeenCalled();
+    expect(prisma.scheduledPost.update).not.toHaveBeenCalled();
   });
 
   it('allows a MANAGER with an explicit UserClientAccess grant to cancel', async () => {
@@ -412,7 +412,10 @@ describe('SchedulerService.requireAccess (client-access scoping — AUTH-1)', ()
     const manager: AuthenticatedUser = { sub: 'user-1', email: 'a@b.com', role: Role.MANAGER, agencyId: 'agency-1' };
 
     await service.cancel('post-1', manager);
-    expect(prisma.scheduledPost.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith({
+      where: { id: 'post-1' },
+      data: { status: ScheduledPostStatus.CANCELLED },
+    });
   });
 
   it('allows an OWNER to cancel with no UserClientAccess lookup at all', async () => {
@@ -421,6 +424,26 @@ describe('SchedulerService.requireAccess (client-access scoping — AUTH-1)', ()
 
     await service.cancel('post-1', owner);
     expect(userClientAccessFindUnique).not.toHaveBeenCalled();
-    expect(prisma.scheduledPost.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
+    expect(prisma.scheduledPost.update).toHaveBeenCalledWith({
+      where: { id: 'post-1' },
+      data: { status: ScheduledPostStatus.CANCELLED },
+    });
+  });
+
+});
+
+describe('SchedulerService — content item completion after a cancel (terminal-state enum)', () => {
+  it('excludes CANCELLED alongside PUBLISHED when deciding whether a content item is fully published', async () => {
+    const { service, prisma } = buildService();
+
+    await service.autoPublishDuePosts();
+
+    expect(prisma.scheduledPost.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { notIn: [ScheduledPostStatus.PUBLISHED, ScheduledPostStatus.CANCELLED] },
+        }),
+      }),
+    );
   });
 });
