@@ -851,6 +851,10 @@ enum EmailCampaignStatus {
   QUEUED
   SENDING
   SENT
+  // The batch finished (no PENDING recipients left) but delivery failed for every recipient it
+  // actually attempted — previously this was indistinguishable from SENT, e.g. SMTP being
+  // unconfigured would mark a campaign "sent" despite zero emails actually going out.
+  FAILED
 }
 
 enum EmailRecipientStatus {

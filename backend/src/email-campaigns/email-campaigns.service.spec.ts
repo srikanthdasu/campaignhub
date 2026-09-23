@@ -5,6 +5,7 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { EmailService } from '../notifications/email.service.js';
 import type { ConfigService } from '@nestjs/config';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 
 function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscribes?: any[] } = {}) {
   const campaign = overrides.campaign ?? {
@@ -41,13 +42,15 @@ function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscri
       upsert: vi.fn(() => Promise.resolve({})),
     },
   };
+  const notifications = { create: vi.fn(), createMany: vi.fn() };
   const service = new EmailCampaignsService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     email as unknown as EmailService,
     config as unknown as ConfigService,
+    notifications as unknown as NotificationsService,
   );
-  return { service, prisma, audit, email, config, campaign };
+  return { service, prisma, audit, email, config, campaign, notifications };
 }
 
 describe('EmailCampaignsService — tenant scoping', () => {
@@ -190,6 +193,56 @@ describe('EmailCampaignsService.processQueuedCampaigns', () => {
     expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: EmailCampaignStatus.SENT }) }),
     );
+  });
+
+  it('flips the campaign to FAILED — not SENT — when every recipient failed delivery (§21 EmailCampaignStatus terminal state)', async () => {
+    const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'A', email: 'a@example.com', status: EmailRecipientStatus.PENDING };
+    const { service, prisma, email, notifications } = buildService({
+      campaign: {
+        id: 'campaign-1', clientId: 'client-1', name: 'Spring Sale', createdById: 'creator-1',
+        status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'x',
+      },
+      recipients: [recipient],
+    });
+    email.send = vi.fn(() => Promise.resolve(false));
+    // Every prisma.emailRecipient.count() call in this codepath is (PENDING remaining, then SENT,
+    // then FAILED) in that order — mocked per-call since (unlike other tests here) this one
+    // actually depends on telling them apart.
+    prisma.emailRecipient.count = vi
+      .fn()
+      .mockResolvedValueOnce(0) // remainingPending
+      .mockResolvedValueOnce(0) // sentCount
+      .mockResolvedValueOnce(1) as any; // failedCount
+
+    await service.processQueuedCampaigns();
+
+    expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: EmailCampaignStatus.FAILED }) }),
+    );
+    expect(notifications.create).toHaveBeenCalledWith(
+      'creator-1',
+      expect.stringContaining('Spring Sale'),
+      '/email-campaigns',
+    );
+  });
+
+  it('stays SENT when only some recipients fail — a handful of bounces is not a campaign-level failure', async () => {
+    const { service, prisma, notifications } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.SENDING, subject: 'Hi', bodyTemplate: 'x' },
+      recipients: [],
+    });
+    prisma.emailRecipient.count = vi
+      .fn()
+      .mockResolvedValueOnce(0) // remainingPending
+      .mockResolvedValueOnce(8) // sentCount
+      .mockResolvedValueOnce(2) as any; // failedCount
+
+    await service.processQueuedCampaigns();
+
+    expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: EmailCampaignStatus.SENT }) }),
+    );
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 });
 

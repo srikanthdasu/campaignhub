@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { EmailService } from '../notifications/email.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { CreateEmailCampaignDto } from './dto/create-email-campaign.dto.js';
 import { UpdateEmailCampaignDto } from './dto/update-email-campaign.dto.js';
 import { BulkImportRecipientsDto } from './dto/bulk-import-recipients.dto.js';
@@ -20,6 +21,7 @@ export class EmailCampaignsService {
     private audit: AuditService,
     private email: EmailService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   private hashToken(token: string): string {
@@ -266,10 +268,33 @@ export class EmailCampaignsService {
         where: { campaignId: campaign.id, status: EmailRecipientStatus.PENDING },
       });
       if (remainingPending === 0) {
+        // Previously this always wrote SENT once the batch finished — even when every single
+        // delivery attempt failed (e.g. SMTP misconfigured), which read as a successful send with
+        // zero visibility into the fact nothing actually went out. FAILED only fires when nothing
+        // was delivered at all (sentCount === 0 with at least one real failure) — a handful of
+        // bounced addresses among hundreds of real sends is normal and still counts as SENT; a
+        // campaign that reached zero recipients is a genuine failure worth surfacing distinctly.
+        const [sentCount, failedCount] = await Promise.all([
+          this.prisma.emailRecipient.count({ where: { campaignId: campaign.id, status: EmailRecipientStatus.SENT } }),
+          this.prisma.emailRecipient.count({ where: { campaignId: campaign.id, status: EmailRecipientStatus.FAILED } }),
+        ]);
+        const allFailed = sentCount === 0 && failedCount > 0;
+
         await this.prisma.emailCampaign.update({
           where: { id: campaign.id },
-          data: { status: EmailCampaignStatus.SENT, sentAt: new Date() },
+          data: {
+            status: allFailed ? EmailCampaignStatus.FAILED : EmailCampaignStatus.SENT,
+            sentAt: new Date(),
+          },
         });
+
+        if (allFailed && campaign.createdById) {
+          await this.notifications.create(
+            campaign.createdById,
+            `Email campaign "${campaign.name}" failed to send — every recipient failed delivery.`,
+            '/email-campaigns',
+          );
+        }
       }
     }
 

@@ -14,14 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 
-type CampaignStatus = 'DRAFT' | 'QUEUED' | 'SENDING' | 'SENT';
+type CampaignStatus = 'DRAFT' | 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
 type RecipientStatus = 'PENDING' | 'SENT' | 'FAILED' | 'UNSUBSCRIBED';
 
-const STATUS_TONE: Record<CampaignStatus, 'neutral' | 'accent' | 'success'> = {
+const STATUS_TONE: Record<CampaignStatus, 'neutral' | 'accent' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
   QUEUED: 'accent',
   SENDING: 'accent',
   SENT: 'success',
+  FAILED: 'danger',
 };
 
 const RECIPIENT_TONE: Record<RecipientStatus, 'neutral' | 'accent' | 'success' | 'danger'> = {
