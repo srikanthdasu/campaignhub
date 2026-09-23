@@ -45,9 +45,28 @@ Reviewer checklist: don't assume a new "delete" feature gets a grace period or i
 unless it explicitly reimplements the `Client` pattern — the default in this codebase is
 irreversible.
 
-## DB-1
+## DB-1 — three models with no direct tenant column
 
-Not reconstructed here — the original audit finding text wasn't preserved anywhere in this repo
-(no saved report, no docs file references it), and guessing at a second schema-design finding
-would risk documenting something that was never actually flagged. If the original audit artifact
-resurfaces, add its DB-1 finding here rather than leaving this section blank.
+Correction: this was previously marked "not reconstructed" in this file — the original audit
+artifact wasn't in the repo, but it was later found outside it. Recording the real finding here now.
+
+**`ApprovalStep`, `EmailRecipient`, and `AiMessage` have no `clientId`/`agencyId` column of their
+own.** Their tenant is only reachable by walking the parent chain:
+
+- `ApprovalStep` → `approvalFlowId` → `ApprovalFlow.contentItemId` → `ContentItem.clientId` →
+  `Client.agencyId` (3 hops).
+- `EmailRecipient` (holds real PII — names and email addresses) and `AiMessage` (raw LLM
+  conversation content) are each 2 hops indirect.
+
+**Why it matters:** any future query written as `findMany({ where: { approvalFlowId } })` or
+`{ where: { conversationId } }` without re-deriving the parent chain's tenant is a silent
+cross-tenant read. `ApprovalStep` additionally has `@@index([approverId])` — a fast index that
+would make exactly this mistake perform *well*, so it wouldn't surface in slow-query monitoring
+either.
+
+**Not a bug today** — the audit itself confirmed the app-layer checks are in fact present via the
+`requireInClient`-style helpers this codebase already uses consistently. This is a schema-shape
+risk, not a live vulnerability, and not something a migration fixes on its own (adding a
+denormalized `clientId` to all three would work, but is a real migration + backfill, not a
+one-line change). Reviewer checklist: any new query against these three tables must confirm it
+re-derives tenant scope through the chain before trusting request-supplied ids.
