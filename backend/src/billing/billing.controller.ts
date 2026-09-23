@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { BillingService } from './billing.service.js';
@@ -51,6 +51,19 @@ export class BillingController {
   @Roles(Role.OWNER)
   cancel(@CurrentUser() user: AuthenticatedUser) {
     return this.billingService.cancel(user.agencyId!, user.sub);
+  }
+
+  // OWNER-only, matching cancel() above — real money movement, not a routine admin task.
+  @Post('invoices/:id/refund')
+  @Roles(Role.OWNER)
+  refundInvoice(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.billingService.refundInvoice(user.agencyId!, user.sub, id);
+  }
+
+  @Post('invoices/:id/void')
+  @Roles(Role.OWNER)
+  voidInvoice(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.billingService.voidInvoice(user.agencyId!, user.sub, id);
   }
 
   // No @Roles() here is intentional, not an oversight (see the C1 audit finding this pattern

@@ -9,6 +9,13 @@ interface RazorpayOrder {
   notes?: Record<string, string>;
 }
 
+interface RazorpayRefund {
+  id: string;
+  payment_id: string;
+  amount: number;
+  status: string;
+}
+
 // Raw REST calls rather than the razorpay npm SDK — same reasoning as AzureAiFoundryService:
 // one small, well-documented endpoint doesn't need a dependency to wrap it.
 @Injectable()
@@ -90,6 +97,37 @@ export class RazorpayService {
     const actualBuf = Buffer.from(signature);
     if (expectedBuf.length !== actualBuf.length) return false;
     return timingSafeEqual(expectedBuf, actualBuf);
+  }
+
+  /**
+   * Issues a full refund against an already-captured payment. No `amount` is sent — omitting it
+   * tells Razorpay to refund the payment's full captured amount, which is all this app currently
+   * needs (BillingService.refundInvoice only ever refunds a whole invoice, never a partial
+   * amount). Razorpay's refund id is itself the idempotency key on their side: retrying this same
+   * call for a payment that's already fully refunded returns their existing refund, not a
+   * duplicate one.
+   */
+  async refundPayment(paymentId: string): Promise<RazorpayRefund> {
+    let res: Response;
+    try {
+      res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: this.authHeader() },
+        body: JSON.stringify({}),
+      });
+    } catch {
+      throw new BadGatewayException('Could not reach Razorpay. Please try again.');
+    }
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: { description?: string } } | null;
+      const detail = body?.error?.description;
+      throw new BadGatewayException(
+        detail ? `Razorpay refund failed: ${detail}` : `Razorpay refund failed (${res.status}).`,
+      );
+    }
+
+    return (await res.json()) as RazorpayRefund;
   }
 
   // Razorpay signs webhook deliveries with a SEPARATE secret (configured alongside the webhook

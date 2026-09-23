@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -6,7 +6,7 @@ import { RazorpayService } from './razorpay.service.js';
 import { SubscribeDto } from './dto/subscribe.dto.js';
 import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto.js';
 import { GST_RATE, PLANS } from './billing.constants.js';
-import { Role, SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
+import { InvoiceStatus, Role, SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
 
 // Invoice.amount/gstAmount are Prisma Decimal (see schema.prisma) so GST math never accumulates
 // binary floating-point error — but a raw Decimal instance serializes to a *string* over JSON
@@ -274,6 +274,76 @@ export class BillingService {
     await this.notifyAgencyAdmins(agencyId, 'Your subscription was cancelled.');
 
     return subscription;
+  }
+
+  private async requireOwnInvoice(agencyId: string, invoiceId: string) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice || invoice.agencyId !== agencyId) {
+      throw new NotFoundException('Invoice not found');
+    }
+    return invoice;
+  }
+
+  /**
+   * A real refund — money actually moves back via Razorpay's refund API against the original
+   * payment. Only a PAID invoice with a real paymentProviderRef can be refunded; anything else
+   * (ISSUED, OVERDUE, or already REFUNDED/VOID) has either never been paid or has already been
+   * resolved. Always a full refund of the invoice — no partial-amount support, since nothing in
+   * this app currently has a reason to refund less than the whole thing.
+   */
+  async refundInvoice(agencyId: string, actorId: string, invoiceId: string) {
+    const invoice = await this.requireOwnInvoice(agencyId, invoiceId);
+    if (invoice.status !== InvoiceStatus.PAID) {
+      throw new BadRequestException('Only a paid invoice can be refunded');
+    }
+    if (!invoice.paymentProviderRef) {
+      throw new BadRequestException('This invoice has no associated payment to refund');
+    }
+
+    const refund = await this.razorpay.refundPayment(invoice.paymentProviderRef);
+
+    const updated = await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { status: InvoiceStatus.REFUNDED },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'INVOICE_REFUNDED',
+      entityType: 'invoice',
+      entityId: invoiceId,
+      metadata: { razorpayRefundId: refund.id, amount: Number(invoice.amount) },
+    });
+
+    await this.notifyAgencyAdmins(agencyId, `Invoice for ₹${Number(invoice.amount).toFixed(2)} was refunded.`);
+
+    return invoiceToPlainNumbers(updated);
+  }
+
+  /**
+   * An accounting correction, not a refund — no money moves and no Razorpay call happens. For
+   * marking an invoice as not-counting (e.g. a duplicate) without implying a payment was returned.
+   * REFUNDED and VOID are each other's terminal states — once either, an invoice can't move again.
+   */
+  async voidInvoice(agencyId: string, actorId: string, invoiceId: string) {
+    const invoice = await this.requireOwnInvoice(agencyId, invoiceId);
+    if (invoice.status === InvoiceStatus.REFUNDED || invoice.status === InvoiceStatus.VOID) {
+      throw new BadRequestException('This invoice has already been resolved');
+    }
+
+    const updated = await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { status: InvoiceStatus.VOID },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'INVOICE_VOIDED',
+      entityType: 'invoice',
+      entityId: invoiceId,
+    });
+
+    return invoiceToPlainNumbers(updated);
   }
 
   /**

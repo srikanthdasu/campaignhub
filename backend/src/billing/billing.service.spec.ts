@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingService } from './billing.service.js';
-import { SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
+import { InvoiceStatus, SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { RazorpayService } from './razorpay.service.js';
@@ -17,6 +17,7 @@ function buildService(
     // idempotency backstop for BILL-2.
     duplicatePaymentRef?: boolean;
     existingInvoice?: any;
+    invoice?: any;
   } = {},
 ) {
   const prisma = {
@@ -34,6 +35,19 @@ function buildService(
       findUniqueOrThrow: vi.fn(() =>
         Promise.resolve(overrides.existingInvoice ?? { id: 'inv-existing', amount: 999, gstAmount: 179.82 }),
       ),
+      findUnique: vi.fn(() =>
+        Promise.resolve(
+          'invoice' in overrides ? overrides.invoice : {
+            id: 'inv-1',
+            agencyId: 'agency-1',
+            status: InvoiceStatus.PAID,
+            paymentProviderRef: 'pay_1',
+            amount: 999,
+            gstAmount: 179.82,
+          },
+        ),
+      ),
+      update: vi.fn((args: any) => Promise.resolve({ ...(overrides.invoice ?? { id: 'inv-1' }), ...args.data })),
     },
     user: {
       findMany: vi.fn(() => Promise.resolve([{ id: 'admin-1' }])),
@@ -57,6 +71,7 @@ function buildService(
     ),
     verifyPaymentSignature: vi.fn(() => overrides.verifies ?? true),
     verifyWebhookSignature: vi.fn(() => overrides.verifies ?? true),
+    refundPayment: vi.fn(() => Promise.resolve({ id: 'rfnd_1', payment_id: 'pay_1', amount: 99900, status: 'processed' })),
   };
   const service = new BillingService(
     prisma as unknown as PrismaService,
@@ -332,5 +347,115 @@ describe('BillingService.cancel', () => {
       expect.stringContaining('cancelled'),
       '/billing',
     );
+  });
+});
+
+describe('BillingService.refundInvoice (§21 InvoiceStatus terminal state)', () => {
+  it('refunds via Razorpay and marks the invoice REFUNDED', async () => {
+    const { service, prisma, audit, razorpay, notifications } = buildService();
+
+    const result = await service.refundInvoice('agency-1', 'owner-1', 'inv-1');
+
+    expect(razorpay.refundPayment).toHaveBeenCalledWith('pay_1');
+    expect(prisma.invoice.update).toHaveBeenCalledWith({
+      where: { id: 'inv-1' },
+      data: { status: InvoiceStatus.REFUNDED },
+    });
+    expect(result.status).toBe(InvoiceStatus.REFUNDED);
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'INVOICE_REFUNDED', entityId: 'inv-1' }),
+    );
+    expect(notifications.createMany).toHaveBeenCalledWith(
+      ['admin-1'],
+      expect.stringContaining('refunded'),
+      '/billing',
+    );
+  });
+
+  it('rejects refunding an invoice that was never paid', async () => {
+    const { service, prisma, razorpay } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'agency-1', status: InvoiceStatus.ISSUED, paymentProviderRef: null },
+    });
+
+    await expect(service.refundInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow(
+      'Only a paid invoice can be refunded',
+    );
+    expect(razorpay.refundPayment).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects refunding an invoice already REFUNDED or VOID', async () => {
+    const { service } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'agency-1', status: InvoiceStatus.REFUNDED, paymentProviderRef: 'pay_1' },
+    });
+
+    await expect(service.refundInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow(
+      'Only a paid invoice can be refunded',
+    );
+  });
+
+  it('rejects an invoice belonging to a different agency (tenant isolation)', async () => {
+    const { service } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'other-agency', status: InvoiceStatus.PAID, paymentProviderRef: 'pay_1' },
+    });
+
+    await expect(service.refundInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow('Invoice not found');
+  });
+
+  it('rejects a 404 for a nonexistent invoice', async () => {
+    const { service } = buildService({ invoice: null });
+
+    await expect(service.refundInvoice('agency-1', 'owner-1', 'missing')).rejects.toThrow('Invoice not found');
+  });
+
+  it('propagates a Razorpay refund failure without marking the invoice REFUNDED', async () => {
+    const { prisma } = buildService();
+    prisma.invoice.update = vi.fn();
+    const failingRazorpay = {
+      refundPayment: vi.fn(() => Promise.reject(new Error('Razorpay refund failed: already refunded'))),
+    };
+    const service2 = new BillingService(
+      prisma as unknown as PrismaService,
+      { log: vi.fn() } as unknown as AuditService,
+      failingRazorpay as unknown as RazorpayService,
+      { create: vi.fn(), createMany: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await expect(service2.refundInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow('already refunded');
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('BillingService.voidInvoice (§21 InvoiceStatus terminal state)', () => {
+  it('marks the invoice VOID without calling Razorpay', async () => {
+    const { service, prisma, audit, razorpay } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'agency-1', status: InvoiceStatus.PAID, paymentProviderRef: 'pay_1' },
+    });
+
+    const result = await service.voidInvoice('agency-1', 'owner-1', 'inv-1');
+
+    expect(razorpay.refundPayment).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).toHaveBeenCalledWith({ where: { id: 'inv-1' }, data: { status: InvoiceStatus.VOID } });
+    expect(result.status).toBe(InvoiceStatus.VOID);
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'INVOICE_VOIDED', entityId: 'inv-1' }));
+  });
+
+  it('rejects voiding an invoice that is already REFUNDED or VOID', async () => {
+    const { service, prisma } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'agency-1', status: InvoiceStatus.VOID, paymentProviderRef: 'pay_1' },
+    });
+
+    await expect(service.voidInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow(
+      'This invoice has already been resolved',
+    );
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invoice belonging to a different agency (tenant isolation)', async () => {
+    const { service } = buildService({
+      invoice: { id: 'inv-1', agencyId: 'other-agency', status: InvoiceStatus.PAID },
+    });
+
+    await expect(service.voidInvoice('agency-1', 'owner-1', 'inv-1')).rejects.toThrow('Invoice not found');
   });
 });

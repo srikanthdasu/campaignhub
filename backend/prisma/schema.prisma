@@ -811,6 +811,11 @@ enum InvoiceStatus {
   ISSUED
   PAID
   OVERDUE
+  // Money was actually returned via Razorpay's refund API against the original payment.
+  REFUNDED
+  // An accounting correction with no money movement (e.g. a duplicate invoice) — distinct from
+  // REFUNDED, which always means a real refund was issued.
+  VOID
 }
 
 model Invoice {

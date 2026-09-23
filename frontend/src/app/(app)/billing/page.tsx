@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table } from '@/components/ui/table';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
 import { RequireRole } from '@/components/require-role';
 import { Role } from '@/lib/roles';
@@ -83,6 +84,14 @@ const STATUS_TONE: Record<SubStatus, 'neutral' | 'accent' | 'success' | 'warning
   CANCELLED: 'danger',
   EXPIRED: 'danger',
   PAUSED: 'warning',
+};
+
+const INVOICE_STATUS_TONE: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'danger'> = {
+  ISSUED: 'accent',
+  PAID: 'success',
+  OVERDUE: 'warning',
+  REFUNDED: 'danger',
+  VOID: 'neutral',
 };
 
 const VIEW_ROLES = ['OWNER', 'ADMIN'];
@@ -176,6 +185,26 @@ function BillingPageContent() {
       setError(err instanceof ApiError ? err.message : 'Failed to cancel');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onRefundInvoice(id: string) {
+    setError(null);
+    try {
+      await api.post(`/billing/invoices/${id}/refund`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to refund invoice');
+    }
+  }
+
+  async function onVoidInvoice(id: string) {
+    setError(null);
+    try {
+      await api.post(`/billing/invoices/${id}/void`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to void invoice');
     }
   }
 
@@ -320,8 +349,28 @@ function BillingPageContent() {
                   {
                     key: 'status',
                     header: 'Status',
-                    render: (inv) => <Badge tone={inv.status === 'PAID' ? 'success' : 'warning'}>{inv.status}</Badge>,
+                    render: (inv) => <Badge tone={INVOICE_STATUS_TONE[inv.status] ?? 'neutral'}>{inv.status}</Badge>,
                   },
+                  ...(canManage
+                    ? [
+                        {
+                          key: 'actions',
+                          header: '',
+                          render: (inv: Invoice) =>
+                            inv.status === 'PAID' ? (
+                              <div className="flex justify-end gap-2">
+                                <ConfirmButton size="sm" onConfirm={() => onRefundInvoice(inv.id)}>
+                                  Refund
+                                </ConfirmButton>
+                                <ConfirmButton size="sm" onConfirm={() => onVoidInvoice(inv.id)}>
+                                  Void
+                                </ConfirmButton>
+                              </div>
+                            ) : null,
+                          className: 'text-right',
+                        },
+                      ]
+                    : []),
                 ]}
               />
             )}

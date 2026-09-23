@@ -125,6 +125,59 @@ describe('RazorpayService.fetchOrder', () => {
   });
 });
 
+describe('RazorpayService.refundPayment', () => {
+  it('posts to the refund endpoint for the given payment id with no amount (full refund)', async () => {
+    const service = buildService();
+    const fetchMock = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 'rfnd_1', payment_id: 'pay_1', amount: 99900, status: 'processed' }),
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const refund = await service.refundPayment('pay_1');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.razorpay.com/v1/payments/pay_1/refund');
+    const requestInit = fetchMock.mock.calls[0][1];
+    expect(requestInit.method).toBe('POST');
+    expect(JSON.parse(requestInit.body as string)).toEqual({});
+    expect(refund).toEqual({ id: 'rfnd_1', payment_id: 'pay_1', amount: 99900, status: 'processed' });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces Razorpay's own error description on failure", async () => {
+    const service = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          json: () => Promise.resolve({ error: { description: 'The payment has already been fully refunded' } }),
+        }),
+      ),
+    );
+
+    await expect(service.refundPayment('pay_1')).rejects.toThrow('The payment has already been fully refunded');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('throws a clear error when Razorpay cannot be reached', async () => {
+    const service = buildService();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('network down'))),
+    );
+
+    await expect(service.refundPayment('pay_1')).rejects.toThrow('Could not reach Razorpay');
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('RazorpayService.verifyWebhookSignature', () => {
   it('accepts a signature genuinely computed over the raw body with the webhook secret', () => {
     const service = buildService();
