@@ -15,6 +15,11 @@ import { Button } from '@/components/ui/button';
 const DEMO_ACCOUNT_EMAIL = 'demo@campaignhubai.app';
 const STORAGE_KEY = 'demo-lead-captured';
 
+// Stable reference (not an inline arrow in JSX) — Modal's focus-trap effect depends on
+// [open, onClose], and a new onClose identity on every keystroke re-ran that effect and yanked
+// focus back to the dialog's first focusable element after each character typed.
+function noop() {}
+
 export function DemoLeadGate() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -48,7 +53,7 @@ export function DemoLeadGate() {
   if (user?.email !== DEMO_ACCOUNT_EMAIL) return null;
 
   return (
-    <Modal open={open} onClose={() => {}} title="Welcome to the CampaignHub AI demo" size="sm">
+    <Modal open={open} onClose={noop} title="Welcome to the CampaignHub AI demo" size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-neutral-400">
           Quick intro before you look around — this helps us follow up if you&apos;d like your own
