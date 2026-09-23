@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 import { requireInClient } from '../common/require-in-client.js';
 import { CreateStrategyDto } from './dto/create-strategy.dto.js';
 import { ReviewStrategyDto } from './dto/review-strategy.dto.js';
 import { FeedbackStrategyDto } from './dto/feedback-strategy.dto.js';
-import { AiStrategyStatus } from '../generated/prisma/client.js';
+import { AiStrategyStatus, Role } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 @Injectable()
@@ -15,7 +16,27 @@ export class AiStrategyService {
     private prisma: PrismaService,
     private audit: AuditService,
     private foundry: AzureAiFoundryService,
+    private notifications: NotificationsService,
   ) {}
+
+  // Mirrors ai-strategy.controller.ts's CAN_REVIEW list — agency-wide Owner/Admin plus whichever
+  // Managers were specifically granted access to this client, i.e. everyone actually allowed to
+  // call review() on a request for it.
+  private async reviewerIdsForClient(clientId: string): Promise<string[]> {
+    const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { agencyId: true } });
+    if (!client) return [];
+    const [agencyWide, clientScoped] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { agencyId: client.agencyId, role: { in: [Role.OWNER, Role.ADMIN] }, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.userClientAccess.findMany({
+        where: { clientId, user: { role: Role.MANAGER, isActive: true } },
+        select: { userId: true },
+      }),
+    ]);
+    return [...new Set([...agencyWide.map((u) => u.id), ...clientScoped.map((a) => a.userId)])];
+  }
 
   async create(clientId: string, actorId: string, dto: CreateStrategyDto) {
     const context = dto.contextNote
@@ -30,6 +51,10 @@ export class AiStrategyService {
       entityType: 'ai_strategy_request',
       entityId: request.id,
     });
+
+    const reviewerIds = (await this.reviewerIdsForClient(clientId)).filter((id) => id !== actorId);
+    await this.notifications.createMany(reviewerIds, `A new AI strategy request ("${dto.title}") needs review`, '/ai-strategy');
+
     return request;
   }
 
@@ -112,6 +137,14 @@ export class AiStrategyService {
       entityId: id,
       metadata: { reviewNote: dto.reviewNote },
     });
+
+    if (request.createdById && request.createdById !== actorId) {
+      await this.notifications.create(
+        request.createdById,
+        `Your AI strategy request ("${request.title}") was ${dto.status === AiStrategyStatus.APPROVED ? 'approved' : 'rejected'}`,
+        '/ai-strategy',
+      );
+    }
 
     return updated;
   }

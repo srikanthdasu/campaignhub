@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { RazorpayService } from './razorpay.service.js';
 import { SubscribeDto } from './dto/subscribe.dto.js';
 import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto.js';
 import { GST_RATE, PLANS } from './billing.constants.js';
-import { SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
+import { Role, SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client.js';
 
 // Invoice.amount/gstAmount are Prisma Decimal (see schema.prisma) so GST math never accumulates
 // binary floating-point error — but a raw Decimal instance serializes to a *string* over JSON
@@ -58,10 +59,22 @@ export class BillingService {
     private prisma: PrismaService,
     private audit: AuditService,
     private razorpay: RazorpayService,
+    private notifications: NotificationsService,
   ) {}
 
   getPlans() {
     return PLANS;
+  }
+
+  // Billing events matter to whoever can act on them, not just whoever happened to click
+  // "Subscribe" — an Owner/Admin who wasn't at the keyboard for a webhook-driven activation, a
+  // cancellation, or a failed payment still needs to know.
+  private async notifyAgencyAdmins(agencyId: string, message: string) {
+    const admins = await this.prisma.user.findMany({
+      where: { agencyId, role: { in: [Role.OWNER, Role.ADMIN] }, isActive: true },
+      select: { id: true },
+    });
+    await this.notifications.createMany(admins.map((a) => a.id), message, '/billing');
   }
 
   getSubscription(agencyId: string) {
@@ -240,6 +253,8 @@ export class BillingService {
       metadata: { plan: dto.plan, billingCycle: dto.billingCycle, amount, razorpayPaymentId: paymentId },
     });
 
+    await this.notifyAgencyAdmins(agencyId, `Your ${dto.plan} subscription is now active.`);
+
     return { subscription, invoice: invoiceToPlainNumbers(invoice), alreadyProcessed: false as const };
   }
 
@@ -256,6 +271,8 @@ export class BillingService {
       entityId: subscription.id,
     });
 
+    await this.notifyAgencyAdmins(agencyId, 'Your subscription was cancelled.');
+
     return subscription;
   }
 
@@ -271,6 +288,19 @@ export class BillingService {
     }
 
     const body = JSON.parse(rawBody.toString('utf8')) as RazorpayWebhookPayload;
+
+    if (body.event === 'payment.failed') {
+      const entity = body.payload?.payment?.entity;
+      const activation = entity?.notes ? this.parseActivationNotes(entity.notes) : null;
+      if (activation) {
+        await this.notifyAgencyAdmins(
+          activation.agencyId,
+          `Your payment for the ${activation.plan} plan failed — please retry from the Billing page.`,
+        );
+      }
+      return { received: true, handled: Boolean(activation) };
+    }
+
     if (body.event !== 'payment.captured') {
       return { received: true, handled: false };
     }

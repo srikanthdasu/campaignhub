@@ -4,6 +4,7 @@ import { SubscriptionPlan, SubscriptionStatus } from '../generated/prisma/client
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { RazorpayService } from './razorpay.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 
 const VERIFIED_PAYMENT = { orderId: 'order_1', paymentId: 'pay_1', signature: 'sig_1' };
 
@@ -34,8 +35,12 @@ function buildService(
         Promise.resolve(overrides.existingInvoice ?? { id: 'inv-existing', amount: 999, gstAmount: 179.82 }),
       ),
     },
+    user: {
+      findMany: vi.fn(() => Promise.resolve([{ id: 'admin-1' }])),
+    },
   };
   const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn(), createMany: vi.fn() };
   const razorpay = {
     keyId: 'rzp_test_fake',
     createOrder: vi.fn((amount: number) => Promise.resolve({ id: 'order_1', amount: amount * 100, currency: 'INR' })),
@@ -57,8 +62,9 @@ function buildService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     razorpay as unknown as RazorpayService,
+    notifications as unknown as NotificationsService,
   );
-  return { service, prisma, audit, razorpay };
+  return { service, prisma, audit, razorpay, notifications };
 }
 
 describe('BillingService.createCheckoutOrder', () => {
@@ -277,7 +283,7 @@ describe('BillingService.processRazorpayWebhook', () => {
   });
 
   it('activates the subscription for a verified payment.captured event with valid notes', async () => {
-    const { service, prisma } = buildService();
+    const { service, prisma, notifications } = buildService();
     const result = await service.processRazorpayWebhook(
       payload('payment.captured', { agencyId: 'agency-1', plan: 'GROWTH', billingCycle: 'MONTHLY' }),
       'sig',
@@ -286,24 +292,45 @@ describe('BillingService.processRazorpayWebhook', () => {
     expect(prisma.subscription.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ plan: 'GROWTH', paymentProviderRef: 'pay_1' }) }),
     );
+    expect(notifications.createMany).toHaveBeenCalledWith(['admin-1'], expect.stringContaining('active'), '/billing');
+  });
+
+  it('notifies agency admins on a payment.failed event with recognizable notes (NOTIF-1)', async () => {
+    const { service, notifications } = buildService();
+    const result = await service.processRazorpayWebhook(
+      payload('payment.failed', { agencyId: 'agency-1', plan: 'GROWTH', billingCycle: 'MONTHLY' }),
+      'sig',
+    );
+    expect(result).toEqual({ received: true, handled: true });
+    expect(notifications.createMany).toHaveBeenCalledWith(['admin-1'], expect.stringContaining('failed'), '/billing');
   });
 });
 
 describe('BillingService.cancel', () => {
-  it('marks the subscription cancelled', async () => {
+  it('marks the subscription cancelled and notifies agency admins (NOTIF-1)', async () => {
     const prisma = {
       subscription: {
         update: vi.fn((args: any) => Promise.resolve({ id: 'sub-1', ...args.data })),
       },
+      user: {
+        findMany: vi.fn(() => Promise.resolve([{ id: 'admin-1' }, { id: 'admin-2' }])),
+      },
     };
     const audit = { log: vi.fn() };
+    const notifications = { create: vi.fn(), createMany: vi.fn() };
     const service = new BillingService(
       prisma as unknown as PrismaService,
       audit as unknown as AuditService,
       {} as unknown as RazorpayService,
+      notifications as unknown as NotificationsService,
     );
 
     const result = await service.cancel('agency-1', 'owner-1');
     expect(result.status).toBe(SubscriptionStatus.CANCELLED);
+    expect(notifications.createMany).toHaveBeenCalledWith(
+      ['admin-1', 'admin-2'],
+      expect.stringContaining('cancelled'),
+      '/billing',
+    );
   });
 });

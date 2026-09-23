@@ -230,7 +230,7 @@ export class ClientsService {
     targetUserId: string,
     role: ClientGroupRole = ClientGroupRole.VIEWER,
   ) {
-    await this.requireInAgency(agencyId, clientId);
+    const client = await this.requireInAgency(agencyId, clientId);
 
     const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser || targetUser.agencyId !== agencyId) {
@@ -250,6 +250,11 @@ export class ClientsService {
       entityId: clientId,
       metadata: { targetUserId, role },
     });
+
+    await this.notifications.create(
+      targetUserId,
+      `You were given ${role} access to "${client.name}".`,
+    );
   }
 
   async updateAccessRole(
@@ -259,7 +264,7 @@ export class ClientsService {
     targetUserId: string,
     role: ClientGroupRole,
   ) {
-    await this.requireInAgency(agencyId, clientId);
+    const client = await this.requireInAgency(agencyId, clientId);
 
     const existing = await this.prisma.userClientAccess.findUnique({
       where: { userId_clientId: { userId: targetUserId, clientId } },
@@ -280,10 +285,15 @@ export class ClientsService {
       entityId: clientId,
       metadata: { targetUserId, role },
     });
+
+    await this.notifications.create(
+      targetUserId,
+      `Your access to "${client.name}" was changed to ${role}.`,
+    );
   }
 
   async revokeAccess(agencyId: string, actorId: string, clientId: string, targetUserId: string) {
-    await this.requireInAgency(agencyId, clientId);
+    const client = await this.requireInAgency(agencyId, clientId);
 
     await this.prisma.userClientAccess.deleteMany({
       where: { userId: targetUserId, clientId },
@@ -296,6 +306,11 @@ export class ClientsService {
       entityId: clientId,
       metadata: { targetUserId },
     });
+
+    await this.notifications.create(
+      targetUserId,
+      `Your access to "${client.name}" was revoked.`,
+    );
   }
 
   /**

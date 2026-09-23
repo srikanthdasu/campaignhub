@@ -3,10 +3,12 @@ import { UsersService } from './users.service.js';
 import { Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { CreateMemberDto } from './dto/create-member.dto.js';
 
 function buildService(overrides: { existingUser?: any; ownerCount?: number; agency?: any } = {}) {
   const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn(), createMany: vi.fn() };
   const prisma = {
     user: {
       findUnique: vi.fn(() => Promise.resolve(overrides.existingUser ?? null)),
@@ -21,8 +23,12 @@ function buildService(overrides: { existingUser?: any; ownerCount?: number; agen
       ),
     },
   };
-  const service = new UsersService(prisma as unknown as PrismaService, audit as unknown as AuditService);
-  return { service, prisma, audit };
+  const service = new UsersService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    notifications as unknown as NotificationsService,
+  );
+  return { service, prisma, audit, notifications };
 }
 
 function makeDto(overrides: Partial<CreateMemberDto> = {}): CreateMemberDto {
@@ -78,6 +84,12 @@ describe('UsersService.updateRole', () => {
     expect(prisma.user.update).toHaveBeenCalled();
   });
 
+  it('notifies the target user their role changed (NOTIF-1)', async () => {
+    const { service, notifications } = buildService({ existingUser: { id: 'u1', agencyId: 'agency-1', role: Role.CREATOR } });
+    await service.updateRole('agency-1', 'actor-1', Role.ADMIN, 'u1', Role.MANAGER);
+    expect(notifications.create).toHaveBeenCalledWith('u1', expect.stringContaining('MANAGER'), expect.any(String));
+  });
+
   it('blocks an ADMIN from promoting a member to Owner (privilege escalation)', async () => {
     const { service, prisma } = buildService({ existingUser: { id: 'u1', agencyId: 'agency-1', role: Role.CREATOR } });
     await expect(service.updateRole('agency-1', 'actor-1', Role.ADMIN, 'u1', Role.OWNER)).rejects.toThrow(
@@ -124,6 +136,20 @@ describe('UsersService.updateRole', () => {
       'This role cannot be assigned through the app',
     );
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsersService.setActive', () => {
+  it('notifies the target user when deactivated (NOTIF-1)', async () => {
+    const { service, notifications } = buildService({ existingUser: { id: 'u1', agencyId: 'agency-1', role: Role.CREATOR } });
+    await service.setActive('agency-1', 'actor-1', 'u1', false);
+    expect(notifications.create).toHaveBeenCalledWith('u1', expect.stringContaining('deactivated'), expect.any(String));
+  });
+
+  it('does not notify on reactivation', async () => {
+    const { service, notifications } = buildService({ existingUser: { id: 'u1', agencyId: 'agency-1', role: Role.CREATOR } });
+    await service.setActive('agency-1', 'actor-1', 'u1', true);
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 });
 

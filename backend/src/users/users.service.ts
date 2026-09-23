@@ -9,6 +9,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { CreateMemberDto } from './dto/create-member.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
@@ -32,6 +33,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async findMe(userId: string) {
@@ -165,6 +167,12 @@ export class UsersService {
       metadata: { from: target.role, to: role },
     });
 
+    await this.notifications.create(
+      targetUserId,
+      `Your role was changed from ${target.role} to ${role}.`,
+      '/profile',
+    );
+
     return user;
   }
 
@@ -196,6 +204,14 @@ export class UsersService {
       entityType: 'user',
       entityId: targetUserId,
     });
+
+    if (!isActive) {
+      await this.notifications.create(
+        targetUserId,
+        'Your account was deactivated by an agency admin.',
+        '/profile',
+      );
+    }
 
     return user;
   }

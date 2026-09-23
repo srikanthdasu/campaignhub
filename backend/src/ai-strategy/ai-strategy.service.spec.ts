@@ -4,6 +4,7 @@ import { AiStrategyStatus } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 
 function buildService(overrides: { request?: any; reply?: string } = {}) {
   const request = overrides.request ?? {
@@ -15,14 +16,25 @@ function buildService(overrides: { request?: any; reply?: string } = {}) {
     status: AiStrategyStatus.GENERATED,
   };
   const audit = { log: vi.fn() };
+  const notifications = { create: vi.fn(), createMany: vi.fn() };
   const prisma = {
     aiStrategyRequest: {
+      create: vi.fn((args: any) => Promise.resolve({ id: 'req-1', ...args.data })),
       findUnique: vi.fn(() => Promise.resolve(request)),
       update: vi.fn((args: any) => Promise.resolve({ ...request, ...args.data })),
       delete: vi.fn(() => Promise.resolve({})),
     },
     aiStrategyGeneration: {
       create: vi.fn((args: any) => Promise.resolve({ id: 'gen-1', ...args.data })),
+    },
+    client: {
+      findUnique: vi.fn(() => Promise.resolve({ agencyId: 'agency-1' })),
+    },
+    user: {
+      findMany: vi.fn(() => Promise.resolve([{ id: 'owner-1' }])),
+    },
+    userClientAccess: {
+      findMany: vi.fn((_args: any) => Promise.resolve([] as { userId: string }[])),
     },
     $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
@@ -31,11 +43,28 @@ function buildService(overrides: { request?: any; reply?: string } = {}) {
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     foundry as unknown as AzureAiFoundryService,
+    notifications as unknown as NotificationsService,
   );
-  return { service, prisma, audit, foundry, request };
+  return { service, prisma, audit, foundry, notifications, request };
 }
 
 describe('AiStrategyService', () => {
+  describe('create', () => {
+    it('notifies reviewers (Owner/Admin + client-scoped Managers), excluding the requester (NOTIF-1)', async () => {
+      const { service, prisma, notifications } = buildService();
+      prisma.user.findMany.mockResolvedValueOnce([{ id: 'owner-1' }, { id: 'actor-1' }]);
+      prisma.userClientAccess.findMany.mockResolvedValueOnce([{ userId: 'manager-1' }]);
+      await service.create('client-1', 'actor-1', { title: 'New strategy' } as any);
+      expect(notifications.createMany).toHaveBeenCalledWith(
+        expect.arrayContaining(['owner-1', 'manager-1']),
+        expect.stringContaining('New strategy'),
+        '/ai-strategy',
+      );
+      const [recipients] = notifications.createMany.mock.calls[0];
+      expect(recipients).not.toContain('actor-1');
+    });
+  });
+
   it('rejects operating on a request from a different client', async () => {
     const { service } = buildService({ request: { id: 'req-1', clientId: 'other-client' } });
     await expect(service.getOne('client-1', 'req-1')).rejects.toThrow(
@@ -68,6 +97,38 @@ describe('AiStrategyService', () => {
     const { service, audit } = buildService();
     await service.review('client-1', 'req-1', 'actor-1', { status: AiStrategyStatus.APPROVED } as any);
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'AI_STRATEGY_APPROVED' }));
+  });
+
+  it('notifies the requester when their strategy is reviewed (NOTIF-1)', async () => {
+    const { service, notifications } = buildService({
+      request: {
+        id: 'req-1',
+        clientId: 'client-1',
+        title: 'Q1 push',
+        status: AiStrategyStatus.GENERATED,
+        createdById: 'creator-1',
+      },
+    });
+    await service.review('client-1', 'req-1', 'actor-1', { status: AiStrategyStatus.APPROVED } as any);
+    expect(notifications.create).toHaveBeenCalledWith(
+      'creator-1',
+      expect.stringContaining('approved'),
+      '/ai-strategy',
+    );
+  });
+
+  it('does not notify when the reviewer is also the requester', async () => {
+    const { service, notifications } = buildService({
+      request: {
+        id: 'req-1',
+        clientId: 'client-1',
+        title: 'Q1 push',
+        status: AiStrategyStatus.GENERATED,
+        createdById: 'actor-1',
+      },
+    });
+    await service.review('client-1', 'req-1', 'actor-1', { status: AiStrategyStatus.APPROVED } as any);
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it('logs a REJECTED audit action for any other review status', async () => {

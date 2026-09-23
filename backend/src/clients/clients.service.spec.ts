@@ -249,12 +249,24 @@ describe('ClientsService', () => {
       expect(prisma.userClientAccess.upsert).not.toHaveBeenCalled();
     });
 
+    it('notifies the target user when access is granted (NOTIF-1)', async () => {
+      const { service, notifications } = buildService({ targetUser: { id: 'target-1', agencyId: 'agency-1' } });
+      await service.grantAccess('agency-1', 'actor-1', 'client-1', 'target-1');
+      expect(notifications.create).toHaveBeenCalledWith('target-1', expect.stringContaining('Client'));
+    });
+
     it('revokes access scoped to the client', async () => {
       const { service, prisma } = buildService();
       await service.revokeAccess('agency-1', 'actor-1', 'client-1', 'target-1');
       expect(prisma.userClientAccess.deleteMany).toHaveBeenCalledWith({
         where: { userId: 'target-1', clientId: 'client-1' },
       });
+    });
+
+    it('notifies the target user when access is revoked (NOTIF-1)', async () => {
+      const { service, notifications } = buildService();
+      await service.revokeAccess('agency-1', 'actor-1', 'client-1', 'target-1');
+      expect(notifications.create).toHaveBeenCalledWith('target-1', expect.stringContaining('revoked'));
     });
 
     it('lists access with the per-client accessRole flattened onto the user', async () => {
@@ -282,6 +294,14 @@ describe('ClientsService', () => {
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'CLIENT_ACCESS_ROLE_CHANGED' }),
       );
+    });
+
+    it('notifies the target user when their access role changes (NOTIF-1)', async () => {
+      const { service, notifications } = buildService({
+        existingAccess: { userId: 'target-1', clientId: 'client-1', role: ClientGroupRole.VIEWER },
+      });
+      await service.updateAccessRole('agency-1', 'actor-1', 'client-1', 'target-1', ClientGroupRole.APPROVER);
+      expect(notifications.create).toHaveBeenCalledWith('target-1', expect.stringContaining('APPROVER'));
     });
 
     it('rejects updating a role when no access grant exists', async () => {
