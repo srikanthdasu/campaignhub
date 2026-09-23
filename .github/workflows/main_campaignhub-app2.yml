@@ -47,9 +47,12 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Run backend tests
+      # TEST-1: runs the unit suite with coverage enforcement — vitest.config.ts's
+      # `coverage.thresholds` (set just under the baseline measured when this was added) fails
+      # the build on a real regression, not just on a failing assertion.
+      - name: Run backend tests (with coverage threshold)
         working-directory: backend
-        run: npm run test
+        run: npm run test:cov
 
       # Applies the schema to the ephemeral CI Postgres service above, not production — the e2e
       # suite below (AppModule booted for real, real HTTP requests via supertest) needs real
