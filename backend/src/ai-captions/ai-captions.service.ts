@@ -13,8 +13,27 @@ export interface CaptionVariant {
 
 const VARIANT_COUNT = 3;
 
-function buildPrompt(input: string, tone: string, platform?: string): string {
+// FEAT-3: BrandKit (voice guidelines, brand rules, AI context) was fully built — CRUD service,
+// schema, an admin form for voiceGuidelines — and never read by any AI generation feature. This
+// is the "clearest, most direct win" the audit called it: inject what's actually there into the
+// prompt. brandRules/aiContext have no frontend form yet (only voiceGuidelines does), but are
+// included when present since the schema/DTO already support setting them directly via the API.
+function buildBrandVoiceSection(kit: { voiceGuidelines: string | null; aiContext: string | null; brandRules: unknown } | null): string | null {
+  if (!kit) return null;
+  const lines: string[] = [];
+  if (kit.voiceGuidelines) lines.push(`Voice and tone guidelines: ${kit.voiceGuidelines}`);
+  if (kit.aiContext) lines.push(`Additional brand context: ${kit.aiContext}`);
+  if (kit.brandRules && typeof kit.brandRules === 'object' && Object.keys(kit.brandRules).length > 0) {
+    lines.push(`Brand rules to follow: ${JSON.stringify(kit.brandRules)}`);
+  }
+  if (lines.length === 0) return null;
+  return `This client has a defined brand voice — follow it even where it varies from the requested tone below:\n${lines.join('\n')}`;
+}
+
+function buildPrompt(input: string, tone: string, platform: string | undefined, brandVoice: string | null): string {
   return [
+    brandVoice,
+    brandVoice ? '' : null,
     `Write ${VARIANT_COUNT} distinct social media caption variants for the following, in a ${tone} tone` +
       (platform ? ` for ${platform}` : '') +
       '.',
@@ -24,7 +43,9 @@ function buildPrompt(input: string, tone: string, platform?: string): string {
     '',
     'Respond with ONLY a JSON array, no prose, no markdown code fences, in exactly this shape:',
     '[{"text": "...", "hashtags": ["#example", "#example2"]}]',
-  ].join('\n');
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 function isCaptionVariants(value: unknown): value is CaptionVariant[] {
@@ -50,15 +71,17 @@ export class AiCaptionsService {
     private foundry: AzureAiFoundryService,
   ) {}
 
-  async generate(actorId: string, dto: GenerateCaptionsDto): Promise<CaptionVariant[]> {
+  async generate(clientId: string, actorId: string, dto: GenerateCaptionsDto): Promise<CaptionVariant[]> {
     const tone = dto.tone ?? 'Friendly';
+    const kit = await this.prisma.brandKit.findUnique({ where: { clientId } });
+    const brandVoice = buildBrandVoiceSection(kit);
     const raw = await this.foundry.chat(
       [
         {
           role: 'system',
           content: 'You are a social media copywriter. Respond with only valid JSON, nothing else.',
         },
-        { role: 'user', content: buildPrompt(dto.input, tone, dto.platform) },
+        { role: 'user', content: buildPrompt(dto.input, tone, dto.platform, brandVoice) },
       ],
       { maxTokens: 500, temperature: 0.8 },
     );

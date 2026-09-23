@@ -24,8 +24,12 @@ export class AiCaptionsController {
   @UseGuards(AiSpendCapGuard)
   @Post('generate')
   @Roles(...CAN_CREATE)
-  generate(@CurrentUser() user: AuthenticatedUser, @Body() dto: GenerateCaptionsDto) {
-    return this.aiCaptionsService.generate(user.sub, dto);
+  generate(
+    @Param('clientId') clientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateCaptionsDto,
+  ) {
+    return this.aiCaptionsService.generate(clientId, user.sub, dto);
   }
 
   @Post()

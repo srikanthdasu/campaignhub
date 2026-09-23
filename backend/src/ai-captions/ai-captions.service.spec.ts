@@ -4,15 +4,20 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
 
-function buildService(overrides: { caption?: any; foundryReply?: string } = {
-  caption: { id: 'cap-1', clientId: 'client-1' },
-}) {
+function buildService(
+  overrides: { caption?: any; foundryReply?: string; brandKit?: any } = {
+    caption: { id: 'cap-1', clientId: 'client-1' },
+  },
+) {
   const caption = overrides.caption;
   const audit = { log: vi.fn() };
   const prisma = {
     aiCaption: {
       findUnique: vi.fn(() => Promise.resolve(caption)),
       delete: vi.fn(() => Promise.resolve({})),
+    },
+    brandKit: {
+      findUnique: vi.fn(() => Promise.resolve(overrides.brandKit ?? null)),
     },
   };
   const foundry = {
@@ -34,7 +39,7 @@ function buildService(overrides: { caption?: any; foundryReply?: string } = {
 describe('AiCaptionsService.generate', () => {
   it('parses a well-formed JSON array response into caption variants', async () => {
     const { service } = buildService();
-    const result = await service.generate('actor-1', { input: 'our new product', tone: 'Bold' } as any);
+    const result = await service.generate('client-1', 'actor-1', { input: 'our new product', tone: 'Bold' } as any);
     expect(result).toEqual([{ text: 'Check out our new product!', hashtags: ['#new', '#launch'] }]);
   });
 
@@ -42,25 +47,25 @@ describe('AiCaptionsService.generate', () => {
     const { service } = buildService({
       foundryReply: '```json\n[{"text":"Hi","hashtags":["#a"]}]\n```',
     });
-    const result = await service.generate('actor-1', { input: 'x' } as any);
+    const result = await service.generate('client-1', 'actor-1', { input: 'x' } as any);
     expect(result).toEqual([{ text: 'Hi', hashtags: ['#a'] }]);
   });
 
   it('rejects a response that is not valid JSON', async () => {
     const { service } = buildService({ foundryReply: 'Sure, here are some captions: ...' });
-    await expect(service.generate('actor-1', { input: 'x' } as any)).rejects.toThrow(
+    await expect(service.generate('client-1', 'actor-1', { input: 'x' } as any)).rejects.toThrow(
       'could not parse',
     );
   });
 
   it('rejects a response whose shape does not match caption variants', async () => {
     const { service } = buildService({ foundryReply: JSON.stringify({ not: 'an array' }) });
-    await expect(service.generate('actor-1', { input: 'x' } as any)).rejects.toThrow('unexpected response');
+    await expect(service.generate('client-1', 'actor-1', { input: 'x' } as any)).rejects.toThrow('unexpected response');
   });
 
   it('defaults to a Friendly tone and passes the platform through to the prompt', async () => {
     const { service, foundry } = buildService();
-    await service.generate('actor-1', { input: 'x', platform: 'INSTAGRAM' } as any);
+    await service.generate('client-1', 'actor-1', { input: 'x', platform: 'INSTAGRAM' } as any);
     const [, userMessage] = foundry.chat.mock.calls[0][0];
     expect(userMessage.content).toContain('Friendly');
     expect(userMessage.content).toContain('INSTAGRAM');
@@ -68,7 +73,7 @@ describe('AiCaptionsService.generate', () => {
 
   it('audit-logs the generation call itself, not just the later save (AI-2)', async () => {
     const { service, audit } = buildService();
-    await service.generate('actor-1', { input: 'x', tone: 'Bold', platform: 'INSTAGRAM' } as any);
+    await service.generate('client-1', 'actor-1', { input: 'x', tone: 'Bold', platform: 'INSTAGRAM' } as any);
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'actor-1',
@@ -76,6 +81,41 @@ describe('AiCaptionsService.generate', () => {
         metadata: expect.objectContaining({ tone: 'Bold', platform: 'INSTAGRAM' }),
       }),
     );
+  });
+
+  it('injects the brand kit voice guidelines into the prompt when one exists (FEAT-3)', async () => {
+    const { service, foundry, prisma } = buildService({
+      brandKit: { voiceGuidelines: 'Always playful, never corporate.', aiContext: null, brandRules: null },
+    });
+    await service.generate('client-1', 'actor-1', { input: 'x' } as any);
+
+    expect(prisma.brandKit.findUnique).toHaveBeenCalledWith({ where: { clientId: 'client-1' } });
+    const [, userMessage] = foundry.chat.mock.calls[0][0];
+    expect(userMessage.content).toContain('Always playful, never corporate.');
+  });
+
+  it('includes brand rules and AI context alongside voice guidelines', async () => {
+    const { service, foundry } = buildService({
+      brandKit: {
+        voiceGuidelines: 'Warm and direct.',
+        aiContext: 'We sell eco-friendly kitchenware.',
+        brandRules: { neverUse: ['cheap', 'discount'] },
+      },
+    });
+    await service.generate('client-1', 'actor-1', { input: 'x' } as any);
+
+    const [, userMessage] = foundry.chat.mock.calls[0][0];
+    expect(userMessage.content).toContain('Warm and direct.');
+    expect(userMessage.content).toContain('eco-friendly kitchenware');
+    expect(userMessage.content).toContain('cheap');
+  });
+
+  it('says nothing about brand voice when no brand kit exists for the client', async () => {
+    const { service, foundry } = buildService({ brandKit: null });
+    await service.generate('client-1', 'actor-1', { input: 'x' } as any);
+
+    const [, userMessage] = foundry.chat.mock.calls[0][0];
+    expect(userMessage.content).not.toContain('brand voice');
   });
 });
 
