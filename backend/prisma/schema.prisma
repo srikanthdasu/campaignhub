@@ -950,3 +950,17 @@ model AiUsageLog {
   @@index([agencyId, createdAt])
   @@map("ai_usage_logs")
 }
+
+// Deliberately standalone — not tied to User/Agency. The public demo account
+// (demo@campaignhubai.app) is shared by design, so a login alone can't tell one visitor from
+// another; the frontend gate shows a one-time "who's this" prompt only for that account and
+// posts here. This is a marketing lead list, not a tenant-scoped business record.
+model DemoLead {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("demo_leads")
+}

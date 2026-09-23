@@ -28,6 +28,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
+import { DemoLeadsModule } from './demo-leads/demo-leads.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 import { validateEnv } from './config/validate-env.js';
@@ -66,6 +67,7 @@ import { validateEnv } from './config/validate-env.js';
     BillingModule,
     AnalyticsModule,
     DashboardModule,
+    DemoLeadsModule,
   ],
   controllers: [AppController],
   providers: [

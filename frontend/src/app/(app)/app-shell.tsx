@@ -8,6 +8,7 @@ import { AppNav } from '@/components/app-nav';
 import { NotificationBell } from '@/components/notification-bell';
 import { PageTransition } from '@/components/ui/page-transition';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DemoLeadGate } from '@/components/demo-lead-gate';
 
 function AppShellSkeleton() {
   return (
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <DemoLeadGate />
       {isMobileNavOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 lg:hidden"

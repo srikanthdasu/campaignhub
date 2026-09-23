@@ -31,6 +31,7 @@ import {
   CreditCard,
   Crown,
   Mail,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -97,6 +98,7 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: '/ai-strategy', label: 'AI Strategy & Governance', icon: Brain, adminOnly: false },
       { href: '/billing', label: 'Billing & Subscriptions', icon: CreditCard, adminOnly: true },
       { href: '/admin/audit-log', label: 'Security & Audit', icon: ShieldCheck, adminOnly: true },
+      { href: '/admin/demo-leads', label: 'Demo Leads', icon: UserPlus, adminOnly: true },
       {
         href: '/admin/super-admin',
         label: 'Super Admin',
