@@ -275,8 +275,10 @@ model Campaign {
   adCampaigns  AdCampaign[]
   mediaAssets  MediaAsset[]
 
-  @@index([clientId])
   @@index([status])
+  // Covers plain clientId-only lookups too (leftmost prefix) — the old bare @@index([clientId])
+  // is dropped as redundant now that this exists.
+  @@index([clientId, status])
   @@map("campaigns")
 }
 
@@ -482,8 +484,11 @@ model InboxMessage {
   isRead          Boolean        @default(false) @map("is_read")
   receivedAt      DateTime       @default(now()) @map("received_at")
 
-  @@index([clientId])
+  // The bare clientId-only index this replaces was already redundant against [clientId, isRead]
+  // below (same leftmost prefix) even before this change.
   @@index([clientId, isRead])
+  // Matches list()'s actual query shape (where clientId[, isRead], orderBy receivedAt desc).
+  @@index([clientId, receivedAt])
   @@map("inbox_messages")
 }
 
@@ -728,9 +733,11 @@ model AdCampaign {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  @@index([clientId])
   @@index([campaignId])
   @@index([status])
+  // Covers plain clientId-only lookups too (leftmost prefix) — the old bare @@index([clientId])
+  // is dropped as redundant now that this exists.
+  @@index([clientId, status])
   @@map("ad_campaigns")
 }
 
@@ -823,8 +830,11 @@ model Invoice {
   status         InvoiceStatus @default(ISSUED)
   issuedAt       DateTime      @default(now()) @map("issued_at")
 
-  @@index([agencyId])
   @@index([status])
+  // Matches listInvoices()'s actual query shape (where agencyId, orderBy issuedAt desc); also
+  // covers plain agencyId-only lookups (leftmost prefix) — the old bare @@index([agencyId]) is
+  // dropped as redundant now that this exists.
+  @@index([agencyId, issuedAt])
   @@map("invoices")
 }
 
@@ -859,10 +869,12 @@ model EmailCampaign {
 
   recipients EmailRecipient[]
 
-  @@index([clientId])
   // EmailCampaignsCronService polls this every minute for QUEUED/SENDING campaigns with no other
   // filter — a full-table scan without this.
   @@index([status])
+  // Covers plain clientId-only lookups too (leftmost prefix) — the old bare @@index([clientId])
+  // is dropped as redundant now that this exists.
+  @@index([clientId, status])
   @@map("email_campaigns")
 }
 
