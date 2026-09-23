@@ -183,6 +183,10 @@ function SchedulerWorkspace({
   const [publishingNow, setPublishingNow] = useState(false);
   const [justScheduled, setJustScheduled] = useState<ScheduledPost[] | null>(null);
 
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
+
   function load() {
     api
       .get<ContentItem[]>(`/clients/${clientId}/content?status=APPROVED`)
@@ -279,6 +283,24 @@ function SchedulerWorkspace({
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to cancel');
+    }
+  }
+
+  async function onReschedule(id: string) {
+    if (!rescheduleDateTime) return;
+    setError(null);
+    setRescheduling(true);
+    try {
+      await api.patch(`/scheduled-posts/${id}`, {
+        scheduledTime: new Date(rescheduleDateTime).toISOString(),
+      });
+      setReschedulingId(null);
+      setRescheduleDateTime('');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to reschedule');
+    } finally {
+      setRescheduling(false);
     }
   }
 
@@ -671,45 +693,91 @@ function SchedulerWorkspace({
           </Card>
         ) : (
           <ul className="space-y-3">
-            {posts.map((post) => (
-              <Card key={post.id} padding="md" className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Badge tone="neutral">{post.platform}</Badge>
-                    <Badge tone={POST_TONE[post.status]}>{post.status}</Badge>
-                    {(post.status === 'PUBLISHED' ? post.simulated : !REAL_PUBLISH_PLATFORMS.has(post.platform)) && (
-                      <span title="This platform isn't wired up for real publishing yet — this only updates status here, it doesn't post anywhere.">
-                        <Badge tone="neutral">Simulated</Badge>
-                      </span>
+            {posts.map((post) => {
+              const canReschedule = post.status === 'PENDING' || post.status === 'FAILED';
+              return (
+                <Card key={post.id} padding="md">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Badge tone="neutral">{post.platform}</Badge>
+                        <Badge tone={POST_TONE[post.status]}>{post.status}</Badge>
+                        {(post.status === 'PUBLISHED' ? post.simulated : !REAL_PUBLISH_PLATFORMS.has(post.platform)) && (
+                          <span title="This platform isn't wired up for real publishing yet — this only updates status here, it doesn't post anywhere.">
+                            <Badge tone="neutral">Simulated</Badge>
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-neutral-400">{post.contentItem.body || post.contentItem.type}</p>
+                      <p className="mt-1 text-xs text-neutral-500">{new Date(post.scheduledTime).toLocaleString()}</p>
+                      {post.status === 'FAILED' && post.errorMessage && (
+                        <p className="mt-1 text-xs text-red-400">{post.errorMessage}</p>
+                      )}
+                    </div>
+                    {post.status === 'PENDING' && (
+                      <div className="flex shrink-0 gap-2">
+                        <Button size="sm" onClick={() => onMarkPublished(post.id)}>
+                          Publish Now
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setReschedulingId(reschedulingId === post.id ? null : post.id);
+                            setRescheduleDateTime('');
+                          }}
+                        >
+                          Reschedule
+                        </Button>
+                        <ConfirmButton onConfirm={() => onCancel(post.id)}>Cancel</ConfirmButton>
+                      </div>
+                    )}
+                    {post.status === 'FAILED' && (
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {post.retryCount < MAX_RETRIES ? (
+                          <Button size="sm" onClick={() => onRetry(post.id)}>
+                            Retry{post.retryCount > 0 ? ` (${post.retryCount}/${MAX_RETRIES})` : ''}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setReschedulingId(reschedulingId === post.id ? null : post.id);
+                              setRescheduleDateTime('');
+                            }}
+                          >
+                            Reschedule
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <p className="mt-1 truncate text-xs text-neutral-400">{post.contentItem.body || post.contentItem.type}</p>
-                  <p className="mt-1 text-xs text-neutral-500">{new Date(post.scheduledTime).toLocaleString()}</p>
-                  {post.status === 'FAILED' && post.errorMessage && (
-                    <p className="mt-1 text-xs text-red-400">{post.errorMessage}</p>
-                  )}
-                </div>
-                {post.status === 'PENDING' && (
-                  <div className="flex shrink-0 gap-2">
-                    <Button size="sm" onClick={() => onMarkPublished(post.id)}>
-                      Publish Now
-                    </Button>
-                    <ConfirmButton onConfirm={() => onCancel(post.id)}>Cancel</ConfirmButton>
-                  </div>
-                )}
-                {post.status === 'FAILED' && (
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {post.retryCount < MAX_RETRIES ? (
-                      <Button size="sm" onClick={() => onRetry(post.id)}>
-                        Retry{post.retryCount > 0 ? ` (${post.retryCount}/${MAX_RETRIES})` : ''}
+
+                  {canReschedule && reschedulingId === post.id && (
+                    <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
+                      <input
+                        type="datetime-local"
+                        value={rescheduleDateTime}
+                        onChange={(e) => setRescheduleDateTime(e.target.value)}
+                        className="rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs text-neutral-50 outline-none focus:border-accent-400"
+                      />
+                      <Button
+                        size="sm"
+                        loading={rescheduling}
+                        disabled={!rescheduleDateTime}
+                        onClick={() => onReschedule(post.id)}
+                      >
+                        Confirm
                       </Button>
-                    ) : (
-                      <span className="text-[11px] text-neutral-500">Retry limit reached — reschedule instead</span>
-                    )}
-                  </div>
-                )}
-              </Card>
-            ))}
+                      <Button size="sm" variant="secondary" onClick={() => setReschedulingId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </ul>
         )}
       </motion.div>
