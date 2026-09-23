@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -71,6 +73,14 @@ function maxReachable(status: Status): number {
 }
 
 export default function AdsPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'SUPER_ADMIN']}>
+      <AdsPageContent />
+    </RequireRole>
+  );
+}
+
+function AdsPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
 
   return (

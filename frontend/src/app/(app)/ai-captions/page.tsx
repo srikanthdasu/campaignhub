@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -40,6 +42,14 @@ interface SavedCaption extends Variant {
 }
 
 export default function AiCaptionsPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'CLIENT', 'SUPER_ADMIN']}>
+      <AiCaptionsPageContent />
+    </RequireRole>
+  );
+}
+
+function AiCaptionsPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [input, setInput] = useState('');
   const [tone, setTone] = useState<(typeof TONES)[number]>('Friendly');

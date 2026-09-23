@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -39,6 +41,14 @@ interface Overview {
 }
 
 export default function ClientPortalPage() {
+  return (
+    <RequireRole roles={['CLIENT']}>
+      <ClientPortalPageContent />
+    </RequireRole>
+  );
+}
+
+function ClientPortalPageContent() {
   const { user } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [agency, setAgency] = useState<Agency | null>(null);

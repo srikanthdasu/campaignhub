@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -112,6 +114,14 @@ const WORKFLOW_STEPS = [
 ];
 
 export default function DashboardPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'ANALYST', 'SUPER_ADMIN']}>
+      <DashboardPageContent />
+    </RequireRole>
+  );
+}
+
+function DashboardPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const admin = isAgencyAdmin(user?.role as Role | undefined);

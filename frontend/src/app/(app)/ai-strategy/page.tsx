@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -38,6 +40,14 @@ const STATUS_TONE: Record<Status, 'neutral' | 'accent' | 'success' | 'danger'> =
 const CAN_REVIEW_ROLES = ['OWNER', 'ADMIN', 'MANAGER'];
 
 export default function AiStrategyPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'SUPER_ADMIN']}>
+      <AiStrategyPageContent />
+    </RequireRole>
+  );
+}
+
+function AiStrategyPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
 
   return (

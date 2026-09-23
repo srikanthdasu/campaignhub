@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -101,6 +103,14 @@ function PanelHeader({ n, title, icon: Icon, color }: { n: number; title: string
 }
 
 export default function ContentPlannerPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'CLIENT', 'SUPER_ADMIN']}>
+      <ContentPlannerPageContent />
+    </RequireRole>
+  );
+}
+
+function ContentPlannerPageContent() {
   const { user } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const searchParams = useSearchParams();

@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -79,6 +81,14 @@ function parseCsvLine(line: string): string[] {
 }
 
 export default function EmailCampaignsPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'SUPER_ADMIN']}>
+      <EmailCampaignsPageContent />
+    </RequireRole>
+  );
+}
+
+function EmailCampaignsPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null);
   const [selected, setSelected] = useState<CampaignDetail | null>(null);

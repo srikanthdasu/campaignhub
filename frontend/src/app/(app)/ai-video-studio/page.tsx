@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError, resolveMediaUrl } from '@/lib/api';
@@ -67,6 +69,14 @@ const ENHANCE_TOGGLES: { key: keyof Enhancements; label: string }[] = [
 ];
 
 export default function AiVideoStudioPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'CLIENT', 'SUPER_ADMIN']}>
+      <AiVideoStudioPageContent />
+    </RequireRole>
+  );
+}
+
+function AiVideoStudioPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
 
   return (

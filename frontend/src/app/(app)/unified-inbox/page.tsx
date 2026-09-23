@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
@@ -33,6 +35,14 @@ interface InboxMessage {
 }
 
 export default function UnifiedInboxPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CREATOR', 'DESIGNER', 'SUPER_ADMIN']}>
+      <UnifiedInboxPageContent />
+    </RequireRole>
+  );
+}
+
+function UnifiedInboxPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [messages, setMessages] = useState<InboxMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);

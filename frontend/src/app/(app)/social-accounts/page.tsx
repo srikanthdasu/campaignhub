@@ -1,5 +1,7 @@
 'use client';
 
+import { RequireRole } from '@/components/require-role';
+
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -117,6 +119,14 @@ function ConnectPanel({
 }
 
 export default function SocialAccountsPage() {
+  return (
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'SUPER_ADMIN']}>
+      <SocialAccountsPageContent />
+    </RequireRole>
+  );
+}
+
+function SocialAccountsPageContent() {
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [accounts, setAccounts] = useState<SocialAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
