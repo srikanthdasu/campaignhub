@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { CreateMemberDto } from './dto/create-member.dto.js';
@@ -11,6 +12,7 @@ import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Role } from '../generated/prisma/client.js';
+import { AGENCY_SWITCH_THROTTLE } from '../common/rate-limits.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 @Controller('users')
@@ -83,7 +85,8 @@ export class UsersController {
 
   @Patch('me/act-as-agency')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle(AGENCY_SWITCH_THROTTLE)
   actAsAgency(@CurrentUser() user: AuthenticatedUser, @Body() dto: ActAsAgencyDto) {
-    return this.usersService.actAsAgency(user.sub, user.agencyId, dto.agencyId);
+    return this.usersService.actAsAgency(user.sub, user.agencyId, dto.agencyId, dto.currentPassword);
   }
 }

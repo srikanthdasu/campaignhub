@@ -26,7 +26,7 @@ function Probe() {
       <span data-testid="agency">{user?.agencyId ?? 'none'}</span>
       <button onClick={() => login('a@b.com', 'password123')}>login</button>
       <button onClick={() => logout()}>logout</button>
-      <button onClick={() => switchAgency('agency-2')}>switch</button>
+      <button onClick={() => switchAgency('agency-2', 'password123')}>switch</button>
     </div>
   );
 }
@@ -150,7 +150,10 @@ describe('AuthProvider', () => {
     const user = userEvent.setup();
     await user.click(screen.getByText('switch'));
 
-    expect(api.patch).toHaveBeenCalledWith('/users/me/act-as-agency', { agencyId: 'agency-2' });
+    expect(api.patch).toHaveBeenCalledWith('/users/me/act-as-agency', {
+      agencyId: 'agency-2',
+      currentPassword: 'password123',
+    });
     await waitFor(() => expect(screen.getByTestId('agency')).toHaveTextContent('agency-2'));
   });
 });

@@ -251,7 +251,24 @@ export class UsersService {
    * Logged to that agency's own audit trail — every action taken afterward is attributable, not
    * a hidden backdoor.
    */
-  async actAsAgency(actorId: string, previousAgencyId: string | null, targetAgencyId: string) {
+  // AUTH-3: a SUPER_ADMIN's JWT alone used to be enough to drop into any agency on the platform —
+  // re-proving the password (step-up auth, same bar changePassword() holds) means a stolen/idle
+  // session can't silently walk through every tenant's data. Wrong password fails exactly like a
+  // wrong password anywhere else in this app, and still gets audited as an attempted switch.
+  async actAsAgency(actorId: string, previousAgencyId: string | null, targetAgencyId: string, currentPassword: string) {
+    const actor = await this.prisma.user.findUniqueOrThrow({ where: { id: actorId } });
+    const passwordMatches = await bcrypt.compare(currentPassword, actor.passwordHash);
+    if (!passwordMatches) {
+      await this.audit.log({
+        userId: actorId,
+        action: 'SUPER_ADMIN_SWITCH_AGENCY_DENIED',
+        entityType: 'agency',
+        entityId: targetAgencyId,
+        metadata: { from: previousAgencyId, to: targetAgencyId, reason: 'incorrect_password' },
+      });
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
     const agency = await this.prisma.agency.findUnique({ where: { id: targetAgencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
 
@@ -269,6 +286,21 @@ export class UsersService {
       entityId: targetAgencyId,
       metadata: { from: previousAgencyId, to: targetAgencyId, agencyName: agency.name },
     });
+
+    // Active alerting, not just a log line nobody is watching — the agency being stepped into
+    // finds out in real time, the same way notifyAgencyAdmins() already surfaces billing events
+    // to whoever can act on them rather than leaving it to someone stumbling onto the audit log.
+    const admins = await this.prisma.user.findMany({
+      where: { agencyId: targetAgencyId, role: { in: [Role.OWNER, Role.ADMIN] }, isActive: true },
+      select: { id: true },
+    });
+    if (admins.length > 0) {
+      await this.notifications.createMany(
+        admins.map((a) => a.id),
+        `A platform administrator (${actor.name}) accessed your agency's account.`,
+        '/admin/audit-log',
+      );
+    }
 
     return user;
   }

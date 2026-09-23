@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RequireRole } from '@/components/require-role';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
@@ -30,6 +32,9 @@ function SuperAdminPageContent() {
   const [agencies, setAgencies] = useState<AgencyRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [pendingAgency, setPendingAgency] = useState<AgencyRow | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -41,14 +46,25 @@ function SuperAdminPageContent() {
       });
   }, []);
 
-  async function onSwitch(agencyId: string) {
-    setSwitchingId(agencyId);
-    setError(null);
+  // Memoized — Modal's focus-trap effect re-runs whenever onClose's identity changes, and typing
+  // the password re-renders this component on every keystroke. An inline arrow here would recreate
+  // it each time and steal focus out of the password field after every character.
+  const closeConfirm = useCallback(() => {
+    setPendingAgency(null);
+    setPassword('');
+    setConfirmError(null);
+  }, []);
+
+  async function onConfirmSwitch(e: FormEvent) {
+    e.preventDefault();
+    if (!pendingAgency) return;
+    setSwitchingId(pendingAgency.id);
+    setConfirmError(null);
     try {
-      await switchAgency(agencyId);
+      await switchAgency(pendingAgency.id, password);
       window.location.href = '/dashboard';
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to switch agency');
+      setConfirmError(err instanceof ApiError ? err.message : 'Failed to switch agency');
       setSwitchingId(null);
     }
   }
@@ -98,7 +114,7 @@ function SuperAdminPageContent() {
                     variant={user?.agencyId === agency.id ? 'secondary' : 'primary'}
                     loading={switchingId === agency.id}
                     disabled={user?.agencyId === agency.id}
-                    onClick={() => onSwitch(agency.id)}
+                    onClick={() => setPendingAgency(agency)}
                   >
                     {user?.agencyId === agency.id ? 'Current' : 'Switch into'}
                   </Button>
@@ -108,6 +124,40 @@ function SuperAdminPageContent() {
           </ul>
         )}
       </motion.div>
+
+      <Modal
+        open={pendingAgency !== null}
+        onClose={closeConfirm}
+        title={`Switch into ${pendingAgency?.name ?? ''}`}
+        size="sm"
+      >
+        <form onSubmit={onConfirmSwitch} className="space-y-4">
+          <p className="text-sm text-neutral-400">
+            Confirm your password to step into this agency&apos;s data as its Owner.
+          </p>
+          <Input
+            label="Your password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus
+          />
+          {confirmError && (
+            <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-300">
+              {confirmError}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" className="flex-1" onClick={closeConfirm}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" loading={switchingId === pendingAgency?.id}>
+              Confirm switch
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </motion.div>
   );
 }

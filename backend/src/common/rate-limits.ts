@@ -14,3 +14,8 @@ export const AI_GENERATION_THROTTLE = { default: { limit: 20, ttl: 60_000 } };
 // identity (spam complaints, provider blocks) — tighter than AI generation, since the cost of
 // abuse here isn't just money, it's deliverability for every client sharing that SMTP account.
 export const EMAIL_CAMPAIGN_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+
+// AUTH-3: a SUPER_ADMIN switching into an agency reaches every tenant's data on the platform —
+// tighter than even login (AUTH_THROTTLE), and on a longer window, since a real support session
+// touching a handful of agencies is normal but rapid-fire switching across many is not.
+export const AGENCY_SWITCH_THROTTLE = { default: { limit: 5, ttl: 300_000 } };

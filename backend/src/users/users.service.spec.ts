@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('bcrypt', () => ({
+  hash: vi.fn(async () => 'hashed-password'),
+  compare: vi.fn(async (plain: string) => plain === 'correct-password'),
+}));
+
 import { UsersService } from './users.service.js';
 import { Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -6,12 +12,18 @@ import type { AuditService } from '../audit/audit.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { CreateMemberDto } from './dto/create-member.dto.js';
 
-function buildService(overrides: { existingUser?: any; ownerCount?: number; agency?: any } = {}) {
+function buildService(
+  overrides: { existingUser?: any; ownerCount?: number; agency?: any; actor?: any; targetAdmins?: any[] } = {},
+) {
   const audit = { log: vi.fn() };
   const notifications = { create: vi.fn(), createMany: vi.fn() };
   const prisma = {
     user: {
       findUnique: vi.fn(() => Promise.resolve(overrides.existingUser ?? null)),
+      findUniqueOrThrow: vi.fn(() =>
+        Promise.resolve(overrides.actor ?? { id: 'super-admin-1', name: 'Super Admin', passwordHash: 'hash' }),
+      ),
+      findMany: vi.fn(() => Promise.resolve(overrides.targetAdmins ?? [])),
       create: vi.fn((args: any) => Promise.resolve({ id: 'new-user', ...args.data })),
       update: vi.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
       count: vi.fn(() => Promise.resolve(overrides.ownerCount ?? 2)),
@@ -156,7 +168,7 @@ describe('UsersService.setActive', () => {
 describe('UsersService.actAsAgency', () => {
   it('switches the actor into the target agency and logs it', async () => {
     const { service, prisma, audit } = buildService({ agency: { id: 'agency-2', name: 'Target Agency' } });
-    const result = await service.actAsAgency('super-admin-1', 'agency-1', 'agency-2');
+    const result = await service.actAsAgency('super-admin-1', 'agency-1', 'agency-2', 'correct-password');
 
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'super-admin-1' }, data: { agencyId: 'agency-2' } }),
@@ -174,9 +186,57 @@ describe('UsersService.actAsAgency', () => {
 
   it('rejects switching into an agency that does not exist', async () => {
     const { service, prisma } = buildService({ agency: null });
-    await expect(service.actAsAgency('super-admin-1', null, 'ghost-agency')).rejects.toThrow(
-      'Agency not found',
-    );
+    await expect(
+      service.actAsAgency('super-admin-1', null, 'ghost-agency', 'correct-password'),
+    ).rejects.toThrow('Agency not found');
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  // AUTH-3: step-up auth — the JWT alone (already proven by RolesGuard) isn't enough; the
+  // password must be re-confirmed before the switch is allowed to happen at all.
+  it('rejects the switch when the current password is wrong, without touching the target agency', async () => {
+    const { service, prisma, audit } = buildService({ agency: { id: 'agency-2', name: 'Target Agency' } });
+
+    await expect(
+      service.actAsAgency('super-admin-1', 'agency-1', 'agency-2', 'wrong-password'),
+    ).rejects.toThrow('Current password is incorrect');
+
+    expect(prisma.agency.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SUPER_ADMIN_SWITCH_AGENCY_DENIED',
+        metadata: expect.objectContaining({ reason: 'incorrect_password' }),
+      }),
+    );
+  });
+
+  // AUTH-3: active alerting — the agency being stepped into should find out in real time, not
+  // only if someone happens to go looking at the audit log.
+  it('notifies the target agency’s admins that a platform administrator accessed their account', async () => {
+    const { service, notifications } = buildService({
+      agency: { id: 'agency-2', name: 'Target Agency' },
+      actor: { id: 'super-admin-1', name: 'Sri', passwordHash: 'hash' },
+      targetAdmins: [{ id: 'owner-1' }, { id: 'admin-1' }],
+    });
+
+    await service.actAsAgency('super-admin-1', 'agency-1', 'agency-2', 'correct-password');
+
+    expect(notifications.createMany).toHaveBeenCalledWith(
+      ['owner-1', 'admin-1'],
+      expect.stringContaining('Sri'),
+      '/admin/audit-log',
+    );
+  });
+
+  it('does not try to notify anyone when the target agency has no active OWNER/ADMIN', async () => {
+    const { service, notifications } = buildService({
+      agency: { id: 'agency-2', name: 'Target Agency' },
+      targetAdmins: [],
+    });
+
+    await service.actAsAgency('super-admin-1', 'agency-1', 'agency-2', 'correct-password');
+
+    expect(notifications.createMany).not.toHaveBeenCalled();
   });
 });
