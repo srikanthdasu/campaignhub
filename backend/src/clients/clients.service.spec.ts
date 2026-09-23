@@ -3,6 +3,7 @@ import { ClientsService } from './clients.service.js';
 import { ClientGroupRole, Role } from '../generated/prisma/client.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { AuditService } from '../audit/audit.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 function makeUser(overrides: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
@@ -19,7 +20,7 @@ function buildService(
       findUnique: vi.fn(() =>
         Promise.resolve(overrides.client ?? { id: 'client-1', agencyId: 'agency-1', name: 'Client' }),
       ),
-      findMany: vi.fn(() => Promise.resolve([])),
+      findMany: vi.fn((_args: any) => Promise.resolve([])),
       update: vi.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
       deleteMany: vi.fn(() => Promise.resolve({ count: 0 })),
     },
@@ -43,8 +44,13 @@ function buildService(
       findMany: vi.fn(() => Promise.resolve([])),
     },
   };
-  const service = new ClientsService(prisma as unknown as PrismaService, audit as unknown as AuditService);
-  return { service, prisma, audit };
+  const notifications = { create: vi.fn(), createMany: vi.fn() };
+  const service = new ClientsService(
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
+    notifications as unknown as NotificationsService,
+  );
+  return { service, prisma, audit, notifications };
 }
 
 describe('ClientsService', () => {
@@ -160,6 +166,48 @@ describe('ClientsService', () => {
       expect(prisma.client.deleteMany).not.toHaveBeenCalled();
       expect(audit.log).not.toHaveBeenCalled();
       expect(count).toBe(0);
+    });
+  });
+
+  describe('warnBeforePurge (NOTIF-1)', () => {
+    it('notifies agency Owners/Admins for a client entering the warning window', async () => {
+      const { service, prisma, notifications } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-1', name: 'Soon Gone Co', agencyId: 'agency-1' },
+      ] as never);
+      prisma.user.findMany.mockResolvedValueOnce([{ id: 'owner-1' }, { id: 'admin-1' }] as never);
+
+      const count = await service.warnBeforePurge(15, 3);
+
+      expect(count).toBe(1);
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ agencyId: 'agency-1', role: { in: [Role.OWNER, Role.ADMIN] } }),
+        }),
+      );
+      expect(notifications.createMany).toHaveBeenCalledWith(
+        ['owner-1', 'admin-1'],
+        expect.stringContaining('Soon Gone Co'),
+        '/admin/agency',
+      );
+    });
+
+    it('does nothing when no client is in the warning window', async () => {
+      const { service, notifications } = buildService();
+      const count = await service.warnBeforePurge(15, 3);
+      expect(count).toBe(0);
+      expect(notifications.createMany).not.toHaveBeenCalled();
+    });
+
+    it('queries a narrow window that excludes clients already past the purge cutoff', async () => {
+      const { service, prisma } = buildService();
+      await service.warnBeforePurge(15, 3);
+      const call = prisma.client.findMany.mock.calls[0]!;
+      const { gte, lt } = (call[0] as { where: { deletedAt: { gte: Date; lt: Date } } }).where.deletedAt;
+      expect(lt.getTime() - gte.getTime()).toBe(24 * 60 * 60 * 1000);
+      // 15 - 3 = 12 days ago is the boundary — a client deleted exactly then gets warned once.
+      const expectedLt = Date.now() - 12 * 24 * 60 * 60 * 1000;
+      expect(Math.abs(lt.getTime() - expectedLt)).toBeLessThan(5000);
     });
   });
 

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
 import { ClientGroupRole, Role } from '../generated/prisma/client.js';
@@ -11,6 +12,7 @@ export class ClientsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(agencyId: string, actorId: string, dto: CreateClientDto) {
@@ -107,6 +109,38 @@ export class ClientsService {
     });
 
     return restored;
+  }
+
+  /**
+   * NOTIF-1: the 15-day purge cron permanently deletes client data and notified nobody
+   * beforehand — the one silent-data-loss gap in the whole notification system. Called by
+   * ClientsCronService once daily, `warningDaysBefore` days ahead of purgeExpired's own cutoff;
+   * the 1-day-wide window means a given client is only ever inside it on one cron run, so this
+   * doesn't re-notify the same client every day it remains deleted.
+   */
+  async warnBeforePurge(graceDays: number, warningDaysBefore: number) {
+    const purgeInDays = graceDays - warningDaysBefore;
+    const windowStart = new Date(Date.now() - (purgeInDays + 1) * 24 * 60 * 60 * 1000);
+    const windowEnd = new Date(Date.now() - purgeInDays * 24 * 60 * 60 * 1000);
+    const due = await this.prisma.client.findMany({
+      where: { deletedAt: { gte: windowStart, lt: windowEnd } },
+      select: { id: true, name: true, agencyId: true },
+    });
+    if (due.length === 0) return 0;
+
+    for (const client of due) {
+      const recipients = await this.prisma.user.findMany({
+        where: { agencyId: client.agencyId, role: { in: [Role.OWNER, Role.ADMIN] }, isActive: true },
+        select: { id: true },
+      });
+      await this.notifications.createMany(
+        recipients.map((u) => u.id),
+        `"${client.name}" will be permanently deleted in ${warningDaysBefore} day(s) — restore it from Deleted Clients if this wasn't intended.`,
+        '/admin/agency',
+      );
+    }
+
+    return due.length;
   }
 
   /** Called by ClientsCronService — no user in the loop, so no access check or actor on the audit entry. */

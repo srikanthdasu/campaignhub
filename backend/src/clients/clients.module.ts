@@ -3,9 +3,10 @@ import { ClientsService } from './clients.service.js';
 import { ClientsController } from './clients.controller.js';
 import { ClientsCronService } from './clients-cron.service.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, NotificationsModule],
   controllers: [ClientsController],
   providers: [ClientsService, ClientsCronService],
 })
