@@ -19,3 +19,9 @@ export const EMAIL_CAMPAIGN_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
 // tighter than even login (AUTH_THROTTLE), and on a longer window, since a real support session
 // touching a handful of agencies is normal but rapid-fire switching across many is not.
 export const AGENCY_SWITCH_THROTTLE = { default: { limit: 5, ttl: 300_000 } };
+
+// Public, unauthenticated, and sends two real emails per call (one to us, one to the submitter)
+// — same reasoning as AUTH_THROTTLE, just for a contact form instead of a login form: a real
+// visitor submitting this a few times a day is fine, a script hammering it to spam an inbox or
+// run up email-provider costs is not.
+export const MARKETING_CONTACT_THROTTLE = { default: { limit: 5, ttl: 60_000 } };

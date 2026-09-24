@@ -29,6 +29,7 @@ import { BillingModule } from './billing/billing.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DemoLeadsModule } from './demo-leads/demo-leads.module.js';
+import { MarketingModule } from './marketing/marketing.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { AppController } from './app.controller.js';
 import { validateEnv } from './config/validate-env.js';
@@ -68,6 +69,7 @@ import { validateEnv } from './config/validate-env.js';
     AnalyticsModule,
     DashboardModule,
     DemoLeadsModule,
+    MarketingModule,
   ],
   controllers: [AppController],
   providers: [

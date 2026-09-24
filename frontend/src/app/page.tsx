@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   ClipboardCheck,
   Sparkles,
@@ -12,6 +11,8 @@ import {
   Share2,
 } from 'lucide-react';
 import { AuthenticatedRedirect } from '@/components/authenticated-redirect';
+import { MarketingHeader } from '@/components/marketing-header';
+import { MarketingFooter } from '@/components/marketing-footer';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 
 export const metadata: Metadata = {
@@ -96,23 +97,7 @@ export default function HomePage() {
       <AuthenticatedRedirect />
 
       <div className="flex flex-1 flex-col">
-        <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-          <div className="flex items-center gap-2">
-            <Image src="/brand/emblem.png" alt="" width={32} height={32} />
-            <span className="text-lg font-semibold text-neutral-50">CampaignHub AI</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/login" className="text-sm font-medium text-neutral-300 hover:text-neutral-50">
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-accent-400 via-accent-500 to-fuchsia-500 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-accent-900/30 hover:shadow-lg hover:brightness-110"
-            >
-              Start free
-            </Link>
-          </nav>
-        </header>
+        <MarketingHeader />
 
         <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-24 px-6 pb-24 pt-8">
           <section className="flex flex-col items-center gap-6 text-center">
@@ -172,31 +157,7 @@ export default function HomePage() {
           </section>
         </main>
 
-        <footer className="border-t border-white/10">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-8 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              CampaignHub AI is built by{' '}
-              <a
-                href="https://sreematechhub.com/"
-                target="_blank"
-                rel="noopener"
-                className="text-neutral-300 hover:text-neutral-50 hover:underline"
-              >
-                SreeMa Tech Hub
-              </a>
-              .
-            </p>
-            <div className="flex items-center gap-4">
-              <a href="/terms" className="text-neutral-300 hover:text-neutral-50 hover:underline">
-                Terms of Service
-              </a>
-              <a href="/privacy" className="text-neutral-300 hover:text-neutral-50 hover:underline">
-                Privacy Policy
-              </a>
-              <p>&copy; {new Date().getFullYear()} SreeMa Tech Hub. All rights reserved.</p>
-            </div>
-          </div>
-        </footer>
+        <MarketingFooter />
       </div>
     </>
   );
