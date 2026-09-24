@@ -21,6 +21,12 @@ const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const RESEND_VERIFICATION_GENERIC_RESULT = {
   message: 'If an account with that email exists and is not yet verified, a new verification link has been sent.',
 };
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+// Same email-enumeration reasoning as RESEND_VERIFICATION_GENERIC_RESULT — whether this address
+// has an account at all is exactly the kind of thing a "forgot password" form must never reveal.
+const FORGOT_PASSWORD_GENERIC_RESULT = {
+  message: 'If an account with that email exists, a password reset link has been sent.',
+};
 
 export interface TokenPair {
   accessToken: string;
@@ -51,6 +57,17 @@ export class AuthService {
     };
   }
 
+  // Shorter-lived than email verification (1 hour vs 24) — a password-reset link sitting in an
+  // inbox is a more sensitive thing to leave valid for a full day than a signup-confirmation link.
+  private generatePasswordResetToken(): { rawToken: string; tokenHash: string; expiresAt: Date } {
+    const rawToken = randomBytes(32).toString('hex');
+    return {
+      rawToken,
+      tokenHash: this.hashToken(rawToken),
+      expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+    };
+  }
+
   private async sendVerificationEmail(email: string, name: string, rawToken: string): Promise<void> {
     const appUrl = this.config.getOrThrow<string>('PUBLIC_APP_URL');
     const link = `${appUrl}/verify-email?token=${rawToken}`;
@@ -58,6 +75,16 @@ export class AuthService {
       email,
       'Verify your CampaignHub AI account',
       `Hi ${name},\n\nPlease verify your email address to activate your CampaignHub AI account:\n\n${link}\n\nThis link expires in 24 hours. If you didn't create this account, you can ignore this email.`,
+    );
+  }
+
+  private async sendPasswordResetEmail(email: string, name: string, rawToken: string): Promise<void> {
+    const appUrl = this.config.getOrThrow<string>('PUBLIC_APP_URL');
+    const link = `${appUrl}/reset-password?token=${rawToken}`;
+    await this.email.send(
+      email,
+      'Reset your CampaignHub AI password',
+      `Hi ${name},\n\nSomeone requested a password reset for your CampaignHub AI account. If this was you, choose a new password here:\n\n${link}\n\nThis link expires in 1 hour. If you didn't request this, you can safely ignore this email — your password won't change.`,
     );
   }
 
@@ -356,6 +383,68 @@ export class AuthService {
     await this.sendVerificationEmail(user.email, user.name, rawToken);
 
     return RESEND_VERIFICATION_GENERIC_RESULT;
+  }
+
+  // The one account-recovery path that didn't exist at all before this — an Owner/Admin could
+  // reset a *team member's* password (UsersService.resetMemberPassword), but nothing let someone
+  // recover their own forgotten password, so a solo Owner locked out of their only account had no
+  // way back in short of someone editing the database by hand.
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Same generic response whether or not the account exists, and even if the account is
+    // deactivated — confirming/denying either fact to an anonymous caller is exactly what this
+    // endpoint must never do.
+    if (!user || !user.isActive) {
+      return FORGOT_PASSWORD_GENERIC_RESULT;
+    }
+
+    const { rawToken, tokenHash, expiresAt } = this.generatePasswordResetToken();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetTokenHash: tokenHash, passwordResetTokenExpiresAt: expiresAt },
+    });
+
+    await this.sendPasswordResetEmail(user.email, user.name, rawToken);
+
+    return FORGOT_PASSWORD_GENERIC_RESULT;
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = this.hashToken(token);
+    const user = await this.prisma.user.findUnique({ where: { passwordResetTokenHash: tokenHash } });
+
+    if (!user || !user.passwordResetTokenExpiresAt || user.passwordResetTokenExpiresAt < new Date()) {
+      throw new UnauthorizedException('This password reset link is invalid or has expired.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetTokenHash: null,
+        passwordResetTokenExpiresAt: null,
+      },
+    });
+
+    // A password reset is a real security event — anyone holding a session from before the reset
+    // (e.g. a stolen refresh token that's exactly why a reset was needed) shouldn't get to keep
+    // using it. changePassword() (users.service.ts) doesn't do this today; this path is the
+    // higher-risk one, since it doesn't require already knowing the current password.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: updated.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.audit.log({
+      userId: updated.id,
+      action: 'PASSWORD_RESET',
+      entityType: 'user',
+      entityId: updated.id,
+    });
+
+    const tokens = await this.issueTokenPair(updated);
+    return { user: this.toSafeUser(updated), ...tokens };
   }
 
   async refresh(refreshToken: string) {

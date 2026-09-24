@@ -13,6 +13,8 @@ interface AuthContextValue {
   register: (agencyName: string, name: string, email: string, password: string) => Promise<{ message: string }>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: (email: string) => Promise<{ message: string }>;
+  forgotPassword: (email: string) => Promise<{ message: string }>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   switchAgency: (agencyId: string, currentPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -88,6 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return api.post<{ message: string }>('/auth/resend-verification', { email });
   }, []);
 
+  const forgotPassword = useCallback(async (email: string) => {
+    return api.post<{ message: string }>('/auth/forgot-password', { email });
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    const res = await api.post<{ user: AuthUser; accessToken: string }>('/auth/reset-password', {
+      token,
+      newPassword,
+    });
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+    setStatus('authenticated');
+  }, []);
+
   const switchAgency = useCallback(async (agencyId: string, currentPassword: string) => {
     // The backend endpoint only updates the account's own agencyId + logs it — it deliberately
     // doesn't reissue tokens itself (that logic already exists correctly in /auth/refresh, which
@@ -114,7 +130,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, status, login, loginWithGoogle, register, verifyEmail, resendVerification, switchAgency, logout }}
+      value={{
+        user,
+        status,
+        login,
+        loginWithGoogle,
+        register,
+        verifyEmail,
+        resendVerification,
+        forgotPassword,
+        resetPassword,
+        switchAgency,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -258,6 +258,90 @@ describe('AuthService.resendVerification', () => {
   });
 });
 
+describe('AuthService.forgotPassword', () => {
+  it('returns the generic message and sends nothing for a nonexistent email (no enumeration)', async () => {
+    const { service, email } = buildService({ existingUser: null });
+    const result = await service.forgotPassword('nobody@nowhere.com');
+    expect(email.send).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/if an account with that email exists/i);
+  });
+
+  it('returns the same generic message and sends nothing for a deactivated account (no enumeration)', async () => {
+    const { service, email } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', isActive: false },
+    });
+    const result = await service.forgotPassword('a@b.com');
+    expect(email.send).not.toHaveBeenCalled();
+    expect(result.message).toMatch(/if an account with that email exists/i);
+  });
+
+  it('generates a reset token and emails it for a real active user', async () => {
+    const { service, prisma, email } = buildService({
+      existingUser: { id: 'u1', email: 'a@b.com', name: 'A', isActive: true },
+    });
+    const result = await service.forgotPassword('a@b.com');
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { passwordResetTokenHash: expect.any(String), passwordResetTokenExpiresAt: expect.any(Date) },
+    });
+    expect(email.send).toHaveBeenCalledTimes(1);
+    expect(result.message).toMatch(/if an account with that email exists/i);
+  });
+});
+
+describe('AuthService.resetPassword', () => {
+  it('resets the password, revokes existing sessions, and issues a fresh token pair for a valid token', async () => {
+    const { service, prisma, audit } = buildService({ existingUser: { id: 'u1' } });
+    const hash = (service as any).hashToken('raw-reset-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        email: 'a@b.com',
+        role: Role.OWNER,
+        agencyId: 'agency-1',
+        passwordResetTokenHash: hash,
+        passwordResetTokenExpiresAt: new Date(Date.now() + 100_000),
+      }),
+    ) as any;
+
+    const result = await service.resetPassword('raw-reset-token', 'a-new-strong-password');
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { passwordHash: 'hashed-password', passwordResetTokenHash: null, passwordResetTokenExpiresAt: null },
+    });
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'PASSWORD_RESET' }));
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  it('rejects an unknown token', async () => {
+    const { service, prisma } = buildService();
+    prisma.user.findUnique = vi.fn(() => Promise.resolve(null)) as any;
+    await expect(service.resetPassword('bogus-token', 'a-new-strong-password')).rejects.toThrow(
+      'This password reset link is invalid or has expired.',
+    );
+  });
+
+  it('rejects an expired token', async () => {
+    const { service, prisma } = buildService();
+    const hash = (service as any).hashToken('raw-reset-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        passwordResetTokenHash: hash,
+        passwordResetTokenExpiresAt: new Date(Date.now() - 1000),
+      }),
+    ) as any;
+    await expect(service.resetPassword('raw-reset-token', 'a-new-strong-password')).rejects.toThrow(
+      'This password reset link is invalid or has expired.',
+    );
+  });
+});
+
 describe('AuthService.refresh', () => {
   it('rejects when the presented token does not verify', async () => {
     const { service, jwt } = buildService();

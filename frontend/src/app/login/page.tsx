@@ -159,6 +159,12 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <Link
+                href="/forgot-password"
+                className="mt-1.5 inline-block text-xs font-medium text-accent-300 hover:underline"
+              >
+                Forgot password?
+              </Link>
             </motion.div>
 
             <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>

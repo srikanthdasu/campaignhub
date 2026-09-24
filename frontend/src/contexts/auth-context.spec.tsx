@@ -18,7 +18,7 @@ vi.mock('@/lib/api.js', async () => {
 });
 
 function Probe() {
-  const { user, status, login, logout, switchAgency } = useAuth();
+  const { user, status, login, logout, switchAgency, forgotPassword, resetPassword } = useAuth();
   return (
     <div>
       <span data-testid="status">{status}</span>
@@ -27,6 +27,8 @@ function Probe() {
       <button onClick={() => login('a@b.com', 'password123')}>login</button>
       <button onClick={() => logout()}>logout</button>
       <button onClick={() => switchAgency('agency-2', 'password123')}>switch</button>
+      <button onClick={() => forgotPassword('a@b.com')}>forgot</button>
+      <button onClick={() => resetPassword('reset-token', 'a-new-strong-password')}>reset</button>
     </div>
   );
 }
@@ -155,5 +157,53 @@ describe('AuthProvider', () => {
       currentPassword: 'password123',
     });
     await waitFor(() => expect(screen.getByTestId('agency')).toHaveTextContent('agency-2'));
+  });
+
+  it('forgotPassword posts to /auth/forgot-password without touching session state', async () => {
+    vi.mocked(api.refreshSession).mockResolvedValue(null);
+    vi.mocked(api.post).mockResolvedValue({ message: 'generic' });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('forgot'));
+
+    expect(api.post).toHaveBeenCalledWith('/auth/forgot-password', { email: 'a@b.com' });
+    expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('resetPassword posts the token/newPassword and logs the user in on success', async () => {
+    vi.mocked(api.refreshSession).mockResolvedValue(null);
+    vi.mocked(api.post).mockImplementation((path: string) => {
+      if (path === '/auth/reset-password') {
+        return Promise.resolve({
+          user: { id: 'u1', email: 'a@b.com', name: 'A', role: 'OWNER', agencyId: 'agency-1' },
+          accessToken: 'new-tok',
+        });
+      }
+      return Promise.reject(new Error(`unexpected path ${path}`));
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('reset'));
+
+    expect(api.post).toHaveBeenCalledWith('/auth/reset-password', {
+      token: 'reset-token',
+      newPassword: 'a-new-strong-password',
+    });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
+    expect(screen.getByTestId('user')).toHaveTextContent('a@b.com');
   });
 });

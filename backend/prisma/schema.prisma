@@ -135,6 +135,13 @@ model User {
   emailVerifiedAt            DateTime? @map("email_verified_at")
   verificationTokenHash      String?   @unique @map("verification_token_hash")
   verificationTokenExpiresAt DateTime? @map("verification_token_expires_at")
+  // Separate from verificationTokenHash above — a password-reset request mid-flight must never
+  // collide with (or be silently cleared/consumed by) an unrelated email-verification link, and
+  // vice versa. Same shape (sha256 hash of a random token, deliberately never the raw token
+  // itself, plus an expiry) for the same reason: a stolen DB row alone shouldn't be enough to
+  // reset a password or verify an email.
+  passwordResetTokenHash      String?   @unique @map("password_reset_token_hash")
+  passwordResetTokenExpiresAt DateTime? @map("password_reset_token_expires_at")
   // Set only for accounts that have signed in with Google at least once — nullable since most
   // accounts are still password-only, unique so one Google account can never map to two Users.
   googleId          String?  @unique @map("google_id")
