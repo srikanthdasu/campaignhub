@@ -58,7 +58,14 @@ export async function createApp(): Promise<NestExpressApplication> {
           // without this, CSP would block every uploaded image/video the moment that happens.
           imgSrc: ["'self'", 'data:', 'blob:', 'https://*.blob.core.windows.net'],
           fontSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'", 'https://accounts.google.com'],
+          // https://*.sentry.io: both the frontend and backend Sentry projects report errors
+          // over fetch/XHR from the browser — without this, every report is silently blocked by
+          // CSP itself (confirmed in production: a real CSP violation was firing on every page
+          // load, so Sentry never actually received anything). Wildcarded rather than pinned to
+          // the frontend's known ingest host (o4512129443102720.ingest.de.sentry.io) because the
+          // backend's SENTRY_DSN is only set as an Azure App Setting, not in the repo — if it's a
+          // different Sentry org/region, a pinned host would silently miss it the same way.
+          connectSrc: ["'self'", 'https://accounts.google.com', 'https://*.sentry.io'],
           frameSrc: ['https://accounts.google.com'],
           mediaSrc: ["'self'", 'blob:', 'https://*.blob.core.windows.net'],
           objectSrc: ["'none'"],
