@@ -186,7 +186,15 @@ export default function HomePage() {
               </a>
               .
             </p>
-            <p>&copy; {new Date().getFullYear()} SreeMa Tech Hub. All rights reserved.</p>
+            <div className="flex items-center gap-4">
+              <a href="/terms" className="text-neutral-300 hover:text-neutral-50 hover:underline">
+                Terms of Service
+              </a>
+              <a href="/privacy" className="text-neutral-300 hover:text-neutral-50 hover:underline">
+                Privacy Policy
+              </a>
+              <p>&copy; {new Date().getFullYear()} SreeMa Tech Hub. All rights reserved.</p>
+            </div>
           </div>
         </footer>
       </div>

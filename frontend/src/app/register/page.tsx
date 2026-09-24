@@ -201,6 +201,17 @@ export default function RegisterPage() {
               <Button type="submit" loading={submitting} className="w-full">
                 {submitting ? 'Creating…' : 'Create agency'}
               </Button>
+              <p className="mt-3 text-center text-xs text-neutral-500">
+                By creating an account, you agree to our{' '}
+                <Link href="/terms" className="hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             </motion.div>
 
             <motion.p
