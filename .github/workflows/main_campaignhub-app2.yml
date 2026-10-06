@@ -8,6 +8,10 @@ on:
       - rebuild
   workflow_dispatch:
 
+concurrency:
+  group: campaignhub-app2-production-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
