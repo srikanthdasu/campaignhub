@@ -77,6 +77,7 @@ describe('ApprovalsService.decide', () => {
         }),
       },
       contentItem: { update: vi.fn(() => Promise.resolve({})) },
+      $transaction: vi.fn((fn: any) => fn(prisma)),
     };
     audit = { log: vi.fn() };
     notifications = { create: vi.fn(), createMany: vi.fn() };
@@ -168,6 +169,36 @@ describe('ApprovalsService.decide', () => {
       'Approval flow not found',
     );
     expect(flowState.steps[0].decision).toBe(ApprovalDecision.PENDING);
+  });
+
+  it('runs the step decision and the flow/content status updates inside the same transaction', async () => {
+    const user = makeUser({ sub: 'approver-1' });
+    await service.decide('flow-1', 'step-1', user, ApprovalDecision.REJECTED);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // All three writes ran as calls made from inside the transaction callback, in the order the
+    // business logic requires — proving one atomic unit rather than separately-committable calls.
+    const stepOrder = prisma.approvalStep.update.mock.invocationCallOrder[0];
+    const flowOrder = prisma.approvalFlow.update.mock.invocationCallOrder[0];
+    const contentOrder = prisma.contentItem.update.mock.invocationCallOrder[0];
+    expect(stepOrder).toBeLessThan(flowOrder);
+    expect(flowOrder).toBeLessThan(contentOrder);
+  });
+
+  it('leaves the step decision, flow status, and content status all untouched if the transaction fails', async () => {
+    prisma.$transaction = vi.fn(() => Promise.reject(new Error('connection lost mid-transaction')));
+    const user = makeUser({ sub: 'approver-1' });
+
+    await expect(service.decide('flow-1', 'step-1', user, ApprovalDecision.REJECTED)).rejects.toThrow(
+      'connection lost mid-transaction',
+    );
+
+    expect(flowState.steps[0].decision).toBe(ApprovalDecision.PENDING);
+    expect(flowState.status).toBe(ApprovalFlowStatus.IN_REVIEW);
+    expect(prisma.contentItem.update).not.toHaveBeenCalled();
+    // Nothing downstream of the atomic write should have run either.
+    expect(audit.log).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 });
 

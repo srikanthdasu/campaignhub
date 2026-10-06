@@ -71,13 +71,15 @@ describe('VideoGenerationService.generateVideo', () => {
       aspect_ratio: '9:16',
       audio: false,
     });
+    expect(createInit!.signal).toBeInstanceOf(AbortSignal);
 
-    const [pollUrl] = fetchMock.mock.calls[1];
+    const [pollUrl, pollInit] = fetchMock.mock.calls[1];
     expect(pollUrl).toBe('https://api.magichour.ai/v1/video-projects/proj-1');
+    expect(pollInit!.signal).toBeInstanceOf(AbortSignal);
 
     const [downloadUrl, downloadInit] = fetchMock.mock.calls[3];
     expect(downloadUrl).toBe('https://cdn.magichour.ai/proj-1.mp4');
-    expect(downloadInit).toBeUndefined();
+    expect(downloadInit!.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('includes model and uses an upgraded resolution when MAGIC_HOUR_MODEL/_RESOLUTION are set', async () => {
@@ -174,5 +176,71 @@ describe('VideoGenerationService.generateVideo', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(402, {}))));
 
     await expect(service.generateVideo('idea', 5)).rejects.toThrow('failed (402)');
+  });
+
+  // AbortSignal.timeout() makes a real fetch() reject with a DOMException named "AbortError" once
+  // its deadline passes — simulating that rejection (rather than actually waiting it out) proves
+  // a timed-out create/poll/download request is treated as the existing generic failure, not a
+  // success, without needing a real hung connection or real elapsed wall-clock time.
+  const ABORT_ERROR = new DOMException('The operation was aborted.', 'AbortError');
+
+  it('treats a timed-out create request as a failure, via the existing generic error path', async () => {
+    const { service } = buildService();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(ABORT_ERROR)));
+
+    try {
+      await service.generateVideo('idea', 5);
+      expect.unreachable('should have thrown, not resolved as a success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      expect(message).toContain('Could not reach the AI video service');
+      // The generic message carries no provider/internal detail.
+      expect(message).not.toMatch(/AbortError|test-magic-hour-key|Bearer/);
+    }
+  });
+
+  it('treats a timed-out poll request as a failure, via the existing generic error path', async () => {
+    const { service } = buildService();
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 'proj-1' })).mockRejectedValueOnce(ABORT_ERROR);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const promise = service.generateVideo('idea', 5);
+    promise.catch(() => {});
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await expect(promise).rejects.toThrow('Could not reach the AI video service');
+  });
+
+  it('treats a timed-out download request as a failure, via the existing generic error path', async () => {
+    const { service } = buildService();
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { id: 'proj-1' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { status: 'complete', downloads: [{ url: 'https://cdn.magichour.ai/proj-1.mp4' }] }),
+      )
+      .mockRejectedValueOnce(ABORT_ERROR);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const promise = service.generateVideo('idea', 5);
+    promise.catch(() => {});
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await expect(promise).rejects.toThrow('Could not reach the AI video service');
+  });
+
+  it('never includes the Magic Hour API key or Authorization header in a thrown error message', async () => {
+    const { service } = buildService();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(ABORT_ERROR)));
+
+    try {
+      await service.generateVideo('idea', 5);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      expect(message).not.toContain('test-magic-hour-key');
+      expect(message).not.toContain('Bearer');
+    }
   });
 });

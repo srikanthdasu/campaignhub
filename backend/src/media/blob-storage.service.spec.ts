@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFile, rm } from 'fs/promises';
+import { mkdir, readFile, rm } from 'fs/promises';
 import { join } from 'path';
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 
 vi.mock('./media-storage.js', async () => {
@@ -96,6 +97,33 @@ describe('BlobStorageService (no Azure Storage configured — local dev fallback
     await expect(service.remove('/uploads/never-existed.png')).resolves.toBeUndefined();
   });
 
+  it('does not log anything for the expected already-gone (ENOENT) case', async () => {
+    const service = buildService();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    await service.remove('/uploads/never-existed-2.png');
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('logs a warning (not an error) when local deletion fails for a reason other than a missing file, without throwing', async () => {
+    const service = buildService();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    // A real, non-ENOENT filesystem error: unlink() on a directory fails (EISDIR on
+    // Linux/macOS, EPERM on Windows) — genuine I/O error, no fs/promises mocking needed (Node's
+    // ESM module namespace for built-ins can't be spied on directly).
+    await mkdir(join(UPLOAD_DIR, 'not-a-file.png'));
+
+    await expect(service.remove('/uploads/not-a-file.png')).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message] = warnSpy.mock.calls[0];
+    expect(message).toContain('not-a-file.png');
+
+    warnSpy.mockRestore();
+  });
+
   it('returns a signed /media-files URL whose token verifies for that exact blob name', async () => {
     const service = buildService();
     const url = await service.getReadUrl('/uploads/blob-1.png');
@@ -164,5 +192,49 @@ describe('BlobStorageService — Azure Blob path', () => {
       expect.objectContaining({ permissions: 'r', expiresOn: expect.any(Date) }),
     );
     expect(url).toBe('https://fake.blob.core.windows.net/media/blob-1.png?sig=abc');
+  });
+
+  it('deletes a blob by name', async () => {
+    const service = buildService('UseDevelopmentStorage=true');
+    await service.remove('https://fake.blob.core.windows.net/media/blob-1.png');
+
+    expect(getBlockBlobClientMock).toHaveBeenCalledWith('blob-1.png');
+    expect(deleteIfExistsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a warning (not an error) when Azure blob deletion fails, without throwing, and never logs the raw SDK error object', async () => {
+    const service = buildService('UseDevelopmentStorage=true');
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    // Shaped like a real Azure SDK RestError: a safe .message, plus .request/.response carrying
+    // the actual signed request — those must never reach the log.
+    const sdkError = Object.assign(new Error('The specified blob does not exist.'), {
+      name: 'RestError',
+      statusCode: 404,
+      request: {
+        url: 'https://fake.blob.core.windows.net/media/blob-1.png?sv=2024&sig=SECRET_SAS_SIGNATURE',
+        headers: { Authorization: 'SharedKey fakeaccount:SECRET_SHARED_KEY_HMAC' },
+      },
+      response: { bodyAsText: 'AccountKey=SECRET_ACCOUNT_KEY_VALUE' },
+    });
+    deleteIfExistsMock.mockRejectedValueOnce(sdkError);
+
+    await expect(service.remove('https://fake.blob.core.windows.net/media/blob-1.png')).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message, ...rest] = warnSpy.mock.calls[0];
+    expect(message).toContain('blob-1.png');
+    expect(message).toContain('media');
+    expect(message).toContain('The specified blob does not exist.');
+    // Only the safe .message string was passed — the error object itself (and therefore its
+    // .request/.response) never reached the logger call at all.
+    expect(rest).toEqual([]);
+    const fullCallText = JSON.stringify(warnSpy.mock.calls[0]);
+    expect(fullCallText).not.toContain('SECRET_SAS_SIGNATURE');
+    expect(fullCallText).not.toContain('SECRET_SHARED_KEY_HMAC');
+    expect(fullCallText).not.toContain('SECRET_ACCOUNT_KEY_VALUE');
+    expect(fullCallText).not.toContain('Authorization');
+
+    warnSpy.mockRestore();
   });
 });

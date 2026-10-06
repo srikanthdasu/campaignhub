@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlobServiceClient, BlobSASPermissions } from '@azure/storage-blob';
 import { UPLOAD_DIR } from './media-storage.js';
@@ -14,6 +14,7 @@ const DEFAULT_EXPIRY_MINUTES = 60;
 // disk stays as a fallback so local dev keeps working without an Azure Storage account.
 @Injectable()
 export class BlobStorageService {
+  private readonly logger = new Logger(BlobStorageService.name);
   private client: BlobServiceClient | null;
 
   constructor(private config: ConfigService) {
@@ -97,16 +98,33 @@ export class BlobStorageService {
     if (!this.client) {
       try {
         await unlink(join(UPLOAD_DIR, blobName));
-      } catch {
-        // best-effort — an already-missing file on disk shouldn't block deleting the record
+      } catch (err) {
+        // Still best-effort — an already-missing file (ENOENT) is the expected case this comment
+        // always covered and stays silent; anything else (permissions, disk I/O) was previously
+        // invisible too and is worth a log. Logs only the blob name (a random UUID+extension,
+        // never user content) and the error's own message, never the raw error object.
+        if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+          this.logger.warn(
+            `Failed to delete local media file "${blobName}": ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
       return;
     }
 
     try {
       await this.client.getContainerClient(CONTAINER_NAME).getBlockBlobClient(blobName).deleteIfExists();
-    } catch {
-      // best-effort — same reasoning as the local-disk path above
+    } catch (err) {
+      // Still best-effort — the DB record is already gone by the time this runs (see
+      // MediaService.remove/bulkRemove), so failing loud here would just surface an error for a
+      // deletion the user already sees as successful, without being able to undo it. This only
+      // makes the resulting orphaned blob observable instead of silent. Deliberately logs the
+      // SDK error's .message only, not the error object itself — Azure SDK storage errors carry
+      // .request/.response with the full signed request, which could include Authorization/SAS
+      // details depending on auth mode, and those must never reach the logs.
+      this.logger.warn(
+        `Failed to delete Azure blob "${blobName}" from container "${CONTAINER_NAME}": ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

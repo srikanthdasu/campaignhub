@@ -14,6 +14,17 @@ interface VideoProjectStatus {
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
+// POLL_TIMEOUT_MS above bounds the whole job (queued -> rendering -> complete); it does nothing
+// for a single fetch() that never resolves (a connection accepted but never answered just stalls
+// the loop's current iteration forever instead of moving on). These bound each individual
+// request: generous enough for real network/API latency, short enough that a hung provider
+// request fails fast instead of tying up the request for the rest of POLL_TIMEOUT_MS.
+const CREATE_REQUEST_TIMEOUT_MS = 15 * 1000;
+const POLL_REQUEST_TIMEOUT_MS = 15 * 1000;
+// The download is an actual file transfer (video bytes, not a status check) — same latency
+// budget as the other two would cut off a real multi-MB transfer mid-stream.
+const DOWNLOAD_REQUEST_TIMEOUT_MS = 60 * 1000;
+
 // Magic Hour's API (api.magichour.ai), not Azure Sora — Azure's sora-2 deployment is scheduled
 // to shut down 2026-09-24 with no announced successor, and independent benchmarks put Kling 3.0
 // ahead specifically on facial realism/consistency, the deciding requirement here. However the
@@ -62,6 +73,7 @@ export class VideoGenerationService {
           aspect_ratio: DEFAULT_ASPECT_RATIO,
           audio,
         }),
+        signal: AbortSignal.timeout(CREATE_REQUEST_TIMEOUT_MS),
       });
     } catch {
       throw new BadGatewayException('Could not reach the AI video service. Please try again.');
@@ -81,7 +93,10 @@ export class VideoGenerationService {
 
       let pollRes: Response;
       try {
-        pollRes = await fetch(`https://api.magichour.ai/v1/video-projects/${created.id}`, { headers });
+        pollRes = await fetch(`https://api.magichour.ai/v1/video-projects/${created.id}`, {
+          headers,
+          signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS),
+        });
       } catch {
         throw new BadGatewayException('Could not reach the AI video service. Please try again.');
       }
@@ -107,7 +122,7 @@ export class VideoGenerationService {
 
     let contentRes: Response;
     try {
-      contentRes = await fetch(downloadUrl);
+      contentRes = await fetch(downloadUrl, { signal: AbortSignal.timeout(DOWNLOAD_REQUEST_TIMEOUT_MS) });
     } catch {
       throw new BadGatewayException('Could not reach the AI video service. Please try again.');
     }

@@ -17,7 +17,29 @@ export async function createApp(): Promise<NestExpressApplication> {
   // alongside the normal parsed req.body — needed to verify the Razorpay webhook's HMAC
   // signature, which is computed over the raw payload and would mismatch against any
   // re-serialization of the parsed object (different key order/whitespace = different bytes).
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  //
+  // bodyParser: false stops Nest auto-registering its own default-limit (100kb) json/urlencoded
+  // parsers below, so the useBodyParser calls right after this are the only ones in the stack —
+  // two 100kb-then-2mb parsers stacked would still 413 on anything over 100kb, since Express runs
+  // every matching middleware in registration order and the first (stricter) one rejects first.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+    bodyParser: false,
+  });
+
+  // BulkImportRecipientsDto allows up to 1000 recipients, each up to a 200-char name + 255-char
+  // email — worst case (every character a 3-byte BMP Unicode code point, the heaviest a 200/255
+  // char-count budget can hold in UTF-8) is ~877 bytes/recipient, ~878KB total for 1000 of them.
+  // 2mb covers that with real headroom while staying a small, bounded limit rather than an
+  // effectively-unlimited one — every other route still gets a real cap, just a bigger one.
+  // NestApplication.useBodyParser(type, options) is its own 2-arg convenience method — it already
+  // re-derives rawBody from the `rawBody: true` passed to NestFactory.create above, so passing a
+  // literal rawBody argument here would shift `options` into the wrong slot and silently drop it,
+  // falling back to body-parser's unconfigured 100kb default.
+  const JSON_BODY_LIMIT = '2mb';
+  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
+  app.useBodyParser('urlencoded', { extended: true, limit: JSON_BODY_LIMIT });
+
   const config = app.get(ConfigService);
   const apiPrefix = config.get<string>('API_PREFIX', '');
 

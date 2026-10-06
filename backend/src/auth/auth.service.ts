@@ -418,22 +418,29 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    const updated = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash,
-        passwordResetTokenHash: null,
-        passwordResetTokenExpiresAt: null,
-      },
-    });
 
     // A password reset is a real security event — anyone holding a session from before the reset
     // (e.g. a stolen refresh token that's exactly why a reset was needed) shouldn't get to keep
     // using it. changePassword() (users.service.ts) doesn't do this today; this path is the
-    // higher-risk one, since it doesn't require already knowing the current password.
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: updated.id, revokedAt: null },
-      data: { revokedAt: new Date() },
+    // higher-risk one, since it doesn't require already knowing the current password. Both writes
+    // share one transaction so a crash between them can never leave the password changed but the
+    // old sessions still valid.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          passwordResetTokenHash: null,
+          passwordResetTokenExpiresAt: null,
+        },
+      });
+
+      await tx.refreshToken.updateMany({
+        where: { userId: updated.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      return updated;
     });
 
     await this.audit.log({

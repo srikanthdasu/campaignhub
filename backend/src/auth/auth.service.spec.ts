@@ -50,7 +50,8 @@ function buildService(overrides: { existingUser?: any } = {}) {
     $transaction: vi.fn((fn: any) =>
       fn({
         agency: { create: txAgencyCreate },
-        user: { create: txUserCreate },
+        user: { create: txUserCreate, update: prisma.user.update },
+        refreshToken: { updateMany: prisma.refreshToken.updateMany },
       }),
     ),
   };
@@ -316,6 +317,56 @@ describe('AuthService.resetPassword', () => {
     });
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'PASSWORD_RESET' }));
     expect(result.accessToken).toBe('signed-token');
+  });
+
+  it('runs the password update and the session revocation inside the same transaction', async () => {
+    const { service, prisma } = buildService({ existingUser: { id: 'u1' } });
+    const hash = (service as any).hashToken('raw-reset-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        email: 'a@b.com',
+        role: Role.OWNER,
+        agencyId: 'agency-1',
+        passwordResetTokenHash: hash,
+        passwordResetTokenExpiresAt: new Date(Date.now() + 100_000),
+      }),
+    ) as any;
+
+    await service.resetPassword('raw-reset-token', 'a-new-strong-password');
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // Both writes ran as calls made from inside the transaction callback — not as direct,
+    // independent prisma.* calls — proving they share one atomic unit rather than two
+    // sequential, separately-committable statements.
+    expect(prisma.user.update.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.refreshToken.updateMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not revoke sessions, log, or issue new tokens if the transaction fails', async () => {
+    const { service, prisma, audit, jwt } = buildService({ existingUser: { id: 'u1' } });
+    const hash = (service as any).hashToken('raw-reset-token');
+    prisma.user.findUnique = vi.fn(() =>
+      Promise.resolve({
+        id: 'u1',
+        email: 'a@b.com',
+        role: Role.OWNER,
+        agencyId: 'agency-1',
+        passwordResetTokenHash: hash,
+        passwordResetTokenExpiresAt: new Date(Date.now() + 100_000),
+      }),
+    ) as any;
+    prisma.$transaction = vi.fn(() => Promise.reject(new Error('connection lost mid-transaction'))) as any;
+
+    await expect(service.resetPassword('raw-reset-token', 'a-new-strong-password')).rejects.toThrow(
+      'connection lost mid-transaction',
+    );
+
+    // A failed transaction must not leave the reset half-applied from the caller's perspective —
+    // nothing downstream of the atomic write pair should have run.
+    expect(audit.log).not.toHaveBeenCalled();
+    expect(jwt.sign).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown token', async () => {

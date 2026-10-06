@@ -14,6 +14,7 @@ import {
   ApprovalMode,
   ContentStatus,
   Role,
+  type Prisma,
 } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
@@ -157,8 +158,8 @@ export class ApprovalsService {
     return this.signFlow(flow);
   }
 
-  private async fetchFlow(id: string) {
-    const flow = await this.prisma.approvalFlow.findUnique({
+  private async fetchFlow(id: string, client: Prisma.TransactionClient = this.prisma) {
+    const flow = await client.approvalFlow.findUnique({
       where: { id },
       include: APPROVAL_STEP_INCLUDE,
     });
@@ -208,9 +209,17 @@ export class ApprovalsService {
       }
     }
 
-    await this.prisma.approvalStep.update({
-      where: { id: stepId },
-      data: { decision, comment, decidedAt: new Date() },
+    // Step decision, flow status, and content status must land together — a crash between them
+    // would otherwise leave the step decided but the flow/content status stale (same pattern as
+    // resubmit() below). audit.log stays outside: AuditService deliberately swallows its own
+    // errors (never roll back a real write over a failed log), so it can only run after commit.
+    const resolved = await this.prisma.$transaction(async (tx) => {
+      await tx.approvalStep.update({
+        where: { id: stepId },
+        data: { decision, comment, decidedAt: new Date() },
+      });
+
+      return this.resolveFlowStatus(flowId, tx);
     });
 
     await this.audit.log({
@@ -221,9 +230,9 @@ export class ApprovalsService {
       metadata: { stepId, comment },
     });
 
-    const resolved = await this.resolveFlowStatus(flowId);
+    const signed = await this.signFlow(resolved);
 
-    const createdById = resolved.contentItem.createdById;
+    const createdById = signed.contentItem.createdById;
     if (createdById && createdById !== user.sub) {
       await this.notifications.create(
         createdById,
@@ -232,7 +241,7 @@ export class ApprovalsService {
       );
     }
 
-    return resolved;
+    return signed;
   }
 
   async resubmit(contentItemId: string, actorId: string) {
@@ -270,8 +279,8 @@ export class ApprovalsService {
   }
 
   /** Recomputes flow + content status from the current step decisions. */
-  private async resolveFlowStatus(flowId: string) {
-    const flow = await this.fetchFlow(flowId);
+  private async resolveFlowStatus(flowId: string, tx: Prisma.TransactionClient) {
+    const flow = await this.fetchFlow(flowId, tx);
 
     let flowStatus: ApprovalFlowStatus = flow.status;
     let contentStatus: ContentStatus | null = null;
@@ -289,15 +298,14 @@ export class ApprovalsService {
       flowStatus = ApprovalFlowStatus.IN_REVIEW;
     }
 
-    await this.prisma.approvalFlow.update({ where: { id: flowId }, data: { status: flowStatus } });
+    await tx.approvalFlow.update({ where: { id: flowId }, data: { status: flowStatus } });
     if (contentStatus) {
-      await this.prisma.contentItem.update({
+      await tx.contentItem.update({
         where: { id: flow.contentItemId },
         data: { status: contentStatus },
       });
     }
 
-    const finalFlow = await this.fetchFlow(flowId);
-    return this.signFlow(finalFlow);
+    return this.fetchFlow(flowId, tx);
   }
 }
