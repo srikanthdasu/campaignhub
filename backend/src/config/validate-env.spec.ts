@@ -32,7 +32,7 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/SMTP_HOST/);
   });
 
-  it('passes a production config with all SMTP, storage, and encryption-key settings present', () => {
+  it('passes a production config with all SMTP, storage, encryption-key, and Razorpay settings present', () => {
     const config = {
       NODE_ENV: 'production',
       SMTP_HOST: 'smtp.gmail.com',
@@ -41,36 +41,68 @@ describe('validateEnv', () => {
       SMTP_PASSWORD: 'app-password',
       AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
       TOKEN_ENCRYPTION_KEY: 'd'.repeat(32),
+      RAZORPAY_KEY_ID: 'rzp_live_placeholder',
+      RAZORPAY_KEY_SECRET: 'e'.repeat(32),
+      RAZORPAY_WEBHOOK_SECRET: 'f'.repeat(32),
     };
     expect(validateEnv(config)).toEqual(config);
   });
 
-  it('does not require SMTP or storage settings outside production', () => {
+  it('does not require SMTP, storage, or Razorpay settings outside production', () => {
     expect(() => validateEnv({ NODE_ENV: 'development' })).not.toThrow();
   });
 
-  it('rejects a production config missing AZURE_STORAGE_CONNECTION_STRING even with SMTP present', () => {
-    const config = {
-      NODE_ENV: 'production',
-      SMTP_HOST: 'smtp.gmail.com',
-      SMTP_PORT: '587',
-      SMTP_USER: 'user@gmail.com',
-      SMTP_PASSWORD: 'app-password',
-      TOKEN_ENCRYPTION_KEY: 'd'.repeat(32),
-    };
+  const completeProductionConfig = () => ({
+    NODE_ENV: 'production',
+    SMTP_HOST: 'smtp.gmail.com',
+    SMTP_PORT: '587',
+    SMTP_USER: 'user@gmail.com',
+    SMTP_PASSWORD: 'app-password',
+    AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
+    TOKEN_ENCRYPTION_KEY: 'd'.repeat(32),
+    RAZORPAY_KEY_ID: 'rzp_live_placeholder',
+    RAZORPAY_KEY_SECRET: 'e'.repeat(32),
+    RAZORPAY_WEBHOOK_SECRET: 'f'.repeat(32),
+  });
+
+  it('rejects a production config missing AZURE_STORAGE_CONNECTION_STRING even with everything else present', () => {
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.AZURE_STORAGE_CONNECTION_STRING;
     expect(() => validateEnv(config)).toThrow(/AZURE_STORAGE_CONNECTION_STRING/);
   });
 
   it('rejects a production config missing TOKEN_ENCRYPTION_KEY (SEC-2)', () => {
-    const config = {
-      NODE_ENV: 'production',
-      SMTP_HOST: 'smtp.gmail.com',
-      SMTP_PORT: '587',
-      SMTP_USER: 'user@gmail.com',
-      SMTP_PASSWORD: 'app-password',
-      AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;...',
-    };
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.TOKEN_ENCRYPTION_KEY;
     expect(() => validateEnv(config)).toThrow(/TOKEN_ENCRYPTION_KEY/);
+  });
+
+  it('rejects a production config missing RAZORPAY_KEY_ID (P1-3) even with everything else present', () => {
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.RAZORPAY_KEY_ID;
+    expect(() => validateEnv(config)).toThrow(/RAZORPAY_KEY_ID/);
+  });
+
+  it('rejects a production config missing RAZORPAY_KEY_SECRET (P1-3) even with everything else present', () => {
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.RAZORPAY_KEY_SECRET;
+    expect(() => validateEnv(config)).toThrow(/RAZORPAY_KEY_SECRET/);
+  });
+
+  it('rejects a production config missing RAZORPAY_WEBHOOK_SECRET (P1-3) even with everything else present', () => {
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.RAZORPAY_WEBHOOK_SECRET;
+    expect(() => validateEnv(config)).toThrow(/RAZORPAY_WEBHOOK_SECRET/);
+  });
+
+  it('reports every missing Razorpay variable by name, together, when more than one is absent (P1-3)', () => {
+    const config = completeProductionConfig() as Record<string, string | undefined>;
+    delete config.RAZORPAY_KEY_ID;
+    delete config.RAZORPAY_KEY_SECRET;
+    delete config.RAZORPAY_WEBHOOK_SECRET;
+    expect(() => validateEnv(config)).toThrow(
+      /RAZORPAY_KEY_ID.*RAZORPAY_KEY_SECRET.*RAZORPAY_WEBHOOK_SECRET/,
+    );
   });
 
   it('rejects a long but un-replaced "change-me" placeholder, not just a short one (SEC-2)', () => {

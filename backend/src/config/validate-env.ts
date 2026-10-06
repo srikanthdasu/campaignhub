@@ -27,7 +27,18 @@ const REQUIRED_SMTP_VARS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWOR
 // deferred to each service's own getOrThrow at first use — meaning a production deploy with no
 // key boots green and only fails the first time someone connects a social account, or worse,
 // when the scheduler tries to decrypt a token to actually publish.
-const REQUIRED_PRODUCTION_VARS = ['AZURE_STORAGE_CONNECTION_STRING', 'TOKEN_ENCRYPTION_KEY'] as const;
+// P1-3: RazorpayService reads all three of these only via getOrThrow inside its own methods
+// (order creation, payment-signature verification, webhook-signature verification) — same
+// deferred-to-first-use gap TOKEN_ENCRYPTION_KEY had before SEC-2. Without them, a production
+// deploy boots green and billing looks fully configured right up until the first real customer
+// tries to check out, or the first webhook delivery silently fails signature verification.
+const REQUIRED_PRODUCTION_VARS = [
+  'AZURE_STORAGE_CONNECTION_STRING',
+  'TOKEN_ENCRYPTION_KEY',
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+  'RAZORPAY_WEBHOOK_SECRET',
+] as const;
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   for (const key of SECRETS_TO_VALIDATE) {
@@ -61,7 +72,9 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
         `Missing required production settings: ${missingProduction.join(', ')}. Without ` +
           `AZURE_STORAGE_CONNECTION_STRING, uploaded media silently falls back to local disk and is lost ` +
           `on the next restart/deploy; without TOKEN_ENCRYPTION_KEY, connecting a social account or ` +
-          `publishing a scheduled post fails the first time it's attempted, not at boot.`,
+          `publishing a scheduled post fails the first time it's attempted, not at boot; without the ` +
+          `RAZORPAY_* settings, the app boots looking fully configured and billing fails the first time ` +
+          `a customer actually checks out or a webhook is delivered, not at boot.`,
       );
     }
   }

@@ -15,6 +15,10 @@ function buildService(
 ) {
   const audit = { log: vi.fn() };
   const prisma = {
+    // Array-form $transaction: the real client already has each operation's promise constructed
+    // by the time it reaches here, so awaiting them together (and propagating a rejection, same
+    // as a real rolled-back transaction) is a faithful mock of Prisma's own semantics.
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     client: {
       create: vi.fn((args: any) => Promise.resolve({ id: 'client-1', ...args.data })),
       findUnique: vi.fn(() =>
@@ -22,6 +26,10 @@ function buildService(
       ),
       findMany: vi.fn((_args: any) => Promise.resolve([])),
       update: vi.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
+      delete: vi.fn((args: any) => Promise.resolve({ id: args.where.id })),
+      deleteMany: vi.fn(() => Promise.resolve({ count: 0 })),
+    },
+    approvalFlow: {
       deleteMany: vi.fn(() => Promise.resolve({ count: 0 })),
     },
     userClientAccess: {
@@ -108,20 +116,70 @@ describe('ClientsService', () => {
       await expect(service.restore('agency-1', 'actor-1', 'client-1')).rejects.toThrow('Client is not deleted');
     });
 
-    it('purges only clients past the grace period and audits the batch', async () => {
+    it('purges a client with no approval history: deletes it in its own transaction and audits it', async () => {
       const { service, prisma, audit } = buildService();
       prisma.client.findMany.mockResolvedValueOnce([
         { id: 'client-1', name: 'Old Co', agencyId: 'agency-1' },
       ] as never);
+
       const count = await service.purgeExpired(15);
+
       expect(prisma.client.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { deletedAt: { lt: expect.any(Date) } } }),
       );
-      expect(prisma.client.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['client-1'] } } });
+      // Each client's cleanup + delete runs as one transaction — never the old whole-batch deleteMany.
+      expect(prisma.client.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.approvalFlow.deleteMany).toHaveBeenCalledWith({
+        where: { contentItem: { clientId: 'client-1' } },
+      });
+      expect(prisma.client.delete).toHaveBeenCalledWith({ where: { id: 'client-1' } });
       expect(audit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'CLIENT_PURGED', agencyId: 'agency-1' }),
+        expect.objectContaining({ action: 'CLIENT_PURGED', agencyId: 'agency-1', entityId: 'client-1' }),
       );
       expect(count).toBe(1);
+    });
+
+    it('deletes a client with approval history: ApprovalFlow cleanup runs in the same transaction as the client delete', async () => {
+      // ApprovalStep rows cascading away is a real database FK behavior (ApprovalStep.approvalFlow
+      // is ON DELETE CASCADE), not something a unit test with a mocked Prisma client can observe —
+      // verified instead against the real database in the P1-2 runtime verification. What this
+      // test can and does verify: the approvalFlow.deleteMany scoped to this exact client's content
+      // items is bundled into the same $transaction as the client delete itself.
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-with-approvals', name: 'Approved Co', agencyId: 'agency-1' },
+      ] as never);
+      prisma.approvalFlow.deleteMany = vi.fn(() => Promise.resolve({ count: 3 })) as any;
+
+      const count = await service.purgeExpired(15);
+
+      const [transactionOps] = prisma.$transaction.mock.calls[0]!;
+      expect(transactionOps).toHaveLength(2);
+      expect(prisma.approvalFlow.deleteMany).toHaveBeenCalledWith({
+        where: { contentItem: { clientId: 'client-with-approvals' } },
+      });
+      expect(prisma.client.delete).toHaveBeenCalledWith({ where: { id: 'client-with-approvals' } });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'CLIENT_PURGED', entityId: 'client-with-approvals' }),
+      );
+      expect(count).toBe(1);
+    });
+
+    it('rolls back and skips the audit entry when a client transaction fails, without throwing', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'stuck-client', name: 'Stuck Co', agencyId: 'agency-1' },
+      ] as never);
+      // Simulates the client.delete leg of the transaction failing (e.g. an FK violation that
+      // wasn't actually cleaned up) — Promise.all in the mock rejects exactly like a real
+      // transaction rolling back every operation in it, including the approvalFlow.deleteMany.
+      prisma.client.delete = vi.fn(() => Promise.reject(new Error('FK violation'))) as any;
+
+      const count = await service.purgeExpired(15);
+
+      expect(count).toBe(0);
+      expect(audit.log).not.toHaveBeenCalled();
     });
 
     it('writes one audit entry per agency when a batch spans multiple agencies', async () => {
@@ -160,10 +218,33 @@ describe('ClientsService', () => {
       );
     });
 
+    it('one client failing does not block the others in the same run — A and C still purge when B fails', async () => {
+      const { service, prisma, audit } = buildService();
+      prisma.client.findMany.mockResolvedValueOnce([
+        { id: 'client-a', name: 'A Co', agencyId: 'agency-1' },
+        { id: 'client-b', name: 'B Co', agencyId: 'agency-1' },
+        { id: 'client-c', name: 'C Co', agencyId: 'agency-1' },
+      ] as never);
+      prisma.client.delete = vi.fn((args: any) =>
+        args.where.id === 'client-b'
+          ? Promise.reject(new Error('FK violation for B'))
+          : Promise.resolve({ id: args.where.id }),
+      ) as any;
+
+      const count = await service.purgeExpired(15);
+
+      expect(count).toBe(2); // A and C, not B
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3); // all three were attempted, independently
+      expect(audit.log).toHaveBeenCalledTimes(2);
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'client-a' }));
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'client-c' }));
+      expect(audit.log).not.toHaveBeenCalledWith(expect.objectContaining({ entityId: 'client-b' }));
+    });
+
     it('skips the delete and audit call when nothing is due for purge', async () => {
       const { service, prisma, audit } = buildService();
       const count = await service.purgeExpired(15);
-      expect(prisma.client.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(audit.log).not.toHaveBeenCalled();
       expect(count).toBe(0);
     });

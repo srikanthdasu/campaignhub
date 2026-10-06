@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -9,6 +9,8 @@ import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 @Injectable()
 export class ClientsService {
+  private readonly logger = new Logger(ClientsService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -143,7 +145,22 @@ export class ClientsService {
     return due.length;
   }
 
-  /** Called by ClientsCronService — no user in the loop, so no access check or actor on the audit entry. */
+  /**
+   * Called by ClientsCronService — no user in the loop, so no access check or actor on the audit
+   * entry.
+   *
+   * P1-2: ContentItem.client is ON DELETE CASCADE, so deleting a Client cascades to every one of
+   * its ContentItem rows regardless of status — but ApprovalFlow.contentItem is deliberately ON
+   * DELETE RESTRICT (preserving approval decision history from *incidental* content deletion),
+   * which blocked that cascade the moment a client had ever had content submitted for approval.
+   * A permanent client purge is final by design — everything else about the client already
+   * cascades away unconditionally — so its approval history is explicitly deleted here too, as
+   * the deliberate last step of that same finality (ApprovalStep rows cascade automatically once
+   * their parent ApprovalFlow is gone). Each client gets its own transaction and its own
+   * try/catch specifically so one client's failure can never block another due client in the
+   * same run — the previous single batched deleteMany() for the whole due list didn't have that
+   * property: one bad client failed the entire statement, silently purging nobody that night.
+   */
   async purgeExpired(graceDays: number) {
     const cutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000);
     const due = await this.prisma.client.findMany({
@@ -152,13 +169,25 @@ export class ClientsService {
     });
     if (due.length === 0) return 0;
 
-    await this.prisma.client.deleteMany({ where: { id: { in: due.map((c) => c.id) } } });
+    let purgedCount = 0;
 
-    // One audit entry per purged client, not per agency batch — entityId is a strict UUID
-    // column, so joining multiple client ids into one string (the previous approach) would throw
-    // the moment a single agency had 2+ clients expire in the same run, after the delete had
-    // already committed.
     for (const client of due) {
+      try {
+        await this.prisma.$transaction([
+          this.prisma.approvalFlow.deleteMany({ where: { contentItem: { clientId: client.id } } }),
+          this.prisma.client.delete({ where: { id: client.id } }),
+        ]);
+      } catch (err) {
+        this.logger.error(
+          `Failed to purge client ${client.id} ("${client.name}") — skipping it this run`,
+          err instanceof Error ? err.stack : String(err),
+        );
+        continue;
+      }
+
+      // Outside the transaction, same as every other audit.log() call site — it swallows its own
+      // errors by design (AUDIT-2) and must never be able to undo a deletion that already
+      // committed.
       await this.audit.log({
         agencyId: client.agencyId,
         action: 'CLIENT_PURGED',
@@ -166,9 +195,10 @@ export class ClientsService {
         entityId: client.id,
         metadata: { name: client.name },
       });
+      purgedCount++;
     }
 
-    return due.length;
+    return purgedCount;
   }
 
   async findOne(clientId: string) {

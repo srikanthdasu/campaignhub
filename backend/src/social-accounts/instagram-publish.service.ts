@@ -2,22 +2,46 @@ import { Injectable } from '@nestjs/common';
 
 const GRAPH_VERSION = 'v21.0';
 
+interface InstagramApiError {
+  message?: string;
+  // Meta's documented signature for an expired/invalid/revoked access token — code 190 with
+  // type "OAuthException" — https://developers.facebook.com/docs/graph-api/guides/error-handling
+  code?: number;
+  type?: string;
+}
+
 interface InstagramContainerResponse {
   id?: string;
-  error?: { message?: string };
+  error?: InstagramApiError;
 }
 
 interface InstagramContainerStatusResponse {
   status_code?: 'IN_PROGRESS' | 'FINISHED' | 'ERROR' | 'EXPIRED' | 'PUBLISHED';
-  error?: { message?: string };
+  error?: InstagramApiError;
 }
 
 interface InstagramPublishResponse {
   id?: string;
-  error?: { message?: string };
+  error?: InstagramApiError;
 }
 
 export class InstagramPublishError extends Error {}
+
+// P1-6: distinguishes "the connection itself is broken" from every other kind of publish
+// failure (bad image, rate limit, transient network error, ...), which previously all surfaced
+// identically — Meta's own raw, technical error text, with no indication reconnecting the
+// account would fix it. Falls through to the original message for every other error shape, so
+// existing non-auth failures are completely unaffected.
+function describeInstagramError(error: InstagramApiError | undefined, fallback: string): string {
+  const isExpiredOrInvalidToken =
+    error?.code === 190 ||
+    error?.type === 'OAuthException' ||
+    /access token/i.test(error?.message ?? '');
+  if (isExpiredOrInvalidToken) {
+    return 'Your Instagram connection has expired or is no longer valid. Reconnect the account from Social Accounts to keep publishing.';
+  }
+  return error?.message ?? fallback;
+}
 
 const CONTAINER_POLL_INTERVAL_MS = 2000;
 const CONTAINER_POLL_MAX_ATTEMPTS = 15;
@@ -50,7 +74,7 @@ export class InstagramPublishService {
 
       if (data.status_code === 'FINISHED') return;
       if (data.status_code === 'ERROR' || data.status_code === 'EXPIRED') {
-        throw new InstagramPublishError(data.error?.message ?? 'Instagram failed to process the media');
+        throw new InstagramPublishError(describeInstagramError(data.error, 'Instagram failed to process the media'));
       }
 
       await new Promise((resolve) => setTimeout(resolve, CONTAINER_POLL_INTERVAL_MS));
@@ -77,7 +101,7 @@ export class InstagramPublishService {
     }
     const data = (await res.json()) as InstagramContainerResponse;
     if (!data.id) {
-      throw new InstagramPublishError(data.error?.message ?? 'Instagram rejected the media container');
+      throw new InstagramPublishError(describeInstagramError(data.error, 'Instagram rejected the media container'));
     }
     return data.id;
   }
@@ -96,7 +120,7 @@ export class InstagramPublishService {
     }
     const data = (await res.json()) as InstagramPublishResponse;
     if (!data.id) {
-      throw new InstagramPublishError(data.error?.message ?? 'Instagram rejected publishing the post');
+      throw new InstagramPublishError(describeInstagramError(data.error, 'Instagram rejected publishing the post'));
     }
     return data.id;
   }

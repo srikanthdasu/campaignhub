@@ -247,6 +247,23 @@ export class EmailCampaignsService {
           continue;
         }
 
+        // Atomically claim this recipient before sending anything — without this, two overlapping
+        // cron ticks (a slow batch still running when the next EVERY_MINUTE tick fires) could both
+        // read the same PENDING row from the findMany above and both actually email them. The
+        // `where: { status: PENDING }` makes this a no-op for every caller except whichever one
+        // wins the race, exactly like SchedulerService.publishPost()'s PENDING -> PUBLISHING claim.
+        // There's no separate "claimed" status in EmailRecipientStatus, so this claims straight to
+        // SENT (the real outcome if delivery succeeds, which is by far the common case) and
+        // corrects to FAILED below if it turns out delivery didn't actually go through.
+        const claim = await this.prisma.emailRecipient.updateMany({
+          where: { id: recipient.id, status: EmailRecipientStatus.PENDING },
+          data: { status: EmailRecipientStatus.SENT, sentAt: new Date() },
+        });
+        if (claim.count === 0) {
+          // Already claimed by an overlapping run — skip it, don't send a second time.
+          continue;
+        }
+
         const rawToken = randomBytes(32).toString('hex');
         const unsubscribeLink = `${appUrl}/unsubscribe?token=${rawToken}`;
         const body =
@@ -255,13 +272,21 @@ export class EmailCampaignsService {
 
         const delivered = await this.email.send(recipient.email, campaign.subject, body);
 
-        await this.prisma.emailRecipient.update({
-          where: { id: recipient.id },
-          data: delivered
-            ? { status: EmailRecipientStatus.SENT, sentAt: new Date(), unsubscribeTokenHash: this.hashToken(rawToken) }
-            : { status: EmailRecipientStatus.FAILED, errorMessage: 'Delivery failed or SMTP not configured' },
-        });
-        if (delivered) totalSent++;
+        if (delivered) {
+          await this.prisma.emailRecipient.update({
+            where: { id: recipient.id },
+            data: { unsubscribeTokenHash: this.hashToken(rawToken) },
+          });
+          totalSent++;
+        } else {
+          // The claim above optimistically marked this SENT before the send was attempted —
+          // correct it now that delivery is confirmed to have failed, clearing sentAt so a FAILED
+          // row never carries a timestamp implying it went out.
+          await this.prisma.emailRecipient.update({
+            where: { id: recipient.id },
+            data: { status: EmailRecipientStatus.FAILED, errorMessage: 'Delivery failed or SMTP not configured', sentAt: null },
+          });
+        }
       }
 
       const remainingPending = await this.prisma.emailRecipient.count({

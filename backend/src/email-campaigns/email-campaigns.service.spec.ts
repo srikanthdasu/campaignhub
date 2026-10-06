@@ -33,6 +33,9 @@ function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscri
       findUnique: vi.fn(() => Promise.resolve(overrides.recipients?.[0] ?? null)),
       findMany: vi.fn(() => Promise.resolve(overrides.recipients ?? [])),
       update: vi.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
+      // Default: the atomic PENDING -> SENT claim always succeeds (count: 1) — tests that need to
+      // simulate a losing claimant (an overlapping run that already took the row) override this.
+      updateMany: vi.fn(() => Promise.resolve({ count: 1 })),
       delete: vi.fn(() => Promise.resolve({})),
       count: vi.fn(() => Promise.resolve(overrides.recipients?.length ?? 0)),
     },
@@ -159,12 +162,20 @@ describe('EmailCampaignsService.processQueuedCampaigns', () => {
     expect(sent).toBe(1);
     expect(email.send).toHaveBeenCalledWith('priya@example.com', 'Hi', expect.stringContaining('Hello Priya!'));
     expect(email.send).toHaveBeenCalledWith('priya@example.com', 'Hi', expect.stringContaining('Unsubscribe:'));
+    // The atomic claim (PENDING -> SENT) is what actually performs the status transition now.
+    expect(prisma.emailRecipient.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'r1', status: EmailRecipientStatus.PENDING },
+        data: expect.objectContaining({ status: EmailRecipientStatus.SENT }),
+      }),
+    );
+    // The follow-up `update` only fills in the unsubscribe token hash — it no longer re-sets status.
     expect(prisma.emailRecipient.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'r1' }, data: expect.objectContaining({ status: EmailRecipientStatus.SENT }) }),
+      expect.objectContaining({ where: { id: 'r1' }, data: expect.objectContaining({ unsubscribeTokenHash: expect.any(String) }) }),
     );
   });
 
-  it('marks a failed delivery as FAILED, not SENT', async () => {
+  it('marks a failed delivery as FAILED, not SENT, correcting the optimistic claim', async () => {
     const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'A', email: 'a@example.com', status: EmailRecipientStatus.PENDING };
     const { service, prisma, email } = buildService({
       campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'x' },
@@ -176,9 +187,74 @@ describe('EmailCampaignsService.processQueuedCampaigns', () => {
     const sent = await service.processQueuedCampaigns();
 
     expect(sent).toBe(0);
-    expect(prisma.emailRecipient.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'r1' }, data: expect.objectContaining({ status: EmailRecipientStatus.FAILED }) }),
+    // Still claimed atomically first (optimistically to SENT)...
+    expect(prisma.emailRecipient.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'r1', status: EmailRecipientStatus.PENDING },
+        data: expect.objectContaining({ status: EmailRecipientStatus.SENT }),
+      }),
     );
+    // ...then corrected to FAILED, with sentAt cleared so the FAILED row carries no send timestamp.
+    expect(prisma.emailRecipient.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'r1' },
+        data: expect.objectContaining({ status: EmailRecipientStatus.FAILED, sentAt: null }),
+      }),
+    );
+  });
+
+  it('skips a recipient already claimed by an overlapping run and never attempts to send it', async () => {
+    const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'A', email: 'a@example.com', status: EmailRecipientStatus.PENDING };
+    const { service, prisma, email } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'x' },
+      recipients: [recipient],
+    });
+    // Simulates losing the atomic claim race — an overlapping run already flipped this row off PENDING.
+    prisma.emailRecipient.updateMany = vi.fn(() => Promise.resolve({ count: 0 })) as any;
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+
+    const sent = await service.processQueuedCampaigns();
+
+    expect(sent).toBe(0);
+    expect(email.send).not.toHaveBeenCalled();
+    expect(prisma.emailRecipient.update).not.toHaveBeenCalled();
+  });
+
+  it('concurrency invariant: of two overlapping workers claiming the same PENDING recipient, exactly one claims it and exactly one send is attempted', async () => {
+    const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'A', email: 'a@example.com', status: EmailRecipientStatus.PENDING };
+    const { service: workerA, prisma: prismaA, email: emailA } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'x' },
+      recipients: [recipient],
+    });
+    const { service: workerB, prisma: prismaB, email: emailB } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.SENDING, subject: 'Hi', bodyTemplate: 'x' },
+      recipients: [recipient],
+    });
+    prismaA.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+    prismaB.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+
+    // Shared backing store simulating one real `status: PENDING` row both workers race over: the
+    // first updateMany call to actually run against it claims it (count: 1); every call after that
+    // sees it's no longer PENDING (count: 0) — exactly how a real `WHERE status = PENDING` guard
+    // behaves against one database row under concurrent writers.
+    let claimed = false;
+    const sharedClaim = vi.fn(() => {
+      if (claimed) return Promise.resolve({ count: 0 });
+      claimed = true;
+      return Promise.resolve({ count: 1 });
+    });
+    prismaA.emailRecipient.updateMany = sharedClaim as any;
+    prismaB.emailRecipient.updateMany = sharedClaim as any;
+
+    const [sentA, sentB] = await Promise.all([
+      workerA.processQueuedCampaigns(),
+      workerB.processQueuedCampaigns(),
+    ]);
+
+    expect(sentA + sentB).toBe(1);
+    expect(sharedClaim).toHaveBeenCalledTimes(2);
+    const totalSendAttempts = (emailA.send as any).mock.calls.length + (emailB.send as any).mock.calls.length;
+    expect(totalSendAttempts).toBe(1);
   });
 
   it('flips the campaign to SENT once no PENDING recipients remain', async () => {
