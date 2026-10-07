@@ -13,8 +13,8 @@ import {
   registerAndVerify,
 } from './support/e2e-helpers.js';
 
-// CampaignsController splits CAN_MANAGE (create/update — includes CREATOR/DESIGNER) from the
-// tighter CAN_DELETE (excludes them) — exercised through the real guard stack.
+// CampaignsController splits CAN_MANAGE (create/update — includes CREATOR/DESIGNER/CLIENT) from
+// the tighter CAN_DELETE (excludes them) — exercised through the real guard stack.
 describe('Campaigns RBAC (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -53,11 +53,23 @@ describe('Campaigns RBAC (e2e)', () => {
     await app.close();
   });
 
-  it('forbids a CLIENT-role user from creating a campaign', async () => {
-    await request(app.getHttpServer())
+  it('allows a CLIENT-role user to create and update a campaign, but not delete it', async () => {
+    const createRes = await request(app.getHttpServer())
       .post(`/clients/${clientId}/campaigns`)
       .set('Authorization', `Bearer ${clientRoleToken}`)
-      .send({ name: 'Should be blocked' })
+      .send({ name: 'Client-created campaign' })
+      .expect(201);
+    const clientCampaignId = createRes.body.id as string;
+
+    await request(app.getHttpServer())
+      .patch(`/clients/${clientId}/campaigns/${clientCampaignId}`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
+      .send({ objective: 'Updated by client' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/clients/${clientId}/campaigns/${clientCampaignId}`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
       .expect(403);
   });
 

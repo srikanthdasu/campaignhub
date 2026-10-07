@@ -16,7 +16,8 @@ import {
 // EmailCampaignsController's CAN_MANAGE is deliberately tighter than Campaigns'/Content's
 // (excludes CREATOR/DESIGNER — a bad send carries real reputational/compliance risk against the
 // agency's own sending identity, per the controller's own comment). This is the one place a
-// CREATOR, who can manage regular campaigns, is blocked outright.
+// CREATOR, who can manage regular campaigns, is blocked outright. CLIENT sits in between: it's in
+// CAN_EDIT (create/update/import/remove-recipient) but never in CAN_MANAGE (delete/send).
 describe('Email Campaigns RBAC (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -24,6 +25,7 @@ describe('Email Campaigns RBAC (e2e)', () => {
   let clientId: string;
   let ownerToken: string;
   let creatorToken: string;
+  let clientRoleToken: string;
   let campaignId: string;
 
   const suffix = e2eSuffix();
@@ -38,6 +40,7 @@ describe('Email Campaigns RBAC (e2e)', () => {
 
     clientId = await createClient(app, ownerToken, `E2E EmailCampaigns Client ${suffix}`);
     creatorToken = await createMember(app, ownerToken, `creator-${suffix}@e2e.test`, 'Creator', Role.CREATOR, [clientId], password);
+    clientRoleToken = await createMember(app, ownerToken, `client-${suffix}@e2e.test`, 'Client User', Role.CLIENT, [clientId], password);
 
     const campaignRes = await request(app.getHttpServer())
       .post(`/clients/${clientId}/email-campaigns`)
@@ -80,6 +83,31 @@ describe('Email Campaigns RBAC (e2e)', () => {
       .get(`/clients/${clientId}/email-campaigns`)
       .set('Authorization', `Bearer ${creatorToken}`)
       .expect(200);
+  });
+
+  it('allows a CLIENT to create and import recipients, but forbids sending', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post(`/clients/${clientId}/email-campaigns`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
+      .send({ name: 'Client-drafted campaign', subject: 'Hi', bodyTemplate: 'Body {{name}}' })
+      .expect(201);
+    const clientCampaignId = createRes.body.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/clients/${clientId}/email-campaigns/${clientCampaignId}/recipients/bulk`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
+      .send({ recipients: [{ name: 'Test', email: 'test@example.com' }] })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/clients/${clientId}/email-campaigns/${clientCampaignId}/send`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .delete(`/clients/${clientId}/email-campaigns/${clientCampaignId}`)
+      .set('Authorization', `Bearer ${clientRoleToken}`)
+      .expect(403);
   });
 
   it('allows the OWNER to import recipients and delete the campaign', async () => {

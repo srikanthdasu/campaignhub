@@ -40,3 +40,21 @@ export const CAN_MANAGE_MEDIA_ROLES: Role[] = ['OWNER', 'ADMIN', 'MANAGER', 'CRE
 export function canManageMedia(role: Role | undefined): boolean {
   return !!role && CAN_MANAGE_MEDIA_ROLES.includes(role);
 }
+
+// Mirrors CAN_MANAGE in email-campaigns.controller.ts — the backend's real boundary for deleting
+// an email campaign or sending one, excluding CLIENT (who can draft/edit via CAN_EDIT there, but
+// never send). UX-only — the backend guard is what actually enforces it.
+export const CAN_SEND_EMAIL_CAMPAIGNS_ROLES: Role[] = ['OWNER', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'];
+
+export function canSendEmailCampaigns(role: Role | undefined): boolean {
+  return !!role && CAN_SEND_EMAIL_CAMPAIGNS_ROLES.includes(role);
+}
+
+// Mirrors CAN_DELETE in campaigns.controller.ts — the backend's real boundary for deleting a
+// campaign, excluding CLIENT (who can create/edit via CAN_MANAGE there, but never delete).
+// UX-only — the backend guard is what actually enforces it.
+export const CAN_DELETE_CAMPAIGNS_ROLES: Role[] = ['OWNER', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'];
+
+export function canDeleteCampaigns(role: Role | undefined): boolean {
+  return !!role && CAN_DELETE_CAMPAIGNS_ROLES.includes(role);
+}

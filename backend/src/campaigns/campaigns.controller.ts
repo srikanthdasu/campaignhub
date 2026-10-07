@@ -9,7 +9,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Role } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
-const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER];
+const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.CREATOR, Role.DESIGNER, Role.CLIENT];
 const CAN_DELETE = [Role.OWNER, Role.ADMIN, Role.MANAGER];
 
 @Controller('clients/:clientId/campaigns')

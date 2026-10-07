@@ -14,8 +14,9 @@ import type { AuthenticatedUser } from '../common/types/authenticated-user.js';
 
 // Tighter than Campaigns' CAN_MANAGE (which also includes Creator/Designer) — a bad send here
 // carries real reputational/compliance risk against the agency's own sending identity, so it's
-// scoped to the roles who'd own that risk.
+// scoped to the roles who'd own that risk. CLIENT can draft/edit (CAN_EDIT below) but never send.
 const CAN_MANAGE = [Role.OWNER, Role.ADMIN, Role.MANAGER];
+const CAN_EDIT = [...CAN_MANAGE, Role.CLIENT];
 
 @Controller('clients/:clientId/email-campaigns')
 @UseGuards(ClientAccessGuard, RolesGuard)
@@ -23,7 +24,7 @@ export class EmailCampaignsController {
   constructor(private emailCampaigns: EmailCampaignsService) {}
 
   @Post()
-  @Roles(...CAN_MANAGE)
+  @Roles(...CAN_EDIT)
   @Throttle(EMAIL_CAMPAIGN_THROTTLE)
   create(
     @Param('clientId') clientId: string,
@@ -44,7 +45,7 @@ export class EmailCampaignsController {
   }
 
   @Patch(':id')
-  @Roles(...CAN_MANAGE)
+  @Roles(...CAN_EDIT)
   update(
     @Param('clientId') clientId: string,
     @Param('id') id: string,
@@ -65,7 +66,7 @@ export class EmailCampaignsController {
   }
 
   @Post(':id/recipients/bulk')
-  @Roles(...CAN_MANAGE)
+  @Roles(...CAN_EDIT)
   @Throttle(EMAIL_CAMPAIGN_THROTTLE)
   bulkImportRecipients(
     @Param('clientId') clientId: string,
@@ -77,7 +78,7 @@ export class EmailCampaignsController {
   }
 
   @Delete(':id/recipients/:recipientId')
-  @Roles(...CAN_MANAGE)
+  @Roles(...CAN_EDIT)
   removeRecipient(
     @Param('clientId') clientId: string,
     @Param('id') id: string,

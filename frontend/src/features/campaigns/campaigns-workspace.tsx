@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { canDeleteCampaigns, Role } from '@/lib/roles';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +44,8 @@ import {
 } from './types';
 
 export function CampaignsWorkspace({ clientId }: { clientId: string }) {
+  const { user } = useAuth();
+  const canDelete = canDeleteCampaigns(user?.role as Role | undefined);
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [active, setActive] = useState<CampaignDetail | null>(null);
@@ -199,7 +203,7 @@ export function CampaignsWorkspace({ clientId }: { clientId: string }) {
                   <span className="shrink-0">
                     <Badge tone={STATUS_TONE[c.status]}>{c.status}</Badge>
                   </span>
-                  {confirmDeleteId === c.id ? (
+                  {canDelete && (confirmDeleteId === c.id ? (
                     <span className="flex shrink-0 items-center gap-1">
                       <button
                         onClick={() => onDelete(c.id)}
@@ -219,7 +223,7 @@ export function CampaignsWorkspace({ clientId }: { clientId: string }) {
                     <button onClick={() => setConfirmDeleteId(c.id)} className="shrink-0 opacity-0 group-hover:opacity-100" title="Delete campaign" aria-label={`Delete ${c.name}`}>
                       <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
                     </button>
-                  )}
+                  ))}
                 </div>
               ))
             )}

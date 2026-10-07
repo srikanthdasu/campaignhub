@@ -5,6 +5,8 @@ import { RequireRole } from '@/components/require-role';
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { canSendEmailCampaigns, Role } from '@/lib/roles';
 import { useClientPicker } from '@/hooks/use-client-picker';
 import { ClientPicker } from '@/components/client-picker';
 import { Card } from '@/components/ui/card';
@@ -28,13 +30,15 @@ import { parseCsvLine } from './utils';
 
 export function EmailCampaignsPage() {
   return (
-    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'SUPER_ADMIN']}>
+    <RequireRole roles={['OWNER', 'ADMIN', 'MANAGER', 'CLIENT', 'SUPER_ADMIN']}>
       <EmailCampaignsPageContent />
     </RequireRole>
   );
 }
 
 function EmailCampaignsPageContent() {
+  const { user } = useAuth();
+  const canSend = canSendEmailCampaigns(user?.role as Role | undefined);
   const { clients, selectedClientId, setSelectedClientId } = useClientPicker();
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null);
   const [selected, setSelected] = useState<CampaignDetail | null>(null);
@@ -363,7 +367,7 @@ function EmailCampaignsPageContent() {
                 </ul>
               )}
 
-              {isDraft && (
+              {isDraft && canSend && (
                 <Button
                   onClick={onSend}
                   loading={sending}
