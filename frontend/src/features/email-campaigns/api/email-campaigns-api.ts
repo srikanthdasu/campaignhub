@@ -39,3 +39,15 @@ export function updateCampaignDetails(
 export function sendCampaign(clientId: string, id: string) {
   return api.post(`/clients/${clientId}/email-campaigns/${id}/send`);
 }
+
+export function requestSendCampaign(clientId: string, id: string) {
+  return api.post(`/clients/${clientId}/email-campaigns/${id}/request-send`);
+}
+
+export function approveSendCampaign(clientId: string, id: string) {
+  return api.post(`/clients/${clientId}/email-campaigns/${id}/approve-send`);
+}
+
+export function rejectSendCampaign(clientId: string, id: string, reason: string) {
+  return api.post(`/clients/${clientId}/email-campaigns/${id}/reject-send`, { reason });
+}

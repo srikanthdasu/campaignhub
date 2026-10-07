@@ -4,6 +4,7 @@ import { EmailCampaignsService } from './email-campaigns.service.js';
 import { CreateEmailCampaignDto } from './dto/create-email-campaign.dto.js';
 import { UpdateEmailCampaignDto } from './dto/update-email-campaign.dto.js';
 import { BulkImportRecipientsDto } from './dto/bulk-import-recipients.dto.js';
+import { RejectSendDto } from './dto/reject-send.dto.js';
 import { ClientAccessGuard } from '../common/guards/client-access.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -97,5 +98,42 @@ export class EmailCampaignsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.emailCampaigns.send(clientId, id, user.sub);
+  }
+
+  // CLIENT's equivalent of send() — CAN_EDIT (not CAN_MANAGE), since CLIENT can never send
+  // directly. Puts the campaign in PENDING_APPROVAL for an admin to decide via approve-send/
+  // reject-send below.
+  @Post(':id/request-send')
+  @Roles(...CAN_EDIT)
+  @Throttle(EMAIL_CAMPAIGN_THROTTLE)
+  requestSend(
+    @Param('clientId') clientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.emailCampaigns.requestSend(clientId, id, user.sub);
+  }
+
+  @Post(':id/approve-send')
+  @Roles(...CAN_MANAGE)
+  @Throttle(EMAIL_CAMPAIGN_THROTTLE)
+  approveSend(
+    @Param('clientId') clientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.emailCampaigns.approveSend(clientId, id, user.sub);
+  }
+
+  @Post(':id/reject-send')
+  @Roles(...CAN_MANAGE)
+  @Throttle(EMAIL_CAMPAIGN_THROTTLE)
+  rejectSend(
+    @Param('clientId') clientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RejectSendDto,
+  ) {
+    return this.emailCampaigns.rejectSend(clientId, id, user.sub, dto.reason);
   }
 }

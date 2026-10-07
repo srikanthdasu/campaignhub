@@ -44,6 +44,12 @@ function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscri
       findUnique: vi.fn(() => Promise.resolve(null)),
       upsert: vi.fn(() => Promise.resolve({})),
     },
+    user: {
+      findMany: vi.fn(() => Promise.resolve([{ id: 'admin-1' }, { id: 'admin-2' }])),
+    },
+    client: {
+      findUnique: vi.fn(() => Promise.resolve({ agencyId: 'agency-1', name: 'Acme Client' })),
+    },
   };
   const notifications = { create: vi.fn(), createMany: vi.fn() };
   const service = new EmailCampaignsService(
@@ -144,6 +150,105 @@ describe('EmailCampaignsService.send', () => {
     const { service } = buildService({ campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.SENT } });
     await expect(service.send('client-1', 'campaign-1', 'actor-1')).rejects.toThrow(
       'already been queued or sent',
+    );
+  });
+});
+
+describe('EmailCampaignsService.requestSend / approveSend / rejectSend', () => {
+  it('rejects a send request with zero pending recipients', async () => {
+    const { service, prisma } = buildService();
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+    await expect(service.requestSend('client-1', 'campaign-1', 'actor-1')).rejects.toThrow(
+      'Add at least one recipient',
+    );
+  });
+
+  it('moves a DRAFT campaign to PENDING_APPROVAL, stamps the requester, and notifies agency admins', async () => {
+    const { service, prisma, notifications } = buildService();
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(3)) as any;
+
+    const result = await service.requestSend('client-1', 'campaign-1', 'client-user-1');
+
+    expect(result.status).toBe(EmailCampaignStatus.PENDING_APPROVAL);
+    expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: EmailCampaignStatus.PENDING_APPROVAL,
+          requestedById: 'client-user-1',
+          rejectionReason: null,
+        }),
+      }),
+    );
+    expect(notifications.createMany).toHaveBeenCalledWith(
+      ['admin-1', 'admin-2'],
+      expect.stringContaining('Acme Client'),
+      '/email-campaigns',
+    );
+  });
+
+  it('rejects requesting a send for a campaign that is not DRAFT', async () => {
+    const { service } = buildService({ campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED } });
+    await expect(service.requestSend('client-1', 'campaign-1', 'actor-1')).rejects.toThrow(
+      'already been queued or sent',
+    );
+  });
+
+  it('approves a PENDING_APPROVAL campaign into QUEUED, stamps the approver, and notifies the requester', async () => {
+    const { service, prisma, notifications } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.PENDING_APPROVAL, name: 'Spring Sale', requestedById: 'client-user-1' },
+    });
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(3)) as any;
+
+    const result = await service.approveSend('client-1', 'campaign-1', 'admin-1');
+
+    expect(result.status).toBe(EmailCampaignStatus.QUEUED);
+    expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: EmailCampaignStatus.QUEUED, approvedById: 'admin-1' }),
+      }),
+    );
+    expect(notifications.create).toHaveBeenCalledWith(
+      'client-user-1',
+      expect.stringContaining('Spring Sale'),
+      '/email-campaigns',
+    );
+  });
+
+  it('rejects approving a campaign that is not PENDING_APPROVAL', async () => {
+    const { service } = buildService({ campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.DRAFT } });
+    await expect(service.approveSend('client-1', 'campaign-1', 'admin-1')).rejects.toThrow(
+      'not waiting for approval',
+    );
+  });
+
+  it('rejects a send request, returns the campaign to DRAFT with the reason stored, and notifies the requester', async () => {
+    const { service, prisma, notifications } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.PENDING_APPROVAL, name: 'Spring Sale', requestedById: 'client-user-1' },
+    });
+
+    const result = await service.rejectSend('client-1', 'campaign-1', 'admin-1', 'Fix the typo in the subject');
+
+    expect(result.status).toBe(EmailCampaignStatus.DRAFT);
+    expect(prisma.emailCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: EmailCampaignStatus.DRAFT,
+          requestedById: null,
+          rejectionReason: 'Fix the typo in the subject',
+        }),
+      }),
+    );
+    expect(notifications.create).toHaveBeenCalledWith(
+      'client-user-1',
+      expect.stringContaining('Fix the typo in the subject'),
+      '/email-campaigns',
+    );
+  });
+
+  it('rejects rejecting a campaign that is not PENDING_APPROVAL', async () => {
+    const { service } = buildService({ campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.DRAFT } });
+    await expect(service.rejectSend('client-1', 'campaign-1', 'admin-1', 'reason')).rejects.toThrow(
+      'not waiting for approval',
     );
   });
 });

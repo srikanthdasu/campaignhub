@@ -25,6 +25,9 @@ import {
   removeRecipient,
   updateCampaignDetails,
   sendCampaign,
+  requestSendCampaign,
+  approveSendCampaign,
+  rejectSendCampaign,
 } from './api/email-campaigns-api';
 import { parseCsvLine } from './utils';
 
@@ -51,6 +54,11 @@ function EmailCampaignsPageContent() {
 
   const [importing, setImporting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [requestingSend, setRequestingSend] = useState(false);
+  const [approvingSend, setApprovingSend] = useState(false);
+  const [rejectingSend, setRejectingSend] = useState(false);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const [editingDetails, setEditingDetails] = useState(false);
   const [editName, setEditName] = useState('');
@@ -188,7 +196,56 @@ function EmailCampaignsPageContent() {
     }
   }
 
+  async function onRequestSend() {
+    if (!selected) return;
+    setRequestingSend(true);
+    setError(null);
+    try {
+      await requestSendCampaign(selectedClientId, selected.id);
+      loadSelected(selected.id);
+      loadCampaigns();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to request send');
+    } finally {
+      setRequestingSend(false);
+    }
+  }
+
+  async function onApproveSend() {
+    if (!selected) return;
+    setApprovingSend(true);
+    setError(null);
+    try {
+      await approveSendCampaign(selectedClientId, selected.id);
+      loadSelected(selected.id);
+      loadCampaigns();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to approve send');
+    } finally {
+      setApprovingSend(false);
+    }
+  }
+
+  async function onRejectSend(e: FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    setRejectingSend(true);
+    setError(null);
+    try {
+      await rejectSendCampaign(selectedClientId, selected.id, rejectReason);
+      setShowRejectForm(false);
+      setRejectReason('');
+      loadSelected(selected.id);
+      loadCampaigns();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to reject send');
+    } finally {
+      setRejectingSend(false);
+    }
+  }
+
   const isDraft = selected?.status === 'DRAFT';
+  const isPendingApproval = selected?.status === 'PENDING_APPROVAL';
 
   return (
     <motion.div variants={staggerContainer(0.08)} initial="hidden" animate="show" className="max-w-4xl space-y-6">
@@ -314,6 +371,20 @@ function EmailCampaignsPageContent() {
                 </div>
               )}
 
+              {isDraft && selected.rejectionReason && (
+                <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-200">
+                  Your last send request was rejected: {selected.rejectionReason}
+                </p>
+              )}
+
+              {isPendingApproval && (
+                <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-200">
+                  {canSend
+                    ? 'This campaign is waiting for your approval before it sends.'
+                    : 'Your send request is waiting for an admin to approve it.'}
+                </p>
+              )}
+
               {isDraft && (
                 <div className="border-t border-white/10 pt-4">
                   <div className="flex items-center justify-between">
@@ -376,6 +447,47 @@ function EmailCampaignsPageContent() {
                 >
                   Send to {selected.recipients.filter((r) => r.status === 'PENDING').length} recipient(s)
                 </Button>
+              )}
+
+              {isDraft && !canSend && (
+                <Button
+                  onClick={onRequestSend}
+                  loading={requestingSend}
+                  disabled={selected.recipients.filter((r) => r.status === 'PENDING').length === 0}
+                  className="w-full"
+                >
+                  Request send to {selected.recipients.filter((r) => r.status === 'PENDING').length} recipient(s)
+                </Button>
+              )}
+
+              {isPendingApproval && canSend && !showRejectForm && (
+                <div className="flex gap-2">
+                  <Button onClick={onApproveSend} loading={approvingSend} className="flex-1">
+                    Approve &amp; send
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setShowRejectForm(true)}>
+                    Reject
+                  </Button>
+                </div>
+              )}
+
+              {isPendingApproval && canSend && showRejectForm && (
+                <form onSubmit={onRejectSend} className="space-y-2">
+                  <Input
+                    label="Reason for rejecting"
+                    required
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit" variant="danger" loading={rejectingSend} className="flex-1">
+                      Confirm reject
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setShowRejectForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
               )}
             </Card>
           )}

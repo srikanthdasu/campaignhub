@@ -164,7 +164,9 @@ model User {
   adCampaignsCreated     AdCampaign[]        @relation("AdCampaignCreatedBy")
   adCampaignsApproved    AdCampaign[]        @relation("AdCampaignApprovedBy")
   notifications          Notification[]
-  emailCampaignsCreated  EmailCampaign[]
+  emailCampaignsCreated   EmailCampaign[] @relation("EmailCampaignCreatedBy")
+  emailCampaignsRequested EmailCampaign[] @relation("EmailCampaignRequestedBy")
+  emailCampaignsApproved  EmailCampaign[] @relation("EmailCampaignApprovedBy")
 
   @@index([agencyId])
   @@index([agencyId, role])
@@ -871,6 +873,10 @@ model Invoice {
 
 enum EmailCampaignStatus {
   DRAFT
+  // A CLIENT-requested send waiting on an Owner/Admin/Manager decision — see EmailCampaign's
+  // requestedBy/approvedBy fields below. Agency staff sending their own drafts skip this status
+  // entirely via the unchanged direct DRAFT -> QUEUED send() path.
+  PENDING_APPROVAL
   QUEUED
   SENDING
   SENT
@@ -897,7 +903,18 @@ model EmailCampaign {
   bodyTemplate String              @map("body_template")
   status       EmailCampaignStatus @default(DRAFT)
   createdById  String?             @map("created_by_id") @db.Uuid
-  createdBy    User?               @relation(fields: [createdById], references: [id])
+  createdBy    User?               @relation("EmailCampaignCreatedBy", fields: [createdById], references: [id])
+  // Client-requests/Admin-approves send gate (DRAFT -> PENDING_APPROVAL -> QUEUED or back to
+  // DRAFT on rejection) — mirrors AdCampaign's single approvedBy/approvedAt pair rather than the
+  // generic ApprovalFlow/ApprovalStep model, since this is one requester + one approver gate, not
+  // a multi-step reviewer chain.
+  requestedById   String?   @map("requested_by_id") @db.Uuid
+  requestedBy     User?     @relation("EmailCampaignRequestedBy", fields: [requestedById], references: [id])
+  requestedAt     DateTime? @map("requested_at")
+  approvedById    String?   @map("approved_by_id") @db.Uuid
+  approvedBy      User?     @relation("EmailCampaignApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime? @map("approved_at")
+  rejectionReason String?   @map("rejection_reason")
   queuedAt     DateTime?           @map("queued_at")
   sentAt       DateTime?           @map("sent_at")
   createdAt    DateTime            @default(now()) @map("created_at")

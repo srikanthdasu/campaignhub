@@ -8,7 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { CreateEmailCampaignDto } from './dto/create-email-campaign.dto.js';
 import { UpdateEmailCampaignDto } from './dto/update-email-campaign.dto.js';
 import { BulkImportRecipientsDto } from './dto/bulk-import-recipients.dto.js';
-import { EmailCampaignStatus, EmailRecipientStatus } from '../generated/prisma/client.js';
+import { EmailCampaignStatus, EmailRecipientStatus, Role } from '../generated/prisma/client.js';
 import { requireInClient } from '../common/require-in-client.js';
 
 const DEFAULT_BATCH_SIZE = 20;
@@ -202,6 +202,153 @@ export class EmailCampaignsService {
     });
 
     return queued;
+  }
+
+  // Agency staff who can act on a pending-approval request. Mirrors billing.service.ts's
+  // notifyAgencyAdmins() exactly, except MANAGER is included here (not just OWNER/ADMIN) since
+  // Manager is part of this feature's own CAN_MANAGE tier in the controller.
+  private async notifyAgencyAdmins(agencyId: string, message: string) {
+    const admins = await this.prisma.user.findMany({
+      where: { agencyId, role: { in: [Role.OWNER, Role.ADMIN, Role.MANAGER] }, isActive: true },
+      select: { id: true },
+    });
+    if (admins.length > 0) {
+      await this.notifications.createMany(admins.map((a) => a.id), message, '/email-campaigns');
+    }
+  }
+
+  // CLIENT's equivalent of send() — a CAN_EDIT-role requester asks for a send instead of
+  // dispatching directly, since they're never in CAN_MANAGE. Same preconditions as send();
+  // transitions to PENDING_APPROVAL instead of QUEUED, and notifies whoever can decide it.
+  async requestSend(clientId: string, id: string, actorId: string) {
+    const campaign = await this.requireInClient(id, clientId);
+    if (campaign.status !== EmailCampaignStatus.DRAFT) {
+      throw new BadRequestException('This campaign has already been queued or sent');
+    }
+
+    const pendingCount = await this.prisma.emailRecipient.count({
+      where: { campaignId: id, status: EmailRecipientStatus.PENDING },
+    });
+    if (pendingCount === 0) {
+      throw new BadRequestException(
+        'Add at least one recipient who is not already unsubscribed before requesting a send',
+      );
+    }
+
+    const client = await this.prisma.client.findUnique({
+      where: { id: campaign.clientId },
+      select: { agencyId: true, name: true },
+    });
+
+    const requested = await this.prisma.emailCampaign.update({
+      where: { id },
+      data: {
+        status: EmailCampaignStatus.PENDING_APPROVAL,
+        requestedById: actorId,
+        requestedAt: new Date(),
+        // Clears any banner a previously-rejected request left behind — this is a fresh request.
+        rejectionReason: null,
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'EMAIL_CAMPAIGN_SEND_REQUESTED',
+      entityType: 'email_campaign',
+      entityId: id,
+      metadata: { recipientCount: pendingCount },
+    });
+
+    if (client) {
+      await this.notifyAgencyAdmins(
+        client.agencyId,
+        `${client.name} requested approval to send "${requested.name}" to ${pendingCount} recipient(s)`,
+      );
+    }
+
+    return requested;
+  }
+
+  // Decides a PENDING_APPROVAL request. Approving does exactly what send() does today (queue for
+  // the existing cron to pick up) — the only difference is who triggered it and the audit trail
+  // left behind. Rejecting returns the campaign to DRAFT so the requester can fix and re-request,
+  // reusing the existing DRAFT-only edit guards on update()/bulkImportRecipients() unchanged.
+  async approveSend(clientId: string, id: string, actorId: string) {
+    const campaign = await this.requireInClient(id, clientId);
+    if (campaign.status !== EmailCampaignStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('This campaign is not waiting for approval');
+    }
+
+    const pendingCount = await this.prisma.emailRecipient.count({
+      where: { campaignId: id, status: EmailRecipientStatus.PENDING },
+    });
+    if (pendingCount === 0) {
+      throw new BadRequestException('No pending recipients remain to send to');
+    }
+
+    const now = new Date();
+    const approved = await this.prisma.emailCampaign.update({
+      where: { id },
+      data: {
+        status: EmailCampaignStatus.QUEUED,
+        approvedById: actorId,
+        approvedAt: now,
+        queuedAt: now,
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'EMAIL_CAMPAIGN_SEND_APPROVED',
+      entityType: 'email_campaign',
+      entityId: id,
+      metadata: { recipientCount: pendingCount },
+    });
+
+    if (campaign.requestedById) {
+      await this.notifications.create(
+        campaign.requestedById,
+        `Your send request for "${approved.name}" was approved and is now sending`,
+        '/email-campaigns',
+      );
+    }
+
+    return approved;
+  }
+
+  async rejectSend(clientId: string, id: string, actorId: string, reason: string) {
+    const campaign = await this.requireInClient(id, clientId);
+    if (campaign.status !== EmailCampaignStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('This campaign is not waiting for approval');
+    }
+
+    const rejected = await this.prisma.emailCampaign.update({
+      where: { id },
+      data: {
+        status: EmailCampaignStatus.DRAFT,
+        requestedById: null,
+        requestedAt: null,
+        rejectionReason: reason,
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'EMAIL_CAMPAIGN_SEND_REJECTED',
+      entityType: 'email_campaign',
+      entityId: id,
+      metadata: { reason },
+    });
+
+    if (campaign.requestedById) {
+      await this.notifications.create(
+        campaign.requestedById,
+        `Your send request for "${rejected.name}" was rejected: ${reason}`,
+        '/email-campaigns',
+      );
+    }
+
+    return rejected;
   }
 
   /**
