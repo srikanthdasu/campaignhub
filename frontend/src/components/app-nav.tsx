@@ -125,6 +125,8 @@ const sections: { label: string; links: NavLink[] }[] = [
 function buildClientSections(canCreate: boolean): { label: string; links: NavLink[] }[] {
   const portalLinks: NavLink[] = [
     { href: '/client-portal', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+    { href: '/campaigns', label: 'Campaigns', icon: Megaphone, adminOnly: false },
+    { href: '/email-campaigns', label: 'Email Campaigns', icon: Mail, adminOnly: false },
   ];
   if (canCreate) {
     portalLinks.push(
@@ -137,6 +139,7 @@ function buildClientSections(canCreate: boolean): { label: string; links: NavLin
     );
   }
   portalLinks.push(
+    { href: '/social-accounts', label: 'Social Accounts', icon: Share2, adminOnly: false },
     { href: '/approvals', label: 'Approvals', icon: CheckSquare, adminOnly: false },
     { href: '/analytics', label: 'Analytics', icon: BarChart3, adminOnly: false },
   );
