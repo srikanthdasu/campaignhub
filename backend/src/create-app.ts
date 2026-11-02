@@ -73,7 +73,15 @@ export async function createApp(): Promise<NestExpressApplication> {
           // 'https://accounts.google.com/gsi/client' + frameSrc/connectSrc below let Google
           // Identity Services load its script, render its iframe-based Sign-In button, and make
           // its own network calls — needed for Google Sign-In (auth.service.ts googleAuth()).
-          scriptSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/client'],
+          // 'https://connect.facebook.net' is the Meta JS SDK used for WhatsApp Embedded Signup
+          // (social-accounts-page.tsx) — without it the script load is blocked, so window.FB never
+          // exists and clicking "Connect WhatsApp" silently does nothing (confirmed in prod console).
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://accounts.google.com/gsi/client',
+            'https://connect.facebook.net',
+          ],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
           // https://*.blob.core.windows.net: MediaAsset URLs are Azure Blob SAS links
           // (BlobStorageService.getReadUrl) once AZURE_STORAGE_CONNECTION_STRING is configured —
