@@ -76,17 +76,23 @@ export async function createApp(): Promise<NestExpressApplication> {
           // 'https://connect.facebook.net' is the Meta JS SDK used for WhatsApp Embedded Signup
           // (social-accounts-page.tsx) — without it the script load is blocked, so window.FB never
           // exists and clicking "Connect WhatsApp" silently does nothing (confirmed in prod console).
+          // 'https://checkout.razorpay.com' is Razorpay's checkout widget (billing-page.tsx /
+          // razorpay.ts loadRazorpayScript()) — same failure mode: blocked script load leaves
+          // window.Razorpay undefined, so `new window.Razorpay(...)` throws and every checkout
+          // attempt fails with a generic "Failed to start checkout" (confirmed in prod).
           scriptSrc: [
             "'self'",
             "'unsafe-inline'",
             'https://accounts.google.com/gsi/client',
             'https://connect.facebook.net',
+            'https://checkout.razorpay.com',
           ],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
           // https://*.blob.core.windows.net: MediaAsset URLs are Azure Blob SAS links
           // (BlobStorageService.getReadUrl) once AZURE_STORAGE_CONNECTION_STRING is configured —
           // without this, CSP would block every uploaded image/video the moment that happens.
-          imgSrc: ["'self'", 'data:', 'blob:', 'https://*.blob.core.windows.net'],
+          // https://*.razorpay.com: payment method icons/logos the checkout widget renders inline.
+          imgSrc: ["'self'", 'data:', 'blob:', 'https://*.blob.core.windows.net', 'https://*.razorpay.com'],
           fontSrc: ["'self'", 'data:'],
           // https://*.sentry.io: both the frontend and backend Sentry projects report errors
           // over fetch/XHR from the browser — without this, every report is silently blocked by
@@ -95,8 +101,19 @@ export async function createApp(): Promise<NestExpressApplication> {
           // the frontend's known ingest host (o4512129443102720.ingest.de.sentry.io) because the
           // backend's SENTRY_DSN is only set as an Azure App Setting, not in the repo — if it's a
           // different Sentry org/region, a pinned host would silently miss it the same way.
-          connectSrc: ["'self'", 'https://accounts.google.com', 'https://*.sentry.io'],
-          frameSrc: ['https://accounts.google.com'],
+          // https://api.razorpay.com + https://lumberjack.razorpay.com: the checkout widget calls
+          // these directly from the browser (order validation, its own client-side logging) once
+          // open() runs — without them the widget opens but every internal call it makes is blocked.
+          connectSrc: [
+            "'self'",
+            'https://accounts.google.com',
+            'https://*.sentry.io',
+            'https://api.razorpay.com',
+            'https://lumberjack.razorpay.com',
+          ],
+          // https://api.razorpay.com: the checkout widget renders its card/UPI entry form in an
+          // iframe from this origin — without it the payment modal opens visually empty/broken.
+          frameSrc: ['https://accounts.google.com', 'https://api.razorpay.com'],
           mediaSrc: ["'self'", 'blob:', 'https://*.blob.core.windows.net'],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],

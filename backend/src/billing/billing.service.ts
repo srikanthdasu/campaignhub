@@ -66,6 +66,13 @@ export class BillingService {
     return PLANS;
   }
 
+  // The frontend shows a "test mode, no real money moves" banner on the Billing page — it needs
+  // to know which mode is actually configured rather than always claiming test mode, which became
+  // actively misleading the moment live keys went into production.
+  getPaymentMode() {
+    return { live: this.razorpay.keyId.startsWith('rzp_live_') };
+  }
+
   // Billing events matter to whoever can act on them, not just whoever happened to click
   // "Subscribe" — an Owner/Admin who wasn't at the keyboard for a webhook-driven activation, a
   // cancellation, or a failed payment still needs to know.

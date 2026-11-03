@@ -20,6 +20,7 @@ import {
   cancelSubscription,
   createCheckout,
   fetchInvoices,
+  fetchPaymentMode,
   fetchPlans,
   fetchSubscription,
   refundInvoice,
@@ -47,9 +48,11 @@ function BillingPageContent() {
   const [gstNumber, setGstNumber] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveMode, setLiveMode] = useState<boolean | null>(null);
 
   function load() {
     fetchPlans().then(setPlans);
+    fetchPaymentMode().then((mode) => setLiveMode(mode.live));
     if (canView) {
       fetchSubscription().then(setSubscription);
       fetchInvoices().then(setInvoices);
@@ -141,10 +144,13 @@ function BillingPageContent() {
       <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }}>
         <h1 className="text-2xl font-semibold text-neutral-50">Billing &amp; Subscriptions</h1>
         <p className="text-sm text-neutral-400">Simple plans. Secure payments. Seamless experience.</p>
-        <p className="mt-2 text-xs text-amber-300/80">
-          Checkout runs through Razorpay in test mode — use a test card, no real money moves.
-          Every plan record, invoice, and payment ID below is real.
-        </p>
+        {liveMode !== null && (
+          <p className="mt-2 text-xs text-amber-300/80">
+            {liveMode
+              ? 'Checkout runs through Razorpay in live mode — real payments, real money moves.'
+              : 'Checkout runs through Razorpay in test mode — use a test card, no real money moves. Every plan record, invoice, and payment ID below is real.'}
+          </p>
+        )}
       </motion.div>
 
       {!canView ? (

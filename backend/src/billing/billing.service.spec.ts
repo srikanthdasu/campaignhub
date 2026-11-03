@@ -18,6 +18,7 @@ function buildService(
     duplicatePaymentRef?: boolean;
     existingInvoice?: any;
     invoice?: any;
+    keyId?: string;
   } = {},
 ) {
   const prisma = {
@@ -56,7 +57,7 @@ function buildService(
   const audit = { log: vi.fn() };
   const notifications = { create: vi.fn(), createMany: vi.fn() };
   const razorpay = {
-    keyId: 'rzp_test_fake',
+    keyId: overrides.keyId ?? 'rzp_test_fake',
     createOrder: vi.fn((amount: number) => Promise.resolve({ id: 'order_1', amount: amount * 100, currency: 'INR' })),
     fetchOrder: vi.fn(() =>
       Promise.resolve({
@@ -81,6 +82,18 @@ function buildService(
   );
   return { service, prisma, audit, razorpay, notifications };
 }
+
+describe('BillingService.getPaymentMode', () => {
+  it('reports live mode when the configured key starts with rzp_live_', () => {
+    const { service } = buildService({ keyId: 'rzp_live_real' });
+    expect(service.getPaymentMode()).toEqual({ live: true });
+  });
+
+  it('reports test mode when the configured key starts with rzp_test_', () => {
+    const { service } = buildService({ keyId: 'rzp_test_fake' });
+    expect(service.getPaymentMode()).toEqual({ live: false });
+  });
+});
 
 describe('BillingService.createCheckoutOrder', () => {
   it('opens a real Razorpay order for the monthly Starter price', async () => {

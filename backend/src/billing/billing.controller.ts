@@ -23,6 +23,11 @@ export class BillingController {
     return this.billingService.getPlans();
   }
 
+  @Get('payment-mode')
+  getPaymentMode() {
+    return this.billingService.getPaymentMode();
+  }
+
   @Get('subscription')
   @Roles(...CAN_VIEW)
   getSubscription(@CurrentUser() user: AuthenticatedUser) {

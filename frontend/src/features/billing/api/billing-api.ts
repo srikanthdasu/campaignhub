@@ -5,6 +5,10 @@ export function fetchPlans() {
   return api.get<PlanDefinition[]>('/billing/plans');
 }
 
+export function fetchPaymentMode() {
+  return api.get<{ live: boolean }>('/billing/payment-mode');
+}
+
 export function fetchSubscription() {
   return api.get<Subscription | null>('/billing/subscription');
 }
