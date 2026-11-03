@@ -104,12 +104,23 @@ export async function createApp(): Promise<NestExpressApplication> {
           // https://api.razorpay.com + https://lumberjack.razorpay.com: the checkout widget calls
           // these directly from the browser (order validation, its own client-side logging) once
           // open() runs — without them the widget opens but every internal call it makes is blocked.
+          // https://www.facebook.com: the Meta JS SDK (connect.facebook.net) fires its own
+          // impression/telemetry pings to this host during WhatsApp Embedded Signup — blocked
+          // without it (confirmed in prod console: repeated "Fetch API cannot load .../impression.php"
+          // CSP violations alongside every failed connect attempt).
+          // https://connect.facebook.net: separately from loading as a <script> tag (already in
+          // scriptSrc above), the SDK also fetch()es its own app config from this same host
+          // (.../app_config/json/<appId>/) — a connect-src concern, not script-src. Without this
+          // the SDK script loads but never finishes initializing, so FB.login() never actually
+          // succeeds even though window.FB exists (confirmed in prod console).
           connectSrc: [
             "'self'",
             'https://accounts.google.com',
             'https://*.sentry.io',
             'https://api.razorpay.com',
             'https://lumberjack.razorpay.com',
+            'https://www.facebook.com',
+            'https://connect.facebook.net',
           ],
           // https://api.razorpay.com: the checkout widget renders its card/UPI entry form in an
           // iframe from this origin — without it the payment modal opens visually empty/broken.
