@@ -38,3 +38,37 @@ export interface CampaignDetail extends Omit<CampaignSummary, '_count'> {
   recipients: Recipient[];
   rejectionReason: string | null;
 }
+
+export type SenderVerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED';
+
+export const SENDER_STATUS_TONE: Record<SenderVerificationStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  PENDING: 'warning',
+  VERIFIED: 'success',
+  FAILED: 'danger',
+};
+
+export interface SenderDnsRecord {
+  type: string;
+  hostName: string;
+  value: string;
+  status: boolean;
+}
+
+export interface SenderConfig {
+  senderName: string;
+  senderEmail: string;
+  domain: string;
+  verificationStatus: SenderVerificationStatus;
+  dailySendLimit: number | null;
+  monthlySendLimit: number | null;
+}
+
+export interface SenderUpsertResult {
+  sender: SenderConfig;
+  dnsRecords: SenderDnsRecord[] | null;
+}
+
+export interface SenderVerifyResult {
+  sender: SenderConfig;
+  message: string;
+}

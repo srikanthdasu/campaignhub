@@ -42,14 +42,29 @@ export class EmailService {
    * "best effort, never throws" can keep awaiting this and ignoring the result unchanged. Added
    * for bulk email campaigns, which need a real sent/failed signal per recipient to report back
    * to the agency, rather than silently treating every attempt as successful.
+   *
+   * `sender` is optional and per-call only — when provided (a client's own verified
+   * ClientEmailSender identity), it overrides `this.from` for just this one message; every
+   * existing caller that omits it keeps using the platform default unchanged.
+   *
+   * `html` is likewise optional and per-call only — when omitted, nodemailer sends a plain-text
+   * message exactly as before. Added so email campaigns can render a real "Unsubscribe" button;
+   * `text` is always sent alongside it as the fallback for clients that don't render HTML.
    */
-  async send(to: string, subject: string, text: string): Promise<boolean> {
+  async send(
+    to: string,
+    subject: string,
+    text: string,
+    sender?: { name: string; email: string },
+    html?: string,
+  ): Promise<boolean> {
+    const from = sender ? `"${sender.name}" <${sender.email}>` : this.from;
     if (!this.transporter) {
       this.logger.log(`[email not configured] would send to ${to}: "${subject}"`);
       return false;
     }
     try {
-      await this.transporter.sendMail({ from: this.from, to, subject, text });
+      await this.transporter.sendMail({ from, to, subject, text, ...(html ? { html } : {}) });
       return true;
     } catch (err) {
       this.logger.error(`Failed to send email to ${to}: ${err instanceof Error ? err.message : String(err)}`);

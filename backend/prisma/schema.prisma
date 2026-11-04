@@ -113,6 +113,7 @@ model Client {
   adCampaigns       AdCampaign[]
   emailCampaigns    EmailCampaign[]
   emailUnsubscribes EmailUnsubscribe[]
+  emailSender       ClientEmailSender?
 
   // Covers every real service-layer query on this table: both the plain agencyId lookups and the
   // agencyId+deletedAt filters clients.service.ts/dashboard.service.ts actually run — leftmost-
@@ -167,6 +168,7 @@ model User {
   emailCampaignsCreated   EmailCampaign[] @relation("EmailCampaignCreatedBy")
   emailCampaignsRequested EmailCampaign[] @relation("EmailCampaignRequestedBy")
   emailCampaignsApproved  EmailCampaign[] @relation("EmailCampaignApprovedBy")
+  clientEmailSendersCreated ClientEmailSender[] @relation("ClientEmailSenderCreatedBy")
 
   @@index([agencyId])
   @@index([agencyId, role])
@@ -928,6 +930,46 @@ model EmailCampaign {
   // is dropped as redundant now that this exists.
   @@index([clientId, status])
   @@map("email_campaigns")
+}
+
+enum ClientEmailSenderProvider {
+  BREVO
+}
+
+enum ClientEmailSenderVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+// Per-client "send as" identity for email campaigns — separate from EmailService's single global
+// platform sender (password resets, system notifications), which stays untouched. A client with
+// no row here just falls back to the platform sender, so this is purely additive: existing clients
+// keep working exactly as before until someone configures a sender for them.
+model ClientEmailSender {
+  id                 String                               @id @default(uuid()) @db.Uuid
+  clientId           String                               @map("client_id") @db.Uuid
+  client             Client                               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  senderName         String                               @map("sender_name")
+  senderEmail        String                               @map("sender_email")
+  domain             String
+  provider           ClientEmailSenderProvider             @default(BREVO)
+  verificationStatus ClientEmailSenderVerificationStatus   @default(PENDING) @map("verification_status")
+  verifiedAt         DateTime?                             @map("verified_at")
+  // Brevo's own domain id (the "id" field POST /v3/senders/domains returns) — needed to call
+  // their GET/PUT-authenticate endpoints by name later; domain_name is already unique-enough on
+  // their side, but storing this avoids relying on that assumption holding forever.
+  providerDomainId   String?                               @map("provider_domain_id")
+  dailySendLimit     Int?                                  @map("daily_send_limit")
+  monthlySendLimit   Int?                                  @map("monthly_send_limit")
+  createdById        String?                               @map("created_by_id") @db.Uuid
+  createdBy          User?                                 @relation("ClientEmailSenderCreatedBy", fields: [createdById], references: [id])
+  createdAt          DateTime                              @default(now()) @map("created_at")
+
+  // One sender per client for now — simplest lookup/UI shape; moving to multiple senders per
+  // client later only requires dropping this constraint, not a breaking schema change.
+  @@unique([clientId])
+  @@map("client_email_senders")
 }
 
 model EmailRecipient {

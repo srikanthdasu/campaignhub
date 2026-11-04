@@ -6,6 +6,7 @@ import type { AuditService } from '../audit/audit.service.js';
 import type { EmailService } from '../notifications/email.service.js';
 import type { ConfigService } from '@nestjs/config';
 import type { NotificationsService } from '../notifications/notifications.service.js';
+import type { ClientEmailSenderService } from './client-email-sender.service.js';
 
 function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscribes?: any[] } = {}) {
   const campaign = overrides.campaign ?? {
@@ -52,14 +53,19 @@ function buildService(overrides: { campaign?: any; recipients?: any[]; unsubscri
     },
   };
   const notifications = { create: vi.fn(), createMany: vi.fn() };
+  const clientEmailSender = {
+    checkQuota: vi.fn(() => Promise.resolve()),
+    resolveSenderForSend: vi.fn(() => Promise.resolve(null)),
+  };
   const service = new EmailCampaignsService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     email as unknown as EmailService,
     config as unknown as ConfigService,
     notifications as unknown as NotificationsService,
+    clientEmailSender as unknown as ClientEmailSenderService,
   );
-  return { service, prisma, audit, email, config, campaign, notifications };
+  return { service, prisma, audit, email, config, campaign, notifications, clientEmailSender };
 }
 
 describe('EmailCampaignsService — tenant scoping', () => {
@@ -151,6 +157,16 @@ describe('EmailCampaignsService.send', () => {
     await expect(service.send('client-1', 'campaign-1', 'actor-1')).rejects.toThrow(
       'already been queued or sent',
     );
+  });
+
+  it('rejects sending when the client sender quota would be exceeded', async () => {
+    const { service, prisma, clientEmailSender } = buildService();
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(3)) as any;
+    clientEmailSender.checkQuota = vi.fn(() =>
+      Promise.reject(new Error("This would exceed the client's daily send limit")),
+    );
+    await expect(service.send('client-1', 'campaign-1', 'actor-1')).rejects.toThrow('daily send limit');
+    expect(clientEmailSender.checkQuota).toHaveBeenCalledWith('client-1', 3);
   });
 });
 
@@ -265,8 +281,20 @@ describe('EmailCampaignsService.processQueuedCampaigns', () => {
     const sent = await service.processQueuedCampaigns();
 
     expect(sent).toBe(1);
-    expect(email.send).toHaveBeenCalledWith('priya@example.com', 'Hi', expect.stringContaining('Hello Priya!'));
-    expect(email.send).toHaveBeenCalledWith('priya@example.com', 'Hi', expect.stringContaining('Unsubscribe:'));
+    expect(email.send).toHaveBeenCalledWith(
+      'priya@example.com',
+      'Hi',
+      expect.stringContaining('Hello Priya!'),
+      undefined,
+      expect.any(String),
+    );
+    expect(email.send).toHaveBeenCalledWith(
+      'priya@example.com',
+      'Hi',
+      expect.stringContaining('Unsubscribe:'),
+      undefined,
+      expect.any(String),
+    );
     // The atomic claim (PENDING -> SENT) is what actually performs the status transition now.
     expect(prisma.emailRecipient.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -278,6 +306,37 @@ describe('EmailCampaignsService.processQueuedCampaigns', () => {
     expect(prisma.emailRecipient.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'r1' }, data: expect.objectContaining({ unsubscribeTokenHash: expect.any(String) }) }),
     );
+  });
+
+  it('renders an HTML body with a real unsubscribe button, escaping the campaign body first', async () => {
+    const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'Priya & Co', email: 'priya@example.com', status: EmailRecipientStatus.PENDING };
+    const { service, prisma, email } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'Hello {{name}}! <b>Deal</b>' },
+      recipients: [recipient],
+    });
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+
+    await service.processQueuedCampaigns();
+
+    const htmlArg = (email.send as any).mock.calls[0][4];
+    expect(htmlArg).toContain('Hello Priya &amp; Co! &lt;b&gt;Deal&lt;/b&gt;');
+    expect(htmlArg).toMatch(/<a href="[^"]+\/unsubscribe\?token=[^"]+"[^>]*>Unsubscribe<\/a>/);
+  });
+
+  it("uses the client's verified sender identity when one is configured, instead of the platform default", async () => {
+    const recipient = { id: 'r1', campaignId: 'campaign-1', name: 'Priya', email: 'priya@example.com', status: EmailRecipientStatus.PENDING };
+    const { service, prisma, email, clientEmailSender } = buildService({
+      campaign: { id: 'campaign-1', clientId: 'client-1', status: EmailCampaignStatus.QUEUED, subject: 'Hi', bodyTemplate: 'Hello {{name}}!' },
+      recipients: [recipient],
+    });
+    prisma.emailRecipient.count = vi.fn(() => Promise.resolve(0)) as any;
+    const sender = { name: 'Upshift Services', email: 'info@upshiftservices.com' };
+    clientEmailSender.resolveSenderForSend = vi.fn(() => Promise.resolve(sender));
+
+    await service.processQueuedCampaigns();
+
+    expect(clientEmailSender.resolveSenderForSend).toHaveBeenCalledWith('client-1');
+    expect(email.send).toHaveBeenCalledWith('priya@example.com', 'Hi', expect.any(String), sender, expect.any(String));
   });
 
   it('marks a failed delivery as FAILED, not SENT, correcting the optimistic claim', async () => {

@@ -10,6 +10,7 @@ import { UpdateEmailCampaignDto } from './dto/update-email-campaign.dto.js';
 import { BulkImportRecipientsDto } from './dto/bulk-import-recipients.dto.js';
 import { EmailCampaignStatus, EmailRecipientStatus, Role } from '../generated/prisma/client.js';
 import { requireInClient } from '../common/require-in-client.js';
+import { ClientEmailSenderService } from './client-email-sender.service.js';
 
 const DEFAULT_BATCH_SIZE = 20;
 const MERGE_FIELD = /\{\{\s*name\s*\}\}/gi;
@@ -22,10 +23,31 @@ export class EmailCampaignsService {
     private email: EmailService,
     private config: ConfigService,
     private notifications: NotificationsService,
+    private clientEmailSender: ClientEmailSenderService,
   ) {}
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // The campaign body is agency-authored plain text — escape it before embedding in HTML (it's
+  // not already safe markup) and turn newlines into <br> so paragraph breaks still show up.
+  private renderHtmlBody(mergedBody: string, unsubscribeLink: string): string {
+    const safeBody = this.escapeHtml(mergedBody).replace(/\n/g, '<br>');
+    return `<div style="font-family:sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5;">${safeBody}</div>
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#666;font-family:sans-serif;">
+  Don't want these emails?
+  <a href="${unsubscribeLink}" style="display:inline-block;margin-left:6px;padding:6px 14px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;">Unsubscribe</a>
+</div>`;
   }
 
   async create(clientId: string, actorId: string, dto: CreateEmailCampaignDto) {
@@ -187,6 +209,7 @@ export class EmailCampaignsService {
         'Add at least one recipient who is not already unsubscribed before sending',
       );
     }
+    await this.clientEmailSender.checkQuota(clientId, pendingCount);
 
     const queued = await this.prisma.emailCampaign.update({
       where: { id },
@@ -234,6 +257,7 @@ export class EmailCampaignsService {
         'Add at least one recipient who is not already unsubscribed before requesting a send',
       );
     }
+    await this.clientEmailSender.checkQuota(clientId, pendingCount);
 
     const client = await this.prisma.client.findUnique({
       where: { id: campaign.clientId },
@@ -285,6 +309,7 @@ export class EmailCampaignsService {
     if (pendingCount === 0) {
       throw new BadRequestException('No pending recipients remain to send to');
     }
+    await this.clientEmailSender.checkQuota(clientId, pendingCount);
 
     const now = new Date();
     const approved = await this.prisma.emailCampaign.update({
@@ -375,6 +400,10 @@ export class EmailCampaignsService {
         });
       }
 
+      // null when the client has no verified sender on file — email.send() then falls back to
+      // the platform default exactly as it always has, so unconfigured clients keep working.
+      const sender = await this.clientEmailSender.resolveSenderForSend(campaign.clientId);
+
       const pending = await this.prisma.emailRecipient.findMany({
         where: { campaignId: campaign.id, status: EmailRecipientStatus.PENDING },
         take: batchSize,
@@ -413,11 +442,11 @@ export class EmailCampaignsService {
 
         const rawToken = randomBytes(32).toString('hex');
         const unsubscribeLink = `${appUrl}/unsubscribe?token=${rawToken}`;
-        const body =
-          campaign.bodyTemplate.replace(MERGE_FIELD, recipient.name) +
-          `\n\n---\nDon't want these emails? Unsubscribe: ${unsubscribeLink}`;
+        const mergedBody = campaign.bodyTemplate.replace(MERGE_FIELD, recipient.name);
+        const body = mergedBody + `\n\n---\nDon't want these emails? Unsubscribe: ${unsubscribeLink}`;
+        const html = this.renderHtmlBody(mergedBody, unsubscribeLink);
 
-        const delivered = await this.email.send(recipient.email, campaign.subject, body);
+        const delivered = await this.email.send(recipient.email, campaign.subject, body, sender ?? undefined, html);
 
         if (delivered) {
           await this.prisma.emailRecipient.update({

@@ -15,8 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DURATION, EASE_SOFT, fadeUp, staggerContainer } from '@/lib/motion';
-import { STATUS_TONE, RECIPIENT_TONE } from './types';
-import type { CampaignSummary, CampaignDetail } from './types';
+import { STATUS_TONE, RECIPIENT_TONE, SENDER_STATUS_TONE } from './types';
+import type { CampaignSummary, CampaignDetail, SenderConfig, SenderDnsRecord } from './types';
 import {
   fetchCampaigns,
   fetchCampaignDetail,
@@ -28,6 +28,9 @@ import {
   requestSendCampaign,
   approveSendCampaign,
   rejectSendCampaign,
+  fetchSenderConfig,
+  upsertSenderConfig,
+  checkSenderVerification,
 } from './api/email-campaigns-api';
 import { parseCsvLine } from './utils';
 
@@ -66,6 +69,18 @@ function EmailCampaignsPageContent() {
   const [editBody, setEditBody] = useState('');
   const [savingDetails, setSavingDetails] = useState(false);
 
+  const [sender, setSender] = useState<SenderConfig | null>(null);
+  const [senderLoaded, setSenderLoaded] = useState(false);
+  const [dnsRecords, setDnsRecords] = useState<SenderDnsRecord[] | null>(null);
+  const [senderName, setSenderName] = useState('');
+  const [senderEmail, setSenderEmail] = useState('');
+  const [dailySendLimit, setDailySendLimit] = useState('');
+  const [monthlySendLimit, setMonthlySendLimit] = useState('');
+  const [savingSender, setSavingSender] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
+  const [senderMessage, setSenderMessage] = useState<string | null>(null);
+  const [senderError, setSenderError] = useState<string | null>(null);
+
   function loadCampaigns() {
     if (!selectedClientId) return;
     fetchCampaigns(selectedClientId)
@@ -79,11 +94,30 @@ function EmailCampaignsPageContent() {
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load campaign'));
   }
 
+  function loadSender() {
+    if (!selectedClientId || !canSend) return;
+    setSenderLoaded(false);
+    fetchSenderConfig(selectedClientId)
+      .then((config) => {
+        setSender(config);
+        setSenderName(config?.senderName ?? '');
+        setSenderEmail(config?.senderEmail ?? '');
+        setDailySendLimit(config?.dailySendLimit != null ? String(config.dailySendLimit) : '');
+        setMonthlySendLimit(config?.monthlySendLimit != null ? String(config.monthlySendLimit) : '');
+      })
+      .catch(() => setSender(null))
+      .finally(() => setSenderLoaded(true));
+  }
+
   useEffect(() => {
     setSelected(null);
     setCampaigns(null);
     setEditingDetails(false);
+    setDnsRecords(null);
+    setSenderMessage(null);
+    setSenderError(null);
     loadCampaigns();
+    loadSender();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId]);
 
@@ -244,6 +278,49 @@ function EmailCampaignsPageContent() {
     }
   }
 
+  async function onSaveSender(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedClientId) return;
+    setSavingSender(true);
+    setSenderError(null);
+    setSenderMessage(null);
+    try {
+      const result = await upsertSenderConfig(selectedClientId, {
+        senderName,
+        senderEmail,
+        ...(dailySendLimit ? { dailySendLimit: Number(dailySendLimit) } : {}),
+        ...(monthlySendLimit ? { monthlySendLimit: Number(monthlySendLimit) } : {}),
+      });
+      setSender(result.sender);
+      setDnsRecords(result.dnsRecords);
+      setSenderMessage(
+        result.dnsRecords
+          ? 'Saved. Add the DNS records below, then check verification once they have propagated.'
+          : 'Saved.',
+      );
+    } catch (err) {
+      setSenderError(err instanceof ApiError ? err.message : 'Failed to save sender settings');
+    } finally {
+      setSavingSender(false);
+    }
+  }
+
+  async function onCheckVerification() {
+    if (!selectedClientId) return;
+    setCheckingVerification(true);
+    setSenderError(null);
+    setSenderMessage(null);
+    try {
+      const result = await checkSenderVerification(selectedClientId);
+      setSender(result.sender);
+      setSenderMessage(result.message);
+    } catch (err) {
+      setSenderError(err instanceof ApiError ? err.message : 'Failed to check verification');
+    } finally {
+      setCheckingVerification(false);
+    }
+  }
+
   const isDraft = selected?.status === 'DRAFT';
   const isPendingApproval = selected?.status === 'PENDING_APPROVAL';
 
@@ -272,6 +349,105 @@ function EmailCampaignsPageContent() {
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <motion.div variants={fadeUp} transition={{ duration: DURATION.base, ease: EASE_SOFT }} className="space-y-4">
+          {canSend && selectedClientId && (
+            <Card padding="md">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-neutral-50">Sender settings</h2>
+                {sender && <Badge tone={SENDER_STATUS_TONE[sender.verificationStatus]}>{sender.verificationStatus}</Badge>}
+              </div>
+
+              {!senderLoaded ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-neutral-400">
+                    {sender
+                      ? 'Campaigns for this client send from this identity once verified.'
+                      : 'No sender configured yet — campaigns send from the platform default.'}
+                  </p>
+                  <form onSubmit={onSaveSender} className="space-y-3">
+                    <Input
+                      label="From name"
+                      required
+                      value={senderName}
+                      onChange={(e) => setSenderName(e.target.value)}
+                    />
+                    <Input
+                      label="From email"
+                      type="email"
+                      required
+                      value={senderEmail}
+                      onChange={(e) => setSenderEmail(e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        label="Daily limit"
+                        type="number"
+                        min={1}
+                        placeholder="None"
+                        value={dailySendLimit}
+                        onChange={(e) => setDailySendLimit(e.target.value)}
+                      />
+                      <Input
+                        label="Monthly limit"
+                        type="number"
+                        min={1}
+                        placeholder="None"
+                        value={monthlySendLimit}
+                        onChange={(e) => setMonthlySendLimit(e.target.value)}
+                      />
+                    </div>
+                    <Button type="submit" size="sm" loading={savingSender} className="w-full">
+                      Save sender
+                    </Button>
+                  </form>
+
+                  {senderError && (
+                    <p className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                      {senderError}
+                    </p>
+                  )}
+                  {senderMessage && !senderError && (
+                    <p className="rounded-lg border border-accent-400/30 bg-accent-500/10 px-3 py-2 text-xs text-accent-200">
+                      {senderMessage}
+                    </p>
+                  )}
+
+                  {(dnsRecords || sender?.verificationStatus === 'PENDING') && (
+                    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                      <p className="text-xs font-medium text-neutral-300">DNS records to add at your domain host</p>
+                      {dnsRecords ? (
+                        <ul className="space-y-1.5">
+                          {dnsRecords.map((r, i) => (
+                            <li key={i} className="text-xs text-neutral-400">
+                              <span className="font-mono text-neutral-300">{r.type}</span> —{' '}
+                              <span className="break-all font-mono">{r.hostName}</span>:{' '}
+                              <span className="break-all font-mono">{r.value}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-neutral-500">
+                          Save the sender again to retrieve the DNS records from the provider.
+                        </p>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        loading={checkingVerification}
+                        onClick={onCheckVerification}
+                        className="w-full"
+                      >
+                        Check verification
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
           <Card padding="md">
             <h2 className="mb-3 text-sm font-semibold text-neutral-50">New campaign</h2>
             <form onSubmit={onCreate} className="space-y-3">

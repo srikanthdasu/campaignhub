@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { CampaignSummary, CampaignDetail } from '../types';
+import type { CampaignSummary, CampaignDetail, SenderConfig, SenderUpsertResult, SenderVerifyResult } from '../types';
 
 export function fetchCampaigns(clientId: string) {
   return api.get<CampaignSummary[]>(`/clients/${clientId}/email-campaigns`);
@@ -50,4 +50,19 @@ export function approveSendCampaign(clientId: string, id: string) {
 
 export function rejectSendCampaign(clientId: string, id: string, reason: string) {
   return api.post(`/clients/${clientId}/email-campaigns/${id}/reject-send`, { reason });
+}
+
+export function fetchSenderConfig(clientId: string) {
+  return api.get<SenderConfig | null>(`/clients/${clientId}/email-sender`);
+}
+
+export function upsertSenderConfig(
+  clientId: string,
+  payload: { senderName: string; senderEmail: string; dailySendLimit?: number; monthlySendLimit?: number },
+) {
+  return api.put<SenderUpsertResult>(`/clients/${clientId}/email-sender`, payload);
+}
+
+export function checkSenderVerification(clientId: string) {
+  return api.post<SenderVerifyResult>(`/clients/${clientId}/email-sender/verify`);
 }
