@@ -67,6 +67,14 @@ export async function createApp(): Promise<NestExpressApplication> {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      // helmet's *default* Cross-Origin-Opener-Policy ('same-origin') severs this page's link to
+      // any cross-origin popup it opens — including WhatsApp Embedded Signup's Facebook popup.
+      // The SDK needs that link to drive its multi-step wizard (business/WABA/phone-number
+      // screens) after the initial identity-confirm screen; with it severed the popup just closes
+      // with no visible error the moment that screen tries to proceed (confirmed in prod: FB.login
+      // never calls back with an authResponse.code). 'same-origin-allow-popups' still isolates this
+      // page from popups *other* sites open on it, while letting it talk to popups it opens itself.
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
