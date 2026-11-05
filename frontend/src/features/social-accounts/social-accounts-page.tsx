@@ -107,7 +107,12 @@ function SocialAccountsPageContent() {
   // usually just before) FB.login's own callback — stash it in a ref that onConnectWhatsApp reads.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (event.origin !== 'https://www.facebook.com' || typeof event.data !== 'string') return;
+      if (event.origin !== 'https://www.facebook.com') return;
+      // TEMPORARY: diagnosing why phone_number_id sometimes never arrives for an
+      // already-registered number — remove once confirmed.
+      // eslint-disable-next-line no-console
+      console.log('[WA debug] message from facebook.com:', event.data);
+      if (typeof event.data !== 'string') return;
       let data: unknown;
       try {
         data = JSON.parse(event.data);
@@ -209,6 +214,9 @@ function SocialAccountsPageContent() {
   }
 
   async function handleWhatsAppLoginResponse(response: { authResponse?: { code?: string } }) {
+    // TEMPORARY: see handleMessage above — remove once confirmed.
+    // eslint-disable-next-line no-console
+    console.log('[WA debug] FB.login response:', response);
     const code = response.authResponse?.code;
     if (!code) {
       setError('WhatsApp connection was cancelled or failed');
