@@ -640,7 +640,7 @@ function AgencyAdminPageContent() {
                 placeholder="Notes"
                 value={details.notes}
                 onChange={(e) => setDetails((p) => (p ? { ...p, notes: e.target.value } : p))}
-                rows={2}
+                rows={4}
               />
               <Button size="sm" className="w-full" loading={savingDetails} onClick={onSaveDetails}>
                 Save Details
@@ -809,7 +809,7 @@ function AgencyAdminPageContent() {
                 placeholder="Voice guidelines"
                 value={brandKit.voiceGuidelines ?? ''}
                 onChange={(e) => setBrandKit((p) => ({ ...p, voiceGuidelines: e.target.value }))}
-                rows={2}
+                rows={4}
               />
               <Button size="sm" className="w-full" loading={savingBrandKit} onClick={onSaveBrandKit}>
                 Save Brand Kit

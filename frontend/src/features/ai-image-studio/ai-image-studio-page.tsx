@@ -238,7 +238,7 @@ function AiImageStudioPageContent() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Describe what you want — e.g. bright colors, sunglasses, beach background, discount text"
-                    rows={3}
+                    rows={5}
                   />
                   <div className="flex flex-wrap gap-1">
                     {SUGGESTED_PROMPTS.map((p) => (

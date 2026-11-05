@@ -178,7 +178,7 @@ export function StrategyWorkspace({ clientId }: { clientId: string }) {
                 value={contextNote}
                 onChange={(e) => setContextNote(e.target.value)}
                 placeholder="Context (permitted data / notes)"
-                rows={2}
+                rows={4}
               />
               <Button type="submit" size="sm" className="w-full" loading={busy}>
                 <Plus className="h-3.5 w-3.5" /> Create
@@ -234,7 +234,7 @@ export function StrategyWorkspace({ clientId }: { clientId: string }) {
                         value={reviewNote}
                         onChange={(e) => setReviewNote(e.target.value)}
                         placeholder="Review note (optional)"
-                        rows={2}
+                        rows={3}
                       />
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => onReview('APPROVED')} loading={busy}>

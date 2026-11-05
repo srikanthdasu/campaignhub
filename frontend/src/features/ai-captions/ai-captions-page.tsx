@@ -126,7 +126,7 @@ function AiCaptionsPageContent() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="What's the post about? e.g. New summer collection launch for women."
-                  rows={3}
+                  rows={5}
                   required
                 />
                 <div className="grid grid-cols-2 gap-3">

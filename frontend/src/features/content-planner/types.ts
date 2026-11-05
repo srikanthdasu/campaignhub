@@ -49,6 +49,10 @@ export interface CaptionVariant {
   hashtags: string[];
 }
 
+export interface SavedCaptionOption extends CaptionVariant {
+  id: string;
+}
+
 export interface CampaignOption {
   id: string;
   name: string;

@@ -58,6 +58,40 @@ export class MediaService {
     return this.signAsset(asset);
   }
 
+  // For content that's already uploaded to blob storage by another feature (currently: an
+  // exported AiVideoProject's videoUrl) and just needs to become a real, listable MediaAsset —
+  // same create+audit+signed-URL shape as generateImage()/recordUpload() above, minus the
+  // generation/upload step, since there's nothing left to generate or upload.
+  async recordExisting(
+    clientId: string,
+    actorId: string,
+    data: { type: MediaType; storageUrl: string; fileName: string; aiProvider?: string; prompt?: string },
+  ) {
+    const asset = await this.prisma.mediaAsset.create({
+      data: {
+        clientId,
+        type: data.type,
+        storageUrl: data.storageUrl,
+        fileName: data.fileName,
+        folder: undefined,
+        tags: [],
+        aiProvider: data.aiProvider,
+        prompt: data.prompt,
+        uploadedById: actorId,
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'MEDIA_AI_GENERATED',
+      entityType: 'media_asset',
+      entityId: asset.id,
+      metadata: { prompt: data.prompt, source: 'ai-video-studio' },
+    });
+
+    return this.signAsset(asset);
+  }
+
   async recordUpload(
     clientId: string,
     actorId: string,

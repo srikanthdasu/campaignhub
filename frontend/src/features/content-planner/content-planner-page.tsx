@@ -37,6 +37,7 @@ import {
   fetchClientAccess,
   fetchContent,
   fetchMediaAssets,
+  fetchSavedCaptions,
   generateCaptions,
   generateImage,
   publishScheduledPost,
@@ -52,6 +53,7 @@ import {
   type ContentItem,
   type MediaAssetOption,
   type Member,
+  type SavedCaptionOption,
 } from './types';
 import { buildContentBody } from './utils';
 
@@ -88,6 +90,7 @@ function ContentPlannerPageContent() {
   const [aiTopic, setAiTopic] = useState('');
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
   const [captionVariants, setCaptionVariants] = useState<CaptionVariant[] | null>(null);
+  const [savedCaptions, setSavedCaptions] = useState<SavedCaptionOption[]>([]);
 
   const [aiImagePrompt, setAiImagePrompt] = useState('');
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -123,6 +126,10 @@ function ContentPlannerPageContent() {
     fetchMediaAssets(clientId).then(setMediaAssets).catch(() => setMediaAssets([]));
   }
 
+  function loadSavedCaptions(clientId: string) {
+    fetchSavedCaptions(clientId).then(setSavedCaptions).catch(() => setSavedCaptions([]));
+  }
+
   useEffect(() => {
     if (!selectedClientId) return;
     loadItems(selectedClientId);
@@ -135,6 +142,10 @@ function ContentPlannerPageContent() {
       )
       .catch(() => setMembers([]));
     loadMedia(selectedClientId);
+    // Saved captions come from both this page's own "Generate" + a future Save action and the
+    // standalone AI Captions studio (/ai-captions) — same client-scoped AiCaption table either
+    // way, so whichever page generated it, it's pickable here too.
+    loadSavedCaptions(selectedClientId);
     fetchCampaigns(selectedClientId).then(setCampaigns).catch(() => setCampaigns([]));
   }, [selectedClientId]);
 
@@ -417,7 +428,7 @@ function ContentPlannerPageContent() {
                   placeholder="Content / caption"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  rows={3}
+                  rows={5}
                 />
                 <Input placeholder="Hashtags" value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
                 <Input placeholder="Mentions" value={mentions} onChange={(e) => setMentions(e.target.value)} />
@@ -435,24 +446,40 @@ function ContentPlannerPageContent() {
             {/* 5. AI Captions */}
             <Card padding="lg">
               <PanelHeader n={5} title="AI Captions" icon={Sparkles} color="#d946ef" />
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    placeholder="What's this post about?"
-                    value={aiTopic}
-                    onChange={(e) => setAiTopic(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Textarea
+                  rows={5}
+                  placeholder="What's this post about?"
+                  value={aiTopic}
+                  onChange={(e) => setAiTopic(e.target.value)}
+                />
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
+                  className="w-full"
                   loading={generatingCaptions}
                   disabled={!aiTopic.trim() || !selectedClientId}
                   onClick={onGenerateCaptions}
                 >
                   Generate
                 </Button>
+                {savedCaptions.length > 0 && (
+                  <Select
+                    value=""
+                    onChange={(e) => {
+                      const saved = savedCaptions.find((c) => c.id === e.target.value);
+                      if (saved) useCaptionVariant(saved);
+                    }}
+                  >
+                    <option value="">Use a saved caption…</option>
+                    {savedCaptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.text.length > 60 ? `${c.text.slice(0, 60)}…` : c.text}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </div>
               {captionVariants && (
                 <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
@@ -476,25 +503,23 @@ function ContentPlannerPageContent() {
             <Card padding="lg">
               <PanelHeader n={6} title="Add Media" icon={ImageIcon} color="#8b5cf6" />
               <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Describe an AI image…"
-                      value={aiImagePrompt}
-                      onChange={(e) => setAiImagePrompt(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    loading={generatingImage}
-                    disabled={!aiImagePrompt.trim() || !selectedClientId}
-                    onClick={onGenerateImage}
-                  >
-                    Generate
-                  </Button>
-                </div>
+                <Textarea
+                  rows={5}
+                  placeholder="Describe an AI image…"
+                  value={aiImagePrompt}
+                  onChange={(e) => setAiImagePrompt(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  loading={generatingImage}
+                  disabled={!aiImagePrompt.trim() || !selectedClientId}
+                  onClick={onGenerateImage}
+                >
+                  Generate
+                </Button>
                 <Select value={mediaAssetId} onChange={(e) => setMediaAssetId(e.target.value)}>
                   <option value="">No media</option>
                   {mediaAssets.map((m) => (

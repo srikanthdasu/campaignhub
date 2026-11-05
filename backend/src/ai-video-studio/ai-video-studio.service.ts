@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AzureAiFoundryService } from '../ai-common/azure-ai-foundry.service.js';
@@ -13,7 +13,7 @@ import { UpdateStoryboardDto } from './dto/update-storyboard.dto.js';
 import { UpdateAssetsDto } from './dto/update-assets.dto.js';
 import { UpdateEnhancementsDto } from './dto/update-enhancements.dto.js';
 import { ExportVideoDto } from './dto/export-video.dto.js';
-import { AiVideoStep } from '../generated/prisma/client.js';
+import { AiVideoStep, MediaType } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 // Script generation and the render preview image call Azure AI Foundry (chat, MAI-Image); the
@@ -57,6 +57,23 @@ export class AiVideoStudioService {
     private blobStorage: BlobStorageService,
     private media: MediaService,
   ) {}
+
+  // Bridges an exported video into the shared MediaAsset pool — that's the only way to reach
+  // Content Planner/Approvals/Scheduler today (ScheduledPost.contentItemId is non-null). The
+  // video bytes are already uploaded by export() below; this just registers the existing URL.
+  async promoteToMedia(clientId: string, id: string, actorId: string) {
+    const project = await this.requireInClient(id, clientId);
+    if (!project.videoUrl) {
+      throw new BadRequestException('Export this video before adding it to Content Planner.');
+    }
+    return this.media.recordExisting(clientId, actorId, {
+      type: MediaType.VIDEO,
+      storageUrl: project.videoUrl,
+      fileName: `${project.title.slice(0, 60).trim() || 'ai-video'}.mp4`,
+      aiProvider: 'magic-hour',
+      prompt: project.idea ?? undefined,
+    });
+  }
 
   async create(clientId: string, actorId: string, dto: CreateVideoProjectDto) {
     const project = await this.prisma.aiVideoProject.create({

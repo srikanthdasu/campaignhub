@@ -42,6 +42,10 @@ export interface VideoProject {
   updatedAt: string;
 }
 
+export interface MediaAssetRef {
+  id: string;
+}
+
 export const ENHANCE_TOGGLES: { key: keyof Enhancements; label: string }[] = [
   { key: 'autoCut', label: 'Auto Cut' },
   { key: 'smoothTransitions', label: 'Smooth Transitions' },

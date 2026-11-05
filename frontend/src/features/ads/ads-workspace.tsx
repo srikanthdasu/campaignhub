@@ -307,7 +307,7 @@ export function AdsWorkspace({ clientId }: { clientId: string }) {
                         defaultValue={active.audienceNotes ?? ''}
                         disabled={!editable}
                         onBlur={(e) => e.target.value !== (active.audienceNotes ?? '') && patch({ audienceNotes: e.target.value })}
-                        rows={3}
+                        rows={5}
                         placeholder="Who should this reach? e.g. Women 25-40, US, interested in fitness"
                         className="disabled:opacity-50"
                       />

@@ -81,6 +81,36 @@ describe('MediaService.generateImage', () => {
   });
 });
 
+describe('MediaService.recordExisting', () => {
+  it('registers an already-uploaded video as a real MediaAsset without re-uploading', async () => {
+    const { service, blobStorage, foundry, prisma } = buildService();
+    const asset = await service.recordExisting('client-1', 'actor-1', {
+      type: 'VIDEO' as any,
+      storageUrl: '/uploads/already-there.mp4',
+      fileName: 'my-video.mp4',
+      aiProvider: 'magic-hour',
+      prompt: 'a product demo',
+    });
+
+    expect(blobStorage.upload).not.toHaveBeenCalled();
+    expect(foundry.generateImage).not.toHaveBeenCalled();
+    expect(prisma.mediaAsset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clientId: 'client-1',
+          type: 'VIDEO',
+          storageUrl: '/uploads/already-there.mp4',
+          fileName: 'my-video.mp4',
+          aiProvider: 'magic-hour',
+          prompt: 'a product demo',
+          uploadedById: 'actor-1',
+        }),
+      }),
+    );
+    expect(asset.id).toBe('asset-generated');
+  });
+});
+
 describe('MediaService', () => {
   it('rejects updating an asset that belongs to a different client', async () => {
     const { service } = buildService({ asset: { id: 'asset-1', clientId: 'other-client' } });

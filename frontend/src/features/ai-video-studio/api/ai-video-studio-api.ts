@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { Enhancements, Scene, VideoProject } from '../types';
+import type { Enhancements, MediaAssetRef, Scene, VideoProject } from '../types';
 
 export function fetchProjects(clientId: string) {
   return api.get<VideoProject[]>(`/clients/${clientId}/ai-video-studio/projects`);
@@ -35,6 +35,10 @@ export function renderPreview(clientId: string, id: string) {
 
 export function exportVideo(clientId: string, id: string, payload: { format: string }) {
   return api.post(`/clients/${clientId}/ai-video-studio/projects/${id}/export`, payload);
+}
+
+export function promoteToMedia(clientId: string, id: string) {
+  return api.post<MediaAssetRef>(`/clients/${clientId}/ai-video-studio/projects/${id}/promote-to-media`);
 }
 
 export function publishProject(clientId: string, id: string) {

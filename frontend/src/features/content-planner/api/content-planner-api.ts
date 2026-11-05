@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { CampaignOption, CaptionVariant, ContentItem, MediaAssetOption, Member } from '../types';
+import type { CampaignOption, CaptionVariant, ContentItem, MediaAssetOption, Member, SavedCaptionOption } from '../types';
 
 export function fetchContent(clientId: string) {
   return api.get<ContentItem[]>(`/clients/${clientId}/content`);
@@ -19,6 +19,10 @@ export function fetchCampaigns(clientId: string) {
 
 export function generateCaptions(clientId: string, input: string, platform: string | undefined) {
   return api.post<CaptionVariant[]>(`/clients/${clientId}/ai-captions/generate`, { input, platform });
+}
+
+export function fetchSavedCaptions(clientId: string) {
+  return api.get<SavedCaptionOption[]>(`/clients/${clientId}/ai-captions`);
 }
 
 export function generateImage(clientId: string, prompt: string) {

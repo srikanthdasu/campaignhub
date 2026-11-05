@@ -336,7 +336,7 @@ export function MediaLibraryPage() {
                       placeholder="Description"
                       value={descDraft}
                       onChange={(e) => setDescDraft(e.target.value)}
-                      rows={2}
+                      rows={4}
                     />
                     {canManage ? (
                       <Button

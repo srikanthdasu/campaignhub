@@ -111,6 +111,16 @@ export class AiVideoStudioController {
     return this.aiVideoStudioService.export(clientId, id, user.sub, dto);
   }
 
+  @Post(':id/promote-to-media')
+  @Roles(...CAN_CREATE)
+  promoteToMedia(
+    @Param('clientId') clientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.aiVideoStudioService.promoteToMedia(clientId, id, user.sub);
+  }
+
   @Post(':id/publish')
   @Roles(...CAN_CREATE)
   publish(

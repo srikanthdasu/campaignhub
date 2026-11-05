@@ -297,7 +297,7 @@ export function SchedulerWorkspace({
                   placeholder="Write something amazing…"
                   value={newBody}
                   onChange={(e) => setNewBody(e.target.value)}
-                  rows={3}
+                  rows={5}
                 />
                 <Select value={newMediaAssetId} onChange={(e) => setNewMediaAssetId(e.target.value)}>
                   <option value="">No media</option>

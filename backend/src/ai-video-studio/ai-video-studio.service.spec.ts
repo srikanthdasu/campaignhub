@@ -50,6 +50,9 @@ function buildService(
   };
   const media = {
     requireInClient: vi.fn(overrides.mediaRequireInClient ?? (() => Promise.resolve({}))),
+    recordExisting: vi.fn((clientId: string, actorId: string, data: any) =>
+      Promise.resolve({ id: 'asset-promoted', clientId, uploadedById: actorId, ...data }),
+    ),
   };
   const service = new AiVideoStudioService(
     prisma as unknown as PrismaService,
@@ -282,5 +285,47 @@ describe('AiVideoStudioService.export', () => {
     await expect(
       service.export('client-1', 'proj-1', 'actor-1', { format: 'MP4' } as any),
     ).rejects.toThrow('Video project not found for this client');
+  });
+});
+
+describe('AiVideoStudioService.promoteToMedia', () => {
+  it('registers the already-exported video as a real MediaAsset, with no re-upload', async () => {
+    const { service, media, blobStorage } = buildService({
+      project: {
+        id: 'proj-1',
+        clientId: 'client-1',
+        title: 'Launch Teaser',
+        idea: 'eco water bottle launch',
+        videoUrl: '/uploads/fake-generated.mp4',
+        step: AiVideoStep.EXPORT,
+      },
+    });
+    const asset = await service.promoteToMedia('client-1', 'proj-1', 'actor-1');
+
+    expect(blobStorage.upload).not.toHaveBeenCalled();
+    expect(media.recordExisting).toHaveBeenCalledWith('client-1', 'actor-1', {
+      type: 'VIDEO',
+      storageUrl: '/uploads/fake-generated.mp4',
+      fileName: 'Launch Teaser.mp4',
+      aiProvider: 'magic-hour',
+      prompt: 'eco water bottle launch',
+    });
+    expect(asset.id).toBe('asset-promoted');
+  });
+
+  it('rejects promoting a project that has not been exported yet', async () => {
+    const { service } = buildService({
+      project: { id: 'proj-1', clientId: 'client-1', title: 'Launch Teaser', idea: null, videoUrl: null, step: AiVideoStep.PREVIEW },
+    });
+    await expect(service.promoteToMedia('client-1', 'proj-1', 'actor-1')).rejects.toThrow(
+      'Export this video before adding it to Content Planner.',
+    );
+  });
+
+  it('rejects promoting a project from a different client', async () => {
+    const { service } = buildService({ project: { id: 'proj-1', clientId: 'other-client', step: AiVideoStep.EXPORT } });
+    await expect(service.promoteToMedia('client-1', 'proj-1', 'actor-1')).rejects.toThrow(
+      'Video project not found for this client',
+    );
   });
 });

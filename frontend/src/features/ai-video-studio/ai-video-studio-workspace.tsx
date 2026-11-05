@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ApiError, resolveMediaUrl } from '@/lib/api';
 import { Card } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import {
   fetchProjectDetail,
   fetchProjects,
   generateScript,
+  promoteToMedia,
   publishProject,
   renderPreview,
   saveAssets,
@@ -27,11 +29,13 @@ import {
 import { STEPS, ENHANCE_TOGGLES, type Enhancements, type Scene, type StepKey, type VideoProject } from './types';
 
 export function VideoStudioWorkspace({ clientId }: { clientId: string }) {
+  const router = useRouter();
   const [projects, setProjects] = useState<VideoProject[] | null>(null);
   const [active, setActive] = useState<VideoProject | null>(null);
   const [activeTab, setActiveTab] = useState<StepKey>('IDEA');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [promoting, setPromoting] = useState(false);
 
   const [newTitle, setNewTitle] = useState('');
   const [newIdea, setNewIdea] = useState('');
@@ -174,6 +178,19 @@ export function VideoStudioWorkspace({ clientId }: { clientId: string }) {
     }
   }
 
+  async function onUseInContentPlanner() {
+    if (!active) return;
+    setPromoting(true);
+    setError(null);
+    try {
+      const asset = await promoteToMedia(clientId, active.id);
+      router.push(`/content-planner?client=${clientId}&media=${asset.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to add to Content Planner');
+      setPromoting(false);
+    }
+  }
+
   async function onPublish() {
     if (!active) return;
     setBusy(true);
@@ -263,7 +280,7 @@ export function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                 value={newIdea}
                 onChange={(e) => setNewIdea(e.target.value)}
                 placeholder="Idea or topic"
-                rows={2}
+                rows={5}
               />
               <Button type="submit" size="sm" className="w-full" loading={busy}>
                 <Plus className="h-3.5 w-3.5" /> Create Project
@@ -334,7 +351,7 @@ export function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                         <Textarea
                           value={scene.description}
                           onChange={(e) => updateScene(i, { description: e.target.value })}
-                          rows={2}
+                          rows={3}
                           className="text-xs"
                         />
                         <div className="flex items-center gap-2 text-xs text-neutral-400">
@@ -461,6 +478,9 @@ export function VideoStudioWorkspace({ clientId }: { clientId: string }) {
                         {active.exportFormat && (
                           <p className="text-xs text-neutral-400">Last exported as {active.exportFormat}.</p>
                         )}
+                        <Button size="sm" variant="secondary" onClick={onUseInContentPlanner} loading={promoting}>
+                          Use in Content Planner →
+                        </Button>
                       </div>
                     ) : (
                       <p className="text-sm text-neutral-400">Not exported yet.</p>
