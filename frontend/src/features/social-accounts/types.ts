@@ -14,7 +14,7 @@ declare global {
           config_id: string;
           response_type: string;
           override_default_response_type: boolean;
-          extras?: { setup: Record<string, never>; sessionInfoVersion?: string };
+          extras?: { setup: Record<string, never>; featureType?: string; sessionInfoVersion?: string };
         },
       ) => void;
     };

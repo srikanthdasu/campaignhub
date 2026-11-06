@@ -214,7 +214,11 @@ function SocialAccountsPageContent() {
       // sends its internal relay/proxy message (plain "cb=...&domain=...&code=..." query string,
       // not JSON), so JSON.parse in handleMessage throws, gets swallowed, and phoneNumberId never
       // arrives (confirmed in prod console: that's exactly the only message event received).
-      extras: { setup: {}, sessionInfoVersion: '3' },
+      // featureType must also be present (even empty) alongside sessionInfoVersion -- Meta's SDK
+      // only switches on the WA_EMBEDDED_SIGNUP message path when both are set together; with
+      // sessionInfoVersion alone (no featureType) it still only sent the relay message (confirmed
+      // in prod console after deploying sessionInfoVersion by itself).
+      extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
     });
   }
 
