@@ -209,7 +209,12 @@ function SocialAccountsPageContent() {
       config_id: WHATSAPP_CONFIG_ID,
       response_type: 'code',
       override_default_response_type: true,
-      extras: { setup: {} },
+      // sessionInfoVersion opts into Meta's newer postMessage events (WA_EMBEDDED_SIGNUP with
+      // phone_number_id/waba_id) that handleMessage above listens for — without it the popup only
+      // sends its internal relay/proxy message (plain "cb=...&domain=...&code=..." query string,
+      // not JSON), so JSON.parse in handleMessage throws, gets swallowed, and phoneNumberId never
+      // arrives (confirmed in prod console: that's exactly the only message event received).
+      extras: { setup: {}, sessionInfoVersion: '3' },
     });
   }
 
